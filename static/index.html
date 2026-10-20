@@ -1,0 +1,1206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse Command Center</title>
+<link rel="icon" type="image/jpeg" href="/static/logo.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@2.3.1/dist/chartjs-chart-treemap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey@0.12.1/dist/chartjs-chart-sankey.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f6fa; --surface-1: #ffffff; --surface-2: #f6f8fb; --surface-3: #eef2f8; --border: #e6e9ef; --border-strong: #d9dee7;
+  --text-primary: #0f1b33; --text-secondary: #5b6478; --text-muted: #8a93a6;
+  --accent: #1f6bff; --accent-hover: #1658d6; --accent-soft: #eaf1ff; --grid: #eef0f4;
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100;
+  --series-5: #e87ba4; --series-6: #008300; --series-7: #6250d6; --series-8: #e34948;
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  --serif: "Source Serif 4", Georgia, serif;
+  --shadow: 0 10px 30px -12px rgba(31, 54, 99, .18), 0 2px 6px rgba(31, 54, 99, .05);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text-primary); font: 14px/1.45 Inter, system-ui, sans-serif; }
+button { font: inherit; }
+.app { display: grid; grid-template-columns: auto 1fr; min-height: 100vh; }
+
+/* ---------- side rail ---------- */
+.rail { width: 260px; background: var(--surface-1); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; transition: width .18s; overflow: hidden; }
+.rail.collapsed { width: 64px; }
+.rail .logo { display: flex; align-items: center; gap: 10px; padding: 14px 14px 6px; }
+.logo-img { width: 44px; height: 44px; flex: none; border-radius: 10px; object-fit: contain; background: #fff; border: 1px solid var(--border); padding: 2px; }
+.rail.collapsed .logo { padding-left: 10px; }
+.logo-mark { width: 36px; height: 36px; flex: none; border-radius: 11px; display: grid; place-items: center; color: #fff; font-weight: 700; font-family: var(--serif); font-size: 20px;
+  background: linear-gradient(135deg, #1f6bff, #4aa3ff); box-shadow: 0 4px 10px -3px rgba(31,107,255,.5); }
+.logo-text { font-weight: 700; letter-spacing: .3px; white-space: nowrap; }
+.logo-text small { display: block; font-weight: 500; font-size: 11px; color: var(--text-muted); letter-spacing: 0; }
+.rail .toggle { margin: 4px 14px 8px; width: 36px; height: 28px; border: 0; background: none; color: var(--text-muted); border-radius: 6px; cursor: pointer; display: grid; place-items: center; }
+.rail .toggle:hover { background: var(--surface-3); }
+.rail .scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0 10px 10px; }
+.rail .sep { height: 1px; background: var(--border); margin: 10px 4px; }
+.rail .group { font-size: 10.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); padding: 8px 8px 4px; white-space: nowrap; }
+.rail.collapsed .group, .rail.collapsed .lbl, .rail.collapsed .logo-text { display: none; }
+.rail a { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 8px; color: var(--text-secondary); text-decoration: none; cursor: pointer; font-size: 13px; white-space: nowrap; }
+.rail a svg { flex: none; width: 18px; height: 18px; }
+.rail a .no { flex: none; width: 18px; text-align: center; font-size: 11px; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.rail a:hover { background: var(--surface-2); color: var(--text-primary); }
+.rail a .lbl { overflow: hidden; text-overflow: ellipsis; }
+.rail a.active { background: var(--accent-soft); color: var(--accent); }
+.rail a.active .no { color: var(--accent); }
+.rail .foot { padding: 12px 14px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: #5b7cfa; color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 13px; flex: none; }
+.avatar.ghost { background: var(--surface-3); color: var(--text-muted); }
+
+/* ---------- top bar ---------- */
+.shell { min-width: 0; display: flex; flex-direction: column; }
+.topbar { height: 62px; background: var(--surface-1); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; gap: 12px; position: sticky; top: 0; z-index: 5; }
+.topbar .page { font-weight: 600; font-size: 14.5px; }
+.topbar .right { display: flex; align-items: center; gap: 14px; }
+.topbar .when { text-align: right; line-height: 1.25; }
+.topbar .when b { display: block; font-size: 14px; }
+.topbar .when a { font-size: 12px; color: var(--text-secondary); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; cursor: pointer; }
+.topbar .when a:hover { color: var(--accent); }
+main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
+
+/* ---------- command center home ---------- */
+.hero { background: linear-gradient(180deg, #fbfcfe 0%, #f5f7fc 70%, #eef0fb 100%); border-radius: 14px; padding: 64px 24px 48px; min-height: calc(100vh - 110px); display: flex; flex-direction: column; align-items: center; }
+.hero h1 { font-family: var(--serif); font-weight: 700; font-size: 40px; letter-spacing: -.5px; margin: 0; text-align: center; }
+.hero h1 span { color: var(--accent); }
+.hero .sub { font-family: var(--serif); color: var(--text-secondary); font-size: 17.5px; max-width: 520px; text-align: center; margin: 14px 0 0; }
+.hero.chatting { padding-top: 24px; }
+.hero.chatting h1 { font-size: 26px; }
+.hero.chatting .sub { display: none; }
+.askbox { width: min(768px, 100%); margin-top: 52px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 28px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 16px; }
+.hero.chatting .askbox { margin-top: 16px; position: sticky; bottom: 16px; }
+.askbox svg.spark { width: 22px; height: 22px; color: var(--accent); flex: none; }
+.askbox input { flex: 1; border: 0; outline: 0; background: none; font: inherit; font-size: 15px; color: var(--text-primary); padding: 12px 0; min-width: 0; }
+.askbox input::placeholder { color: var(--text-muted); }
+.askbox .send { width: 38px; height: 38px; border-radius: 50%; border: 0; background: var(--surface-3); color: var(--text-muted); cursor: pointer; display: grid; place-items: center; flex: none; transition: background .15s, color .15s; }
+.askbox .send.ready { background: var(--accent); color: #fff; }
+.divider { width: min(768px, 100%); display: flex; align-items: center; gap: 14px; margin: 56px 0 18px; color: var(--text-muted); font-size: 11.5px; letter-spacing: 1.4px; text-transform: uppercase; font-weight: 500; }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border-strong); }
+.insights { width: min(768px, 100%); display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.insight { display: flex; flex-direction: column; justify-content: flex-start; background: rgba(255,255,255,.75); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; text-align: left; cursor: pointer; color: inherit; transition: box-shadow .15s, border-color .15s, transform .15s; }
+.insight:hover { box-shadow: var(--shadow); border-color: var(--border-strong); transform: translateY(-1px); }
+.insight .lab { font-size: 11.5px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.insight .val { font-family: var(--serif); font-size: 24px; font-weight: 700; margin: 6px 0 2px; }
+.insight .txt { font-size: 12.5px; color: var(--text-secondary); }
+.insight .go { font-size: 12px; color: var(--accent); margin-top: 8px; font-weight: 500; }
+.insight.skeleton { height: 128px; background: linear-gradient(90deg, #f1f3f8, #f8f9fc, #f1f3f8); background-size: 200% 100%; animation: sh 1.4s infinite; cursor: default; }
+@keyframes sh { to { background-position: -200% 0; } }
+.thread { width: min(860px, 100%); display: flex; flex-direction: column; gap: 14px; margin-top: 22px; }
+.msg { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 14px 18px; box-shadow: 0 1px 2px rgba(15,27,51,.04); min-width: 0; }
+.msg.user { align-self: flex-end; max-width: 75%; background: var(--accent); color: #fff; border-color: var(--accent); border-radius: 18px 18px 4px 18px; padding: 10px 16px; }
+.msg .basis { color: var(--text-muted); font-size: 12px; margin-top: 10px; display: flex; align-items: center; gap: 6px; }
+.msg p { margin: 6px 0; } .msg ul { margin: 6px 0; padding-left: 20px; }
+.msg > div > table { border: 1px solid var(--border); border-radius: 8px; display: block; overflow-x: auto; }
+.thinking { display: inline-flex; gap: 4px; } .thinking i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); opacity: .3; animation: bl 1s infinite; }
+.thinking i:nth-child(2) { animation-delay: .15s; } .thinking i:nth-child(3) { animation-delay: .3s; }
+@keyframes bl { 50% { opacity: 1; } }
+.rail .badge { margin-left: auto; background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 600; border-radius: 9px; padding: 0 6px; line-height: 17px; min-width: 18px; text-align: center; }
+.rail.collapsed a { position: relative; }
+.rail.collapsed .badge { position: absolute; top: 2px; left: 26px; }
+.rail a .no.lbl { margin-left: auto; width: auto; }
+.chips { width: min(768px, 100%); display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
+.chips button { display: inline-flex; align-items: center; gap: 6px; background: var(--surface-1); border: 1px solid var(--border); color: var(--text-secondary); border-radius: 16px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; }
+.chips button:hover { border-color: var(--accent); color: var(--accent); }
+.chips svg { color: var(--accent); }
+.hero.chatting .chips { margin-top: 10px; }
+.steps { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; font-size: 12.5px; }
+.steps summary { cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.steps summary svg { color: var(--good); }
+.step { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0 2px; }
+.step .n { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+.acts-head { margin: 12px 0 8px; font-weight: 600; font-size: 13px; display: flex; gap: 6px; align-items: center; color: var(--text-secondary); }
+.acts, .alist { display: flex; flex-direction: column; gap: 10px; }
+.alist { margin-bottom: 12px; }
+.action { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.action.approved { border-left: 3px solid var(--good); } .action.dismissed { opacity: .65; } .action.proposed { border-left: 3px solid var(--warning); }
+.a-top { display: flex; gap: 12px; align-items: flex-start; }
+.a-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex: none; background: var(--accent-soft); color: var(--accent); }
+.a-ic.k-alert { background: #fff4dc; color: #b77a00; } .a-ic.k-transfer { background: #e3f6ee; color: #11845a; } .a-ic.k-briefing { background: #efeaff; color: #5b47c9; }
+.a-main { flex: 1; min-width: 0; } .a-title { font-weight: 600; }
+.action details { margin-top: 8px; } .action summary { cursor: pointer; color: var(--accent); font-size: 12.5px; display: inline-flex; gap: 5px; align-items: center; }
+.a-prev { margin-top: 8px; } .a-prev pre { white-space: pre-wrap; font: 12.5px/1.5 Inter, sans-serif; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin: 0; max-height: 320px; overflow: auto; }
+.a-prev .md { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 4px 14px; max-height: 420px; overflow: auto; font-size: 13px; }
+.a-prev .md table { margin: 6px 0; }
+.a-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.a-btns .btn, .open-ui { display: inline-flex; gap: 5px; align-items: center; text-decoration: none; }
+.open-ui { margin-top: 12px; }
+.empty { text-align: center; padding: 36px; background: var(--surface-1); border: 1px dashed var(--border-strong); border-radius: 12px; color: var(--text-secondary); }
+.empty svg { color: var(--text-muted); }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 12px; margin-top: 12px; }
+.tile { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; color: var(--text-primary); }
+.tile svg:first-child { color: var(--accent); } .tile svg:last-child { margin-left: auto; color: var(--text-muted); }
+.tile:hover { background: var(--accent-soft); }
+.alert-row { display: flex; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--grid); font-size: 13px; }
+.card h3 { display: flex; align-items: center; gap: 6px; }
+.rgroup { margin-bottom: 18px; } .rgroup h3 { display: flex; gap: 8px; align-items: center; font-size: 15px; margin: 6px 0 10px; }
+.rgroup h3 svg { color: var(--accent); }
+.rcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 10px; }
+.rcard { display: flex; gap: 12px; align-items: center; text-align: left; background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; cursor: pointer; color: inherit; transition: box-shadow .15s, border-color .15s; }
+.rcard:hover { border-color: var(--accent); box-shadow: var(--shadow); }
+.rcard > div:nth-child(2) { flex: 1; min-width: 0; } .rcard .muted { font-size: 12px; } .rcard > svg { color: var(--text-muted); flex: none; }
+.rc-ic { width: 36px; height: 36px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; flex: none; }
+.rbtns { display: flex; gap: 8px; flex-wrap: wrap; } .rbtns .btn { display: inline-flex; align-items: center; gap: 5px; text-decoration: none; }
+.sched-form { margin-bottom: 12px; }
+.print-head { display: none; }
+.builder { display: grid; grid-template-columns: 340px 1fr; gap: 14px; align-items: start; }
+.bform { display: flex; flex-direction: column; gap: 8px; position: sticky; top: 76px; max-height: calc(100vh - 96px); overflow-y: auto; }
+.bform label { font-size: 12px; color: var(--text-secondary); font-weight: 500; display: flex; flex-direction: column; gap: 4px; }
+.bform select, .bform input { background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border-strong); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 13px; min-width: 0; }
+.bform .chk { flex-direction: row; align-items: center; gap: 6px; font-weight: 400; color: var(--text-primary); }
+.colpick { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; align-items: end; } .row2:has(label) { grid-template-columns: 1fr 1fr; }
+.row3 { display: grid; grid-template-columns: 1.3fr .7fr 1fr auto; gap: 6px; }
+.seg { display: flex; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; }
+.seg button { flex: 1; border: 0; background: var(--surface-1); padding: 7px; cursor: pointer; color: var(--text-secondary); font-size: 13px; }
+.seg button.on { background: var(--accent); color: #fff; }
+.bbtns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; } .bbtns .btn { display: inline-flex; gap: 5px; align-items: center; }
+.chk { display: inline-flex; gap: 5px; align-items: center; font-size: 13px; cursor: pointer; }
+.banner { background: var(--surface-1); border: 1px solid var(--border); border-left: 4px solid var(--warning); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 13px; }
+@media (max-width: 900px) { .builder { grid-template-columns: 1fr; } .bform { position: static; max-height: none; } }
+@media print {
+  .rail, .topbar, .filters, .vhead .rbtns, .vhead button, #schedBox, .pager, [data-csv], .drawer { display: none !important; }
+  body, html { background: #fff; } main { padding: 0; } .app { display: block; }
+  .print-head { display: block; font-size: 12px; color: #333; margin-bottom: 10px; }
+  .tablewrap { max-height: none !important; overflow: visible !important; border: 0; }
+  .card, .kpi { break-inside: avoid; box-shadow: none; } .tablecard { break-inside: auto; }
+  td { white-space: normal; max-width: none; } th { position: static; }
+  .chartbox { height: 240px; }
+}
+.note-banner { width: min(768px, 100%); margin-top: 14px; font-size: 12.5px; color: var(--text-secondary); text-align: center; }
+
+/* ---------- dashboards ---------- */
+.vhead { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin: 4px 0 14px; }
+.vhead h1 { font-family: var(--serif); font-size: 28px; margin: 0; letter-spacing: -.3px; }
+.vhead h1 .no { color: var(--accent); }
+.vhead p { color: var(--text-secondary); margin: 4px 0 0; font-family: var(--serif); font-size: 15.5px; }
+.btn { background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border-strong); border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+.filters select, .filters input { background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border-strong); border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 13px; }
+.filters input { min-width: 260px; }
+.filters input[type=checkbox], .filters input[type=time], .filters input[type=number] { min-width: 0; }
+.filters select:focus, .filters input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.kpi { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.kpi .label { color: var(--text-secondary); font-size: 12px; display: flex; gap: 6px; align-items: center; }
+.kpi .value { font-family: var(--serif); font-size: 26px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.kpi .value small { font-family: Inter, sans-serif; font-size: 12px; color: var(--text-muted); font-weight: 500; }
+.kpi .note { color: var(--text-muted); font-size: 12px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+.charts > .card { min-width: 0; } .span-2 { grid-column: span 2; } .span-3 { grid-column: 1 / -1; }
+@media (max-width: 1200px) { .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .span-3 { grid-column: 1 / -1; } }
+@media (max-width: 800px) { .charts { grid-template-columns: 1fr; } .span-2, .span-3 { grid-column: auto; } }
+.chart-card { display: flex; flex-direction: column; transition: box-shadow .15s; } .chart-card:hover { box-shadow: var(--shadow); }
+.ch-head h3 { margin: 0; } .ch-head p { margin: 3px 0 0; color: var(--text-muted); font-size: 12px; }
+.ch-head { margin-bottom: 10px; }
+.kpi { position: relative; overflow: hidden; transition: box-shadow .15s, transform .15s; }
+.kpi.link { cursor: pointer; } .kpi.link:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+.kpi.link .label svg { margin-left: auto; color: var(--text-muted); }
+.kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); opacity: .0; }
+.kpi[class*="st-"]::before { opacity: 1; } .kpi.st-critical::before { background: var(--critical); } .kpi.st-serious::before { background: var(--serious); }
+.kpi.st-warning::before { background: var(--warning); } .kpi.st-good::before { background: var(--good); }
+.kv { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.spark-svg { width: 96px; height: 30px; flex: none; }
+.kbar { height: 5px; background: var(--surface-3); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+.kbar span { display: block; height: 100%; border-radius: 3px; } .kbar.big { height: 9px; border-radius: 5px; }
+.insights-card { margin-top: 14px; background: linear-gradient(135deg, #f3f7ff 0%, #ffffff 60%); border: 1px solid #dbe6ff; border-radius: 12px; padding: 14px 18px; }
+.ic-head { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--accent); margin-bottom: 8px; font-size: 13.5px; }
+.insights-card ul { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: 8px 22px; }
+.insights-card li { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; }
+.ic-dot { flex: none; width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 14%, white); margin-top: 1px; }
+.section-title { display: flex; align-items: center; gap: 8px; margin: 22px 0 0; font-weight: 600; color: var(--text-secondary); font-size: 13px; text-transform: uppercase; letter-spacing: .8px; }
+.heat { overflow: auto; } .heat-t { border-collapse: separate; border-spacing: 3px; width: 100%; font-size: 12px; }
+.heat-t th { position: static; background: none; border: 0; color: var(--text-secondary); font-weight: 500; padding: 4px 6px; text-align: center; cursor: default; white-space: nowrap; }
+.heat-t tbody th { text-align: right; } .heat-t td { text-align: center; border-radius: 6px; padding: 8px 4px; border: 0; font-variant-numeric: tabular-nums; font-weight: 500; min-width: 44px; font-size: 11.5px; }
+.dchip { display: inline-block; min-width: 46px; padding: 1px 8px; border-radius: 10px; background: color-mix(in srgb, var(--c) 13%, white); color: color-mix(in srgb, var(--c) 80%, black); font-weight: 600; text-align: right; }
+.cls { display: inline-block; padding: 0 7px; border-radius: 6px; font-size: 11px; font-weight: 700; color: #fff; background: var(--c); letter-spacing: .3px; }
+.abc { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+.abc-A { background: #e3f6ee; color: #0e7a50; } .abc-B { background: #fff4dc; color: #a26a00; } .abc-C { background: var(--surface-3); color: var(--text-muted); }
+.tfilter { border: 1px solid var(--border-strong); border-radius: 8px; padding: 5px 9px; font: inherit; font-size: 12.5px; width: 170px; }
+.loading { padding: 40px; text-align: center; color: var(--text-muted); }
+.d-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; padding-bottom: 14px; border-bottom: 3px solid var(--c); margin-bottom: 14px; }
+.d-head h2 { font-size: 26px; margin: 4px 0 2px; } .d-tags { display: flex; gap: 6px; align-items: center; }
+.d-hero { display: grid; grid-template-columns: 1fr 1.4fr; gap: 14px; }
+.d-cover { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+.d-big { font-family: var(--serif); font-size: 40px; font-weight: 700; line-height: 1.1; margin: 4px 0 8px; }
+.d-scale { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); margin: 3px 0 8px; }
+.d-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.d-tiles > div { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; }
+.d-tiles b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; margin-top: 2px; } .d-tiles span { font-size: 11px; color: var(--text-secondary); }
+.d-tiles .d-spark { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; }
+.d-tiles .d-spark .spark-svg { width: 60%; }
+.d-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.drawer .insights-card ul { grid-template-columns: 1fr; }
+@media (max-width: 900px) { .d-hero, .d-charts { grid-template-columns: 1fr; } }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; min-width: 0; }
+.card h3 { font-size: 14px; margin: 0 0 10px; font-weight: 600; }
+.chartbox { position: relative; height: 290px; }
+.tablecard { margin-top: 12px; }
+.tablehead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tablewrap { overflow: auto; max-height: 560px; margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th { position: sticky; top: 0; background: var(--surface-2); text-align: left; padding: 8px 10px; font-weight: 600; color: var(--text-secondary); cursor: pointer; white-space: nowrap; border-bottom: 1px solid var(--border); }
+td { padding: 7px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; max-width: 360px; overflow: hidden; text-overflow: ellipsis; }
+.msg.user td, .msg.user th { color: inherit; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.click:hover td { background: var(--accent-soft); cursor: pointer; }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 1px 9px; border-radius: 10px; font-size: 11.5px; background: var(--surface-2); border: 1px solid var(--border); }
+.pager { color: var(--text-muted); font-size: 12px; margin-top: 8px; display: flex; gap: 8px; align-items: center; }
+.drawer { position: fixed; top: 0; right: 0; width: min(920px, 100vw); height: 100vh; background: var(--surface-1); border-left: 1px solid var(--border); box-shadow: -16px 0 40px rgba(15,27,51,.12); padding: 22px; overflow-y: auto; transform: translateX(100%); transition: transform .2s; z-index: 20; }
+.drawer.open { transform: none; }
+.drawer h2 { font-family: var(--serif); margin: 0; }
+.drawer .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
+.drawer .grid div { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+.drawer .grid b { display: block; font-size: 16px; font-variant-numeric: tabular-nums; }
+.drawer .grid span { font-size: 11px; color: var(--text-secondary); }
+.drawer .card { margin-top: 12px; }
+dl dt { font-weight: 600; margin-top: 12px; } dl dd { margin: 2px 0 0; color: var(--text-secondary); }
+.muted { color: var(--text-muted); }
+.mobile-nav { display: none; }
+.menu-btn, .top-logo, .d-short, .r-short { display: none; }
+.scrim { display: none; }
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+  /* slide-out navigation */
+  .rail { position: fixed; left: 0; top: 0; bottom: 0; z-index: 40; width: 280px !important; height: 100vh; transform: translateX(-102%);
+    transition: transform .22s ease; box-shadow: 8px 0 30px rgba(15,27,51,.18); }
+  .rail.open { transform: none; }
+  .rail.collapsed .group, .rail.collapsed .lbl, .rail.collapsed .logo-text { display: initial; }
+  .scrim { position: fixed; inset: 0; background: rgba(15,27,51,.35); z-index: 35; }
+  body.menu-open .scrim { display: block; } body.menu-open { overflow: hidden; }
+  .menu-btn { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--border); background: var(--surface-1); border-radius: 10px; color: var(--text-primary); cursor: pointer; flex: none; }
+  .top-logo { display: block; height: 34px; width: auto; border-radius: 6px; }
+  .topbar { padding: 0 12px; gap: 10px; height: 58px; }
+  .topbar .page { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; }
+  .topbar .right { gap: 8px; } #topAvatar { display: none; }
+  .d-long, .r-long { display: none; } .d-short, .r-short { display: inline; }
+  .topbar .when b { font-size: 13px; } .topbar .when a { font-size: 11.5px; }
+  main { padding: 12px 14px 48px; }
+  .vhead { gap: 10px; } .vhead h1 { font-size: 23px; } .vhead p { font-size: 14px; }
+  .rbtns { gap: 6px; } .rbtns .btn { padding: 6px 10px; }
+  .charts { grid-template-columns: 1fr; } .span-2, .span-3 { grid-column: auto; }
+  .chartbox { height: 260px !important; }
+  .insights { grid-template-columns: 1fr; }
+  .hero { padding: 32px 14px 28px; min-height: auto; border-radius: 12px; }
+  .hero h1 { font-size: 30px; } .hero .sub { font-size: 15.5px; }
+  .askbox { margin-top: 28px; } .divider { margin: 32px 0 14px; }
+  .filters { gap: 6px; } .filters select { flex: 1 1 calc(50% - 6px); min-width: 0; }
+  .filters input:not([type=checkbox]):not([type=time]):not([type=number]) { flex: 1 1 calc(100% - 80px); min-width: 0; order: 5; }
+  .filters #f_clear { order: 6; }
+  .tablehead h3 { font-size: 13.5px; } .tfilter { flex: 1; width: auto; min-width: 0; } .tablehead .rbtns { width: 100%; }
+  .tablewrap { max-height: 480px; -webkit-overflow-scrolling: touch; }
+  td { max-width: 220px; }
+  .drawer { padding: 14px; width: 100vw; }
+  .d-head { flex-wrap: wrap; } .d-head h2 { font-size: 22px; } .d-big { font-size: 34px; }
+  .d-tiles { grid-template-columns: repeat(2, 1fr); }
+  .msg.user { max-width: 90%; }
+  .thread { gap: 10px; } .msg { padding: 12px 14px; }
+  .builder { grid-template-columns: 1fr; }
+  .colpick { grid-template-columns: 1fr; }
+  .rcard { padding: 10px 12px; }
+  .heat-t td { min-width: 40px; padding: 7px 3px; font-size: 11px; }
+}
+@media (max-width: 600px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .kpi { padding: 11px 12px; } .kpi .value { font-size: 20px; } .kpi .label { font-size: 11.5px; }
+  .kpi .kv { flex-direction: column; align-items: flex-start; gap: 4px; } .spark-svg { width: 100%; height: 24px; }
+  .kpi .note { font-size: 11px; }
+  .insights-card { padding: 12px 14px; } .insights-card li { font-size: 12.5px; }
+  .ch-head h3 { font-size: 13.5px; }
+  .vhead .rbtns { width: 100%; } .vhead .rbtns .btn { flex: 1; justify-content: center; }
+  .chips button { font-size: 12px; padding: 5px 10px; }
+  .a-btns .btn { flex: 1; justify-content: center; }
+  .seg button { font-size: 12px; }
+  .row3 { grid-template-columns: 1fr 1fr; } .row3 input { grid-column: 1; }
+}
+@media (min-width: 901px) and (max-width: 1200px) {
+  main { padding: 16px 18px 48px; }
+  .rail { width: 232px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail" id="rail"></aside>
+  <div class="shell">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <img class="top-logo" src="/static/logo.jpg" alt="Nice House of Plastics">
+      <select class="mobile-nav btn" id="mobileNav" hidden></select>
+      <div class="page" id="pageTitle">Command Center</div>
+      <div class="right"><div class="when" id="when"></div><div class="avatar ghost" id="topAvatar"></div></div>
+    </header>
+    <main id="content"></main>
+  </div>
+</div>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer"></aside>
+
+<script>
+const S = { meta: null, view: null, filters: { item_class: '', site: '', q: '' }, charts: [], history: [], thread: [] };
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const CLASS = { RM: '--series-1', WIP: '--series-2', FG: '--series-3', 'Raw Material': '--series-1', 'Work in Progress': '--series-2', 'Finished Goods': '--series-3' };
+const STATUS = [
+  [/^(stockout|high|constrained|critical|no open supply|only stale supply|no surplus|failed|review)/i, '--critical'],
+  [/^(medium|low cover|overdue|at risk|supply arrives too late|partly|low$)/i, '--serious'],
+  [/^(low|stale|excess|no movement)/i, '--warning'],
+  [/^(healthy|ready|on time|fully covered|expected|made to order)/i, '--good'],
+];
+const statusColor = s => { for (const [re, c] of STATUS) if (re.test(s || '')) return css(c); return css('--text-muted'); };
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const I = {
+  monitor: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="16" height="12" rx="2"/><path d="M7 20h6M10 16v4"/><circle cx="19" cy="6" r="3"/></svg>',
+  chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>',
+  book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5"/></svg>',
+  side: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>',
+  spark: '<svg class="spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M10 3l1.6 4.4L16 9l-4.4 1.6L10 15l-1.6-4.4L4 9l4.4-1.6z"/><path d="M18 13l.8 2.2L21 16l-2.2.8L18 19l-.8-2.2L15 16l2.2-.8zM17 3l.5 1.5L19 5l-1.5.5L17 7l-.5-1.5L15 5l1.5-.5z"/></svg>',
+  up: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+};
+const P = {
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  box: '<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/>',
+  gauge: '<path d="M12 14l4-4"/><path d="M3.3 19a10 10 0 1 1 17.4 0"/>',
+  layers: '<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/><path d="M3 17.5l9 5 9-5" opacity=".5"/>',
+  package: '<path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/><path d="M7.5 5.5l9 5"/>',
+  truck: '<path d="M3 6h11v10H3z"/><path d="M14 9h4l3 3v4h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+  trend: '<path d="M3 7l6 6 4-4 8 8"/><path d="M21 11v6h-6"/>',
+  alert: '<path d="M12 3l10 18H2L12 3z"/><path d="M12 10v4M12 17.5v.5"/>',
+  shuffle: '<path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/>',
+  factory: '<path d="M3 21V9l6 4V9l6 4V5h6v16z"/><path d="M7 17h2M12 17h2M17 17h1"/>',
+  flag: '<path d="M5 21V4"/><path d="M5 4h12l-2 4 2 4H5"/>',
+  inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"/>',
+  monitor: '<rect x="2" y="4" width="16" height="12" rx="2"/><path d="M7 20h6M10 16v4"/><circle cx="19" cy="6" r="3"/>',
+  book: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5"/>',
+  mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+  swap: '<path d="M7 4L3 8l4 4"/><path d="M3 8h14"/><path d="M17 20l4-4-4-4"/><path d="M21 16H7"/>',
+  bell: '<path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/>',
+  doc: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h6"/>',
+  check: '<path d="M20 6L9 17l-5-5"/>',
+  x: '<path d="M18 6L6 18M6 6l12 12"/>',
+  download: '<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  star: '<path d="M12 3l2.8 5.8 6.2.9-4.5 4.4 1.1 6.2L12 17.4 6.4 20.3l1.1-6.2L3 9.7l6.2-.9z"/>',
+  sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  trendUp: '<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
+  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  printer: '<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/>',
+  play: '<path d="M7 4l13 8-13 8z"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+};
+const svg = (n, s = 18) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${P[n] || ''}</svg>`;
+const VIEW_ICON = { overview: 'grid', inventory_position: 'box', inventory_by_location: 'pin', rm_consumption_cover: 'gauge', wip_cover: 'layers', fg_cover: 'package',
+  in_transit_overdue: 'truck', projection_stockout: 'trend', inventory_risk: 'alert', location_risk: 'shuffle', bom_readiness: 'factory', exceptions: 'flag' };
+const GROUPS = [
+  ['Inventory', ['inventory_position', 'inventory_by_location', 'rm_consumption_cover', 'wip_cover', 'fg_cover']],
+  ['Supply & projection', ['in_transit_overdue', 'projection_stockout']],
+  ['Risk & production', ['inventory_risk', 'location_risk', 'bom_readiness', 'exceptions']],
+];
+const KIND_ICON = { expedite: 'mail', transfer: 'swap', alert: 'bell', briefing: 'doc', report: 'doc' };
+
+function fmt(v, kind) {
+  if (v === null || v === undefined || v === '') return '–';
+  if (kind === 'money') return Math.abs(v) >= 1e9 ? (v / 1e9).toFixed(2) + ' B' : Math.abs(v) >= 1e6 ? (v / 1e6).toFixed(1) + ' M' : Math.round(v).toLocaleString();
+  if (kind === 'days') return Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 });
+  if (kind === 'qty') return Number(v).toLocaleString(undefined, { maximumFractionDigits: Math.abs(v) < 1 ? 4 : 2 });
+  return v;
+}
+const tableFmt = (v, kind) => kind === 'money' ? (v == null ? '–' : Math.round(v).toLocaleString()) : fmt(v, kind);
+async function api(path, opts) { const r = await fetch(path, opts); return r.json(); }
+const initials = n => (n || '').split(/\s+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+async function init() {
+  S.meta = await api('/api/meta');
+  const rail = document.getElementById('rail'), views = S.meta.views;
+  rail.innerHTML = `<div class="logo"><img class="logo-img" src="/static/logo.jpg" alt="Nice House of Plastics"><div class="logo-text">Pulse<small>${esc(S.meta.notes.company)}</small></div></div>
+    <button class="toggle" id="railToggle" title="Collapse sidebar">${I.side}</button>
+    <div class="scroll">
+      <a data-v="command" title="Command Center">${svg('monitor')}<span class="lbl">Command Center</span></a>
+      <a data-v="actions" title="Agent actions">${svg('inbox')}<span class="lbl">Agent actions</span><span class="badge" id="badge" hidden></span></a>
+      <a data-v="overview" title="Overview">${svg('grid')}<span class="lbl">Overview</span></a>
+      ${GROUPS.map(([g, ids]) => `<div class="sep"></div><div class="group">${g}</div>` + ids.map(id => { const v = views.find(x => x.id === id);
+        return `<a data-v="${id}" title="${v.no} · ${esc(v.title)}">${svg(VIEW_ICON[id])}<span class="lbl">${esc(v.title)}</span></a>`; }).join('')).join('')}
+      <div class="sep"></div><div class="group">Reporting</div>
+      <a data-v="reports" title="Report library">${svg('doc')}<span class="lbl">Report library</span></a>
+      <a data-v="builder" title="Report builder">${svg('sliders')}<span class="lbl">Report builder</span></a>
+      <a data-v="schedules" title="Schedules & history">${svg('calendar')}<span class="lbl">Schedules & history</span></a>
+      <a data-v="trends" title="Trends">${svg('trendUp')}<span class="lbl">Trends</span></a>
+      <div class="sep"></div><div class="group">Governance</div>
+      <a data-v="datarefresh" title="Data refresh">${svg('refresh')}<span class="lbl">Data refresh</span></a>
+      <a data-v="audit" title="Audit log">${svg('shield')}<span class="lbl">Audit log</span></a>
+      <a data-v="definitions" title="Definitions & data notes">${svg('book')}<span class="lbl">Definitions & data notes</span></a>
+    </div>
+    <div class="foot"><div class="avatar">${esc(initials(S.meta.user_name) || 'P')}</div><div class="lbl" style="font-size:12px;color:var(--text-secondary);white-space:nowrap">${esc(S.meta.user_name || 'Supply Chain')}<br><span class="muted">${esc(S.meta.notes.environment)}</span></div></div>`;
+  rail.onclick = e => { const a = e.target.closest('a'); if (a) go(a.dataset.v); };
+  document.getElementById('railToggle').onclick = () => isMobile() ? closeMenu() : rail.classList.toggle('collapsed');
+  document.getElementById('menuBtn').onclick = () => { rail.classList.add('open'); document.body.classList.add('menu-open'); };
+  document.getElementById('scrim').onclick = closeMenu;
+  document.getElementById('topAvatar').textContent = initials(S.meta.user_name);
+  const mn = document.getElementById('mobileNav');
+  mn.innerHTML = '<option value="command">Command Center</option><option value="actions">Agent actions</option><option value="overview">Overview</option>' + views.map(v => `<option value="${v.id}">${v.no} ${esc(v.title)}</option>`).join('') + '<option value="reports">Report library</option><option value="builder">Report builder</option><option value="schedules">Schedules & history</option><option value="trends">Trends</option><option value="datarefresh">Data refresh</option><option value="audit">Audit log</option><option value="definitions">Definitions & data notes</option>';
+  mn.onchange = () => go(mn.value);
+  renderWhen();
+  updateBadge();
+  go(location.hash.slice(1) || 'command');
+}
+
+async function updateBadge() {
+  const acts = await api('/api/actions');
+  const n = acts.filter(a => a.status === 'proposed').length, b = document.getElementById('badge');
+  b.hidden = !n; b.textContent = n;
+}
+
+function renderWhen() {
+  const n = S.meta.notes;
+  const d = new Date(n.reporting_date + 'T12:00:00');
+  const label = `<span class="d-long">${d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</span><span class="d-short">${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>`;
+  document.getElementById('when').innerHTML = `<b>${label}</b><a id="refresh" title="Data loaded ${esc(n.extracted_at.replace('T', ' '))}"><span class="r-long">${S.meta.refreshing ? 'Refreshing from Business Central…' : S.meta.last_error ? 'Last refresh failed – retry' : 'Refresh from Business Central'}</span><span class="r-short">${S.meta.refreshing ? 'Refreshing…' : '↻ Refresh'}</span></a>`;
+  document.getElementById('refresh').onclick = async () => {
+    if (S.meta.refreshing) return;
+    await api('/api/refresh', { method: 'POST' }); S.meta.refreshing = true; renderWhen();
+    const t = setInterval(async () => { S.meta = await api('/api/meta'); if (!S.meta.refreshing) { clearInterval(t); renderWhen(); go(S.view, true); } }, 4000);
+  };
+}
+
+const isMobile = () => matchMedia('(max-width: 900px)').matches;
+function closeMenu() { document.getElementById('rail').classList.remove('open'); document.body.classList.remove('menu-open'); }
+
+function go(v, force) {
+  if (isMobile()) closeMenu();
+  if (v === S.view && !force) return;
+  S.view = v; if (location.hash.slice(1) !== v) location.hash = v;
+  const navKey = v.startsWith('report:') ? 'reports' : v;
+  document.querySelectorAll('.rail a').forEach(a => a.classList.toggle('active', a.dataset.v === navKey));
+  document.getElementById('mobileNav').value = navKey;
+  const meta = S.meta.views.find(x => x.id === v);
+  const grp = (GROUPS.find(([, ids]) => ids.includes(v)) || [''])[0];
+  document.getElementById('pageTitle').textContent = { command: 'Command Center', definitions: 'Definitions & data notes', actions: 'Agent actions', overview: 'Overview', reports: 'Reporting / Report library', builder: 'Reporting / Report builder', schedules: 'Reporting / Schedules & history', trends: 'Reporting / Trends', datarefresh: 'Governance / Data refresh', audit: 'Governance / Audit log' }[v] || `${grp} / ${meta ? meta.title : ''}`;
+  S.charts.forEach(ch => ch.destroy()); S.charts = [];
+  if (v === 'command') return renderCommand();
+  if (v === 'actions') return renderActions();
+  if (v === 'reports') return renderReports();
+  if (v.startsWith('report:')) return renderReport(v.slice(7));
+  if (v === 'builder') return renderBuilder();
+  if (v === 'schedules') return renderSchedules();
+  if (v === 'trends') return renderTrends();
+  if (v === 'datarefresh') return renderDataRefresh();
+  if (v === 'audit') return renderAudit();
+  if (v === 'definitions') return renderDefinitions();
+  loadView();
+}
+
+/* ---------------- Command Center ---------------- */
+function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; }
+
+function renderCommand() {
+  const name = S.meta.user_name;
+  const chatting = S.thread.length > 0;
+  document.getElementById('content').innerHTML = `<section class="hero ${chatting ? 'chatting' : ''}" id="hero">
+    <h1>${greeting()}${name ? `, <span>${esc(name)}</span>` : ''}</h1>
+    <p class="sub">Ask for any stock, cover, purchase or production figure — or tell the agent what to do across raw materials, WIP, finished goods and locations.</p>
+    <div class="thread" id="thread"></div>
+    <div class="askbox">${I.spark}<input id="q" placeholder="Ask anything or tell me what to do..." autocomplete="off"><button class="send" id="send" title="Ask">${I.up}</button></div>
+    <div class="chips" id="chips">${S.meta.playbooks.map(p => `<button data-p="${p.id}">${svg(p.icon, 15)}${esc(p.label)}</button>`).join('')}</div>
+    ${S.meta.command_mode === 'offline' ? `<div class="note-banner">Offline mode — questions map to the matching view and agent playbook. Configure Azure OpenAI for free-form planning.</div>` : ''}
+    <div id="insightsWrap" style="width:100%;display:${chatting ? 'none' : 'flex'};flex-direction:column;align-items:center">
+      <div class="divider">AI insights from your data</div>
+      <div class="insights" id="insights">${'<div class="insight skeleton"></div>'.repeat(3)}</div>
+    </div></section>`;
+  const thread = document.getElementById('thread');
+  S.thread.forEach(el => thread.appendChild(el));
+  const q = document.getElementById('q'), send = document.getElementById('send');
+  q.oninput = () => send.classList.toggle('ready', !!q.value.trim());
+  send.onclick = () => ask(q.value.trim());
+  q.onkeydown = e => { if (e.key === 'Enter') ask(q.value.trim()); };
+  document.getElementById('chips').onclick = e => { const b = e.target.closest('button'); if (b) ask(b.textContent.trim(), b.dataset.p); };
+  if (!chatting) loadInsights(); else q.focus();
+}
+
+async function loadInsights() {
+  const cards = await api('/api/insights');
+  const box = document.getElementById('insights'); if (!box) return;
+  box.innerHTML = cards.map((c, i) => `<button class="insight" data-i="${i}"><div class="lab"><span class="dot" style="background:${css('--' + c.tone)}"></span>${esc(c.label)}</div>
+    <div class="val">${esc(c.value)}</div><div class="txt">${esc(c.text)}</div><div class="go">Ask about this →</div></button>`).join('');
+  box.onclick = e => { const b = e.target.closest('.insight'); if (b) ask(cards[+b.dataset.i].question); };
+}
+
+async function ask(text, playbook) {
+  if (!text) return;
+  const hero = document.getElementById('hero'), thread = document.getElementById('thread'), q = document.getElementById('q');
+  hero.classList.add('chatting'); document.getElementById('insightsWrap').style.display = 'none';
+  q.value = ''; document.getElementById('send').classList.remove('ready');
+  const u = document.createElement('div'); u.className = 'msg user'; u.textContent = text;
+  const a = document.createElement('div'); a.className = 'msg';
+  a.innerHTML = `<div class="steps live"><div class="step"><span class="thinking"><i></i><i></i><i></i></span> ${playbook ? 'Agent is planning and working…' : 'Planning and querying the supply chain model…'}</div></div>`;
+  thread.append(u, a); S.thread.push(u, a);
+  a.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const r = playbook
+    ? await api('/api/playbook/' + playbook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    : await api('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, history: S.history }) });
+  S.history.push({ role: 'user', content: text }, { role: 'assistant', content: r.answer });
+  renderAgentResult(a, r);
+  updateBadge();
+  q.focus();
+}
+
+function renderAgentResult(el, r) {
+  const steps = r.steps || [];
+  const by = r.mode === 'azure' ? `Azure OpenAI agent${S.meta.ai_model ? ' (' + S.meta.ai_model + ')' : ''}` : r.mode === 'claude' ? 'Claude agent' : r.mode === 'agent' ? 'Pulse agent playbook' : 'Offline router';
+  el.innerHTML = `${steps.length ? `<details class="steps" ${r.actions && r.actions.length ? 'open' : ''}><summary>${svg('check', 14)} ${steps.length} step${steps.length > 1 ? 's' : ''} completed · ${esc(by)}</summary>
+      ${steps.map((s, i) => `<div class="step"><span class="n">${i + 1}</span><div><b>${esc(s.label)}</b>${s.detail ? `<div class="muted">${esc(s.detail)}</div>` : ''}</div></div>`).join('')}</details>` : ''}
+    <div class="answer">${marked.parse(r.answer || '')}</div>
+    ${r.table && r.table.rows && r.table.rows.length ? '<div class="tbl"></div>' : ''}
+    ${r.actions && r.actions.length ? `<div class="acts-head">${svg('inbox', 15)} ${r.actions.length} proposed action${r.actions.length > 1 ? 's' : ''} — awaiting your approval</div><div class="acts"></div>` : ''}
+    ${r.ui && r.ui.view ? `<button class="btn open-ui">${svg(VIEW_ICON[r.ui.view] || 'grid', 14)} Open ${esc(viewTitle(r.ui.view))} ${svg('arrow', 14)}</button>` : ''}`;
+  if (r.table && r.table.rows && r.table.rows.length) renderTable(el.querySelector('.tbl'), r.table, { size: 10 });
+  if (r.actions && r.actions.length) { const box = el.querySelector('.acts'); r.actions.forEach(x => box.appendChild(actionCard(x, true))); }
+  const o = el.querySelector('.open-ui');
+  if (o) o.onclick = () => { S.filters = { item_class: r.ui.filters?.item_class || '', site: r.ui.filters?.site || '', q: r.ui.filters?.q || '' }; go(r.ui.view, true); };
+}
+const viewTitle = id => id === 'reports' ? 'Report library' : id === 'overview' ? 'Overview' : (S.meta.views.find(v => v.id === id) || {}).title || id;
+
+/* ---------------- Agent actions ---------------- */
+function actionCard(a, compact) {
+  const el = document.createElement('div');
+  el.className = 'action ' + a.status;
+  const p = a.payload || {};
+  let preview = '';
+  if (a.kind === 'expedite') preview = `<div class="muted" style="margin-bottom:6px"><b>Subject:</b> ${esc(p.subject)}</div><pre>${esc(p.body)}</pre>`;
+  else if (a.kind === 'briefing') preview = `<div class="md">${marked.parse(p.markdown || '')}</div>`;
+  else if (a.kind === 'alert') preview = `<div>Rule: <b>${esc(p.rule.name)}</b><br><span class="muted">Metric ${esc(p.rule.metric)} ${esc(p.rule.op)} ${p.rule.threshold} · current value ${p.current ?? '–'} · checked after every refresh once approved</span></div>`;
+  else if (a.kind === 'transfer') preview = '<div class="ttbl"></div>';
+  else if (a.kind === 'report') preview = `<div>${esc(p.name)}${p.params && Object.keys(p.params).length ? ' · ' + esc(Object.entries(p.params).map(([k, v]) => k + '=' + v).join(', ')) : ''} — <a href="#report:${esc(p.report_id)}">open in Reports</a></div>`;
+  const canDl = ['expedite', 'transfer', 'briefing', 'report'].includes(a.kind);
+  el.innerHTML = `<div class="a-top"><div class="a-ic k-${a.kind}">${svg(KIND_ICON[a.kind] || 'doc', 16)}</div>
+      <div class="a-main"><div class="a-title">${esc(a.title)}</div><div class="muted">${esc(a.summary)} · ${esc(a.created.replace('T', ' '))}${a.decided_by && a.status !== 'proposed' ? ` · ${esc(a.status)} by ${esc(a.decided_by)}` : ''}</div></div>
+      <span class="pill"><span class="dot" style="background:${css(a.status === 'approved' ? '--good' : a.status === 'dismissed' ? '--text-muted' : '--warning')}"></span>${esc(a.status)}</span></div>
+    <details ${compact ? '' : ''}><summary>${svg('eye', 14)} Preview</summary><div class="a-prev">${preview}</div></details>
+    <div class="a-btns">${a.status === 'proposed' ? `<button class="btn primary" data-s="approved">${svg('check', 14)} Approve</button><button class="btn" data-s="dismissed">${svg('x', 14)} Dismiss</button>` : `<button class="btn" data-s="proposed">Undo</button>`}
+      ${canDl ? `<a class="btn" href="/api/actions/${a.id}/download">${svg('download', 14)} ${a.kind === 'transfer' ? 'Export CSV' : 'Download'}</a>` : ''}
+      ${a.kind === 'expedite' ? `<button class="btn" data-copy>Copy message</button>` : ''}</div>`;
+  if (a.kind === 'transfer') renderTable(el.querySelector('.ttbl'), { title: 'Proposed transfers', total_rows: p.rows.length, drill: 'item_no',
+    columns: [{ field: 'item_no', label: 'Item', kind: 'text' }, { field: 'description', label: 'Description', kind: 'text' }, { field: 'from_site', label: 'From', kind: 'text' },
+      { field: 'to_site', label: 'To', kind: 'text' }, { field: 'qty', label: 'Qty', kind: 'qty' }, { field: 'uom', label: 'UoM', kind: 'text' }, { field: 'to_site_cover_days', label: 'Cover at destination', kind: 'days' }], rows: p.rows }, { size: 8 });
+  el.querySelectorAll('[data-s]').forEach(b => b.onclick = async () => {
+    const upd = await api('/api/actions/' + a.id, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: b.dataset.s }) });
+    el.replaceWith(actionCard(upd, compact)); updateBadge();
+  });
+  const c = el.querySelector('[data-copy]'); if (c) c.onclick = () => { navigator.clipboard.writeText(`Subject: ${p.subject}\n\n${p.body}`); c.textContent = 'Copied'; };
+  return el;
+}
+
+async function renderActions() {
+  const [acts, alerts, watch] = await Promise.all([api('/api/actions'), api('/api/alerts'), api('/api/watchlist')]);
+  const c = document.getElementById('content');
+  c.innerHTML = `<div class="vhead"><div><h1>Agent actions</h1><p>Everything the agent has proposed. Nothing is sent or posted to Business Central until a person acts on it.</p></div>
+      <button class="btn primary" id="newRun">${I.spark.replace('class="spark"', 'width="14" height="14" style="vertical-align:-2px"')} Run the agent</button></div>
+    <div class="filters" id="af">${['proposed', 'approved', 'dismissed', 'all'].map(s => `<button class="btn ${s === (S.actFilter || 'proposed') ? 'primary' : ''}" data-f="${s}">${s[0].toUpperCase() + s.slice(1)} (${s === 'all' ? acts.length : acts.filter(a => a.status === s).length})</button>`).join('')}</div>
+    <div id="alist" class="alist"></div>
+    <div class="charts"><div class="card"><h3>${svg('bell', 15)} Alert rules</h3><div id="alerts"></div></div><div class="card"><h3>${svg('star', 15)} Watchlist</h3><div id="watch"></div></div></div>`;
+  const draw = () => {
+    const f = S.actFilter || 'proposed', box = document.getElementById('alist');
+    const list = acts.filter(a => f === 'all' || a.status === f);
+    box.innerHTML = list.length ? '' : `<div class="empty">${svg('inbox', 28)}<div>No ${f === 'all' ? '' : f} actions yet.</div><div class="muted">Ask the Command Center to chase overdue POs, plan transfers, set alerts or write a briefing.</div></div>`;
+    list.forEach(a => box.appendChild(actionCard(a)));
+  };
+  document.getElementById('af').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { S.actFilter = b.dataset.f; renderActions(); } };
+  document.getElementById('newRun').onclick = () => go('command');
+  draw();
+  const al = document.getElementById('alerts');
+  al.innerHTML = alerts.length ? `<div class="tablewrap"><table><thead><tr><th>Rule</th><th class="num">Now</th><th>State</th><th></th></tr></thead><tbody>${alerts.map(r => `<tr><td title="${esc(r.name)}">${esc(r.name)}</td><td class="num">${r.last_value ?? '–'}</td>
+      <td><span class="pill"><span class="dot" style="background:${css(!r.active ? '--text-muted' : r.triggered ? '--critical' : '--good')}"></span>${!r.active ? 'Awaiting approval' : r.triggered ? 'Triggered' : 'OK'}</span></td>
+      <td><button class="btn" data-del="${r.id}">${svg('x', 12)}</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="muted">No alert rules. Try "alert me when any item will run out within 7 days".</div>';
+  al.onclick = async e => { const b = e.target.closest('[data-del]'); if (b) { await fetch('/api/alerts/' + b.dataset.del, { method: 'DELETE' }); renderActions(); } };
+  renderWatch(document.getElementById('watch'), watch, renderActions);
+}
+
+function renderWatch(el, watch, after) {
+  el.innerHTML = watch.length ? `<div class="tablewrap"><table><thead><tr><th>Item</th><th>Description</th><th class="num">Cover days</th><th>Status</th><th></th></tr></thead><tbody>${watch.map(w => `<tr class="click" data-i="${esc(w.item_no)}"><td>${esc(w.item_no)}</td><td title="${esc(w.description)}">${esc(w.description)}</td>
+      <td class="num">${fmt(w.cover_days, 'days')}</td><td><span class="pill"><span class="dot" style="background:${statusColor(w.cover_status)}"></span>${esc(w.cover_status)}</span></td>
+      <td><button class="btn" data-un="${esc(w.item_no)}">${svg('x', 12)}</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="muted">No watched items. Try "watch items about to run out".</div>';
+  el.onclick = async e => {
+    const u = e.target.closest('[data-un]'); if (u) { e.stopPropagation(); await fetch('/api/watchlist/' + u.dataset.un, { method: 'DELETE' }); return after(); }
+    const r = e.target.closest('tr.click'); if (r) openItem(r.dataset.i);
+  };
+}
+
+/* ---------------- Dashboards ---------------- */
+function filterBar() {
+  const f = S.filters, m = S.meta;
+  return `<div class="filters">
+    <select id="f_class"><option value="">All classes</option>${['RM', 'WIP', 'FG'].map(c => `<option ${f.item_class === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
+    <select id="f_site"><option value="">All sites</option>${m.sites.map(s => `<option ${f.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
+    <input id="f_q" placeholder="Search item, description, vendor, PO…" value="${esc(f.q)}">
+    <button class="btn" id="f_clear">Clear</button></div>`;
+}
+
+async function loadView() {
+  const view = S.view;
+  const qs = new URLSearchParams(Object.entries(S.filters).filter(([, v]) => v));
+  const c = document.getElementById('content');
+  if (!c.querySelector('.vhead')) c.innerHTML = `<div class="loading"><span class="thinking"><i></i><i></i><i></i></span> Loading view…</div>`;
+  const d = await api(`/api/view/${view}?${qs}`);
+  if (S.view !== view) return;
+  c.innerHTML = `<div class="vhead"><div><h1>${d.no ? `<span class="no">${d.no}</span> · ` : ''}${esc(d.title)}</h1><p>${esc(d.question)}</p></div>
+      <div class="rbtns"><button class="btn" id="askThis">${I.spark.replace('class="spark"', 'width="14" height="14" style="vertical-align:-2px"')} Ask about this view</button>
+      <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button></div></div>
+    ${filterBar()}
+    ${kpisHTML(d.kpis)}
+    ${insightsHTML(d.insights)}
+    <div id="ovx"></div>
+    ${chartsHTML(d.charts, 'ch')}
+    ${d.tables.length ? `<div class="section-title">${svg('doc', 15)} Detail</div>` : ''}
+    ${d.tables.map((t, i) => `<div class="card tablecard" id="tb${i}"></div>`).join('')}`;
+  bindFilters();
+  bindKpiLinks(c);
+  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('pdfThis').onclick = () => window.print();
+  mountCharts(d.charts, 'ch');
+  d.tables.forEach((t, i) => renderTable(document.getElementById('tb' + i), t));
+  if (view === 'overview') renderOverviewExtras();
+}
+
+async function renderOverviewExtras() {
+  const box = document.getElementById('ovx');
+  box.innerHTML = `<div class="tiles">${GROUPS.map(([g, ids]) => `<div class="card"><h3>${esc(g)}</h3>${ids.map(id => `<a class="tile" data-v="${id}">${svg(VIEW_ICON[id], 16)}<span>${esc(viewTitle(id))}</span>${svg('arrow', 14)}</a>`).join('')}</div>`).join('')}</div>
+    <div class="charts"><div class="card span-2"><h3>${svg('star', 15)} Watchlist</h3><div id="ov_watch"></div></div><div class="card"><h3>${svg('bell', 15)} Alerts</h3><div id="ov_alerts"></div></div></div>`;
+  box.querySelectorAll('.tile').forEach(t => t.onclick = () => go(t.dataset.v));
+  const [watch, alerts] = await Promise.all([api('/api/watchlist'), api('/api/alerts')]);
+  renderWatch(document.getElementById('ov_watch'), watch, () => go('overview', true));
+  const act = alerts.filter(r => r.active);
+  document.getElementById('ov_alerts').innerHTML = act.length ? act.map(r => `<div class="alert-row"><span class="dot" style="background:${css(r.triggered ? '--critical' : '--good')}"></span><b>${r.triggered ? 'Triggered' : 'OK'}</b> · ${esc(r.name)} <span class="muted">(now ${r.last_value ?? '–'})</span></div>`).join('')
+    : `<div class="muted">No active alerts. ${alerts.length ? `${alerts.length} awaiting approval in <a href="#actions">Agent actions</a>.` : 'Ask the agent to "watch items about to run out".'}</div>`;
+}
+
+function bindFilters() {
+  const upd = () => { S.filters = { item_class: f_class.value, site: f_site.value, q: f_q.value.trim() }; loadView(); };
+  f_class.onchange = upd; f_site.onchange = upd;
+  let t; f_q.oninput = () => { clearTimeout(t); t = setTimeout(upd, 400); };
+  f_clear.onclick = () => { S.filters = { item_class: '', site: '', q: '' }; loadView(); };
+}
+
+/* ---------- building blocks ---------- */
+const TONE = { critical: '--critical', crit: '--critical', serious: '--serious', warning: '--warning', good: '--good', info: '--accent' };
+const TONE_ICON = { critical: 'alert', crit: 'alert', serious: 'alert', warning: 'alert', good: 'check', info: 'star' };
+
+function sparkSVG(vals, color) {
+  const v = (vals || []).filter(x => x != null);
+  if (v.length < 2) return '';
+  const w = 120, h = 30, mn = Math.min(...v), mx = Math.max(...v), rg = (mx - mn) || 1;
+  const pts = v.map((x, i) => [i * w / (v.length - 1), h - 3 - (x - mn) / rg * (h - 6)]);
+  const line = pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ');
+  return `<svg class="spark-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polygon points="0,${h} ${line} ${w},${h}" fill="${color}" opacity=".12"/><polyline points="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${pts[pts.length - 1][0]}" cy="${pts[pts.length - 1][1]}" r="2.6" fill="${color}"/></svg>`;
+}
+
+function kpisHTML(kpis) {
+  const unit = k => k.kind === 'money' ? ' <small>UGX</small>' : k.kind === 'days' ? (/%|share/i.test(k.note || '') ? ' <small>%</small>' : ' <small>days</small>') : '';
+  return `<div class="kpis">${(kpis || []).map(k => {
+    const col = k.status ? css('--' + k.status) : css('--accent');
+    return `<div class="kpi ${k.view ? 'link' : ''} ${k.status ? 'st-' + k.status : ''}" ${k.view ? `data-view="${k.view}"` : ''}>
+      <div class="label">${k.status ? `<span class="dot" style="background:${col}"></span>` : ''}${esc(k.label)}${k.view ? svg('arrow', 12) : ''}</div>
+      <div class="kv"><div class="value">${k.kind === 'text' ? esc(k.value) : fmt(k.value, k.kind)}${k.kind === 'text' ? '' : unit(k)}</div>${k.spark ? sparkSVG(k.spark, col) : ''}</div>
+      ${k.pct != null ? `<div class="kbar"><span style="width:${k.pct}%;background:${col}"></span></div>` : ''}
+      ${k.note ? `<div class="note">${esc(k.note)}</div>` : ''}</div>`; }).join('')}</div>`;
+}
+function bindKpiLinks(root) { root.querySelectorAll('.kpi.link').forEach(k => k.onclick = () => go(k.dataset.view)); }
+
+function insightsHTML(list) {
+  if (!list || !list.length) return '';
+  return `<div class="insights-card"><div class="ic-head">${I.spark.replace('class="spark"', 'width="16" height="16"')} Key findings</div>
+    <ul>${list.map(x => `<li><span class="ic-dot" style="--c:${css(TONE[x.tone] || '--accent')}">${svg(TONE_ICON[x.tone] || 'star', 12)}</span><span>${esc(x.text)}</span></li>`).join('')}</ul></div>`;
+}
+
+function chartsHTML(charts, prefix) {
+  if (!charts || !charts.length) return '';
+  return `<div class="charts">${charts.map((ch, i) => `<div class="card chart-card span-${ch.span || 1}">
+      <div class="ch-head"><h3>${esc(ch.title)}</h3>${ch.subtitle ? `<p>${esc(ch.subtitle)}</p>` : ''}</div>
+      ${ch.type === 'heatmap' ? `<div class="heat" id="${prefix}${i}"></div>` : `<div class="chartbox" style="height:${ch.height || (ch.type === 'gauge' ? 190 : ch.type === 'sankey' ? 360 : 300)}px"><canvas id="${prefix}${i}"></canvas></div>`}
+    </div>`).join('')}</div>`;
+}
+function mountCharts(charts, prefix) {
+  S.charts.forEach(ch => ch.destroy()); S.charts = [];
+  (charts || []).forEach((ch, i) => { const el = document.getElementById(prefix + i); if (!el) return;
+    try { const c = drawChart(el, ch); if (c) S.charts.push(c); } catch (e) { el.parentElement.innerHTML = `<div class="muted">Chart unavailable (${esc(e.message)})</div>`; } });
+}
+
+/* ---------- colours ---------- */
+const KEYS = { seq: '--series-1', crit: '--critical', serious: '--serious', warning: '--warning', good: '--good', violet: '--series-7', muted: '--text-muted', FGk: '--series-3' };
+const tok = k => CLASS[k] ? css(CLASS[k]) : KEYS[k] ? css(KEYS[k]) : css('--series-1');
+const catCol = i => css('--series-' + ((i % 8) + 1));
+function hexA(hex, a) { const h = hex.replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map(x => x + x).join('') : h, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+function seriesColor(s, i, labels, ch) {
+  if (ch && ch.colors && ch.series.length === 1) return ch.colors.map(tok);
+  if (s.key && s.key.startsWith('class:')) return s.key.slice(6).split(',').map(k => css(CLASS[k] || '--series-4'));
+  if (s.key === 'class') return labels.map(l => css(CLASS[l] || '--series-4'));
+  if (s.key === 'cat' && ch && ch.type === 'doughnut') return labels.map((_, j) => catCol(j));
+  if (s.key === 'cat') return catCol(i);
+  if (CLASS[s.key] || KEYS[s.key]) return tok(s.key);
+  return catCol(i);
+}
+
+/* reference lines + centre text */
+const refLines = { id: 'refLines', afterDatasetsDraw(c, _, o) {
+  if (!o || !o.y || !o.y.length || !c.scales.y) return; const { ctx, chartArea: a } = c; ctx.save();
+  o.y.forEach(v => { const y = c.scales.y.getPixelForValue(v); if (y < a.top || y > a.bottom) return;
+    ctx.strokeStyle = v === 0 ? css('--text-muted') : hexA(css('--critical'), .55); ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(a.left, y); ctx.lineTo(a.right, y); ctx.stroke();
+    if (v) { ctx.fillStyle = css('--text-muted'); ctx.font = '10px Inter'; ctx.fillText(`${v} days`, a.right - 40, y - 3); } });
+  ctx.restore(); } };
+const centerText = { id: 'centerText', afterDraw(c, _, o) {
+  if (!o || o.text == null) return; const { ctx, chartArea: a } = c; ctx.save();
+  const cx = (a.left + a.right) / 2, mid = o.mid, size = mid ? Math.max(14, Math.min(26, (a.right - a.left) / 9)) : 30;
+  const y = mid ? (a.top + a.bottom) / 2 + size / 3 - (o.sub ? 6 : 0) : a.bottom - 18;
+  ctx.textAlign = 'center'; ctx.fillStyle = css('--text-primary'); ctx.font = `700 ${size}px ${css('--serif') || 'serif'}`;
+  ctx.fillText(o.text, cx, y); ctx.font = '11.5px Inter'; ctx.fillStyle = css('--text-muted');
+  if (o.sub) ctx.fillText(o.sub, cx, mid ? y + 17 : a.bottom + 2); ctx.restore(); } };
+
+function drawChart(el, ch) {
+  const grid = css('--grid'), ink = css('--text-secondary'), surf = css('--surface-1');
+  const money = ch.unit && String(ch.unit).startsWith('UGX');
+  const vfmt = v => v == null ? '–' : money ? Math.round(v).toLocaleString() + ' UGX' : Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 }) + (ch.unit && ch.unit !== 'UGX' ? ' ' + ch.unit : '');
+  const tick = v => money ? fmt(v, 'money') : Number(v).toLocaleString();
+  const tooltip = { backgroundColor: '#0f1b33', padding: 10, cornerRadius: 8, titleFont: { weight: '600' } };
+  const legend = { position: 'bottom', labels: { color: ink, boxWidth: 10, boxHeight: 10, usePointStyle: true, padding: 14 } };
+
+  if (ch.type === 'heatmap') return drawHeatmap(el, ch);
+
+  if (ch.type === 'gauge') {
+    const v = ch.extra.value, col = tok(ch.extra.key);
+    return new Chart(el, { type: 'doughnut', data: { labels: ['', ''], datasets: [{ data: [v, 100 - v], backgroundColor: [col, css('--surface-3')], borderWidth: 0, borderRadius: [6, 0] }] },
+      options: { responsive: true, maintainAspectRatio: false, rotation: -90, circumference: 180, cutout: '74%', layout: { padding: { bottom: 14 } },
+        plugins: { legend: { display: false }, tooltip: { enabled: false }, centerText: { text: `${Math.round(v)}%` } } }, plugins: [centerText] });
+  }
+
+  if (ch.type === 'treemap') {
+    const items = ch.extra.items, groups = [...new Set(items.map(x => x.group))];
+    const gcol = g => CLASS[g] ? css(CLASS[g]) : catCol(groups.indexOf(g));
+    return new Chart(el, { type: 'treemap', data: { datasets: [{ tree: items, key: 'value', borderWidth: 2, borderColor: surf, spacing: 0, borderRadius: 4,
+      backgroundColor: c => c.type !== 'data' ? 'transparent' : hexA(gcol(c.raw._data.group), .82),
+      labels: { display: true, align: 'left', position: 'top', color: '#fff', font: [{ size: 12, weight: '600' }, { size: 11 }], overflow: 'hidden',
+        formatter: c => c.type !== 'data' ? '' : [c.raw._data.label, money ? fmt(c.raw.v, 'money') : Number(c.raw.v).toLocaleString()] } }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false },
+        tooltip: { ...tooltip, callbacks: { title: i => i[0].raw._data.label, label: c => `${c.raw._data.group}: ${vfmt(c.raw.v)}` } } } } });
+  }
+
+  if (ch.type === 'sankey') {
+    const flows = ch.extra.flows, nodes = [...new Set(flows.flatMap(f => [f.from, f.to]))];
+    const ncol = n => { const k = n.trim(); return CLASS[k] ? css(CLASS[k]) : catCol(nodes.indexOf(n)); };
+    return new Chart(el, { type: 'sankey', data: { datasets: [{ data: flows, colorFrom: c => ncol(c.dataset.data[c.dataIndex].from), colorTo: c => ncol(c.dataset.data[c.dataIndex].to),
+      colorMode: 'gradient', alpha: .55, borderWidth: 0, nodeWidth: 12, size: 'max', color: css('--text-primary'), font: { size: 11 } }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false },
+        tooltip: { ...tooltip, callbacks: { label: c => { const f = c.dataset.data[c.dataIndex]; return `${f.from.trim()} → ${f.to}: ${vfmt(f.flow)}`; } } } } } });
+  }
+
+  if (ch.type === 'scatter') {
+    const e = ch.extra || {};
+    const datasets = ch.series.map((s, i) => { const col = seriesColor(s, i, [], ch); return { label: s.name, data: s.data, backgroundColor: hexA(col, .55), borderColor: col, borderWidth: 1, hoverBorderWidth: 2 }; });
+    return new Chart(el, { type: 'bubble', data: { datasets }, plugins: [refLines],
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend, refLines: { y: e.yRef || [] },
+        tooltip: { ...tooltip, callbacks: { title: i => i[0].raw.label, label: c => [`Usage: ${Math.round(c.raw.x).toLocaleString()} UGX/day`, `Cover: ${c.raw.y} days`, `Status: ${c.dataset.label}`] } } },
+        scales: { x: { type: e.xLog ? 'logarithmic' : 'linear', title: { display: true, text: e.xLabel, color: ink }, grid: { color: grid }, ticks: { color: ink, callback: v => { const l = Math.log10(v); return Number.isInteger(l) ? fmt(v, 'money') : ''; } } },
+          y: { type: e.yLog ? 'logarithmic' : 'linear', title: { display: true, text: e.yLabel, color: ink }, grid: { color: grid }, ticks: { color: ink, callback: v => [0.1, 1, 7, 14, 30, 90, 365].includes(v) ? v : '' } } } } });
+  }
+
+  const horizontal = ch.type === 'hbar', area = ch.type === 'area';
+  const type = horizontal ? 'bar' : area ? 'line' : ch.type;
+  const datasets = ch.series.map((s, i) => {
+    const col = seriesColor(s, i, ch.labels, ch);
+    if (type === 'line' && ch.extra && (ch.extra.seriesTypes || [])[i] === 'bar') return { type: 'bar', label: s.name, data: s.data, backgroundColor: hexA(col, .75), borderRadius: 4, maxBarThickness: 22, order: 2 };
+    if (type === 'line') return { label: s.name, data: s.data, borderColor: col, backgroundColor: area ? hexA(col, ch.stacked ? .55 : .18) : col,
+      fill: area ? (ch.stacked ? (i === 0 ? 'origin' : '-1') : 'origin') : false, borderWidth: 2, pointRadius: ch.labels.length > 20 ? 0 : 2.5, pointHoverRadius: 5, tension: .3 };
+    return { label: s.name, data: s.data, backgroundColor: col, borderColor: surf, borderWidth: type === 'doughnut' ? 2 : 0,
+      borderRadius: type === 'doughnut' ? 0 : 5, borderSkipped: 'start', maxBarThickness: horizontal ? 22 : 34, categoryPercentage: .78, barPercentage: .9 };
+  });
+  const total = type === 'doughnut' ? (ch.series[0]?.data || []).reduce((a, b) => a + (b || 0), 0) : 0;
+  return new Chart(el, {
+    type, data: { labels: ch.labels, datasets }, plugins: type === 'doughnut' ? [centerText] : [refLines],
+    options: {
+      indexAxis: horizontal ? 'y' : 'x', responsive: true, maintainAspectRatio: false,
+      interaction: { mode: type === 'line' ? 'index' : 'nearest', intersect: false },
+      plugins: {
+        legend: { ...legend, display: ch.series.length > 1 || type === 'doughnut', position: type === 'doughnut' && el.parentElement.clientWidth > 460 ? 'right' : 'bottom' },
+        tooltip: { ...tooltip, callbacks: { label: c => `${type === 'doughnut' ? c.label : c.dataset.label}: ${vfmt(c.raw)}${type === 'doughnut' && total ? ` (${(100 * c.raw / total).toFixed(0)}%)` : ''}` } },
+        centerText: type === 'doughnut' ? { mid: true, text: money ? fmt(total, 'money') : Number(total).toLocaleString(), sub: money ? 'UGX total' : 'total' } : undefined,
+        refLines: { y: ch.extra && ch.extra.zeroLine ? [0] : [] },
+      },
+      cutout: type === 'doughnut' ? '66%' : undefined,
+      layout: type === 'doughnut' ? { padding: 6 } : undefined,
+      scales: type === 'doughnut' ? {} : {
+        x: { stacked: ch.stacked, border: { display: false }, grid: { color: horizontal ? grid : 'transparent' }, ticks: { color: ink, maxRotation: 0, autoSkipPadding: 12, callback: horizontal ? tick : function (v) { const l = this.getLabelForValue(v); return String(l).length > 14 ? String(l).slice(0, 13) + '…' : l; } } },
+        y: { stacked: ch.stacked, beginAtZero: true, border: { display: false }, grid: { color: horizontal ? 'transparent' : grid }, ticks: { color: ink, autoSkip: !horizontal, font: { size: horizontal ? 11 : 12 }, callback: horizontal ? function (v) { const l = String(this.getLabelForValue(v)); return l.length > 30 ? l.slice(0, 29) + '…' : l; } : tick } },
+      },
+    },
+  });
+}
+
+function drawHeatmap(el, ch) {
+  const e = ch.extra, vals = e.values.flat().filter(v => v != null), mx = Math.max(1, ...vals);
+  const base = tok(e.key), money = ch.unit === 'UGX';
+  el.innerHTML = `<table class="heat-t"><thead><tr><th></th>${e.cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>
+    ${ch.labels.map((r, i) => `<tr><th>${esc(r)}</th>${e.values[i].map((v, j) => { const a = v ? .1 + .85 * (v / mx) : 0;
+      return `<td style="background:${v ? hexA(base, a) : 'transparent'};color:${a > .55 ? '#fff' : 'var(--text-primary)'}" title="${esc(r)} · ${esc(e.cols[j])}: ${money ? Math.round(v || 0).toLocaleString() + ' UGX' : (v || 0)}">${v ? (money ? fmt(v, 'money') : Number(v).toLocaleString()) : '·'}</td>`; }).join('')}</tr>`).join('')}</tbody></table>`;
+  return null;
+}
+
+/* ---------- tables with in-cell data bars ---------- */
+function renderTable(el, t, opts = {}) {
+  const st = { sort: null, dir: 1, page: 0, size: opts.size || 50 };
+  const num = k => ['qty', 'money', 'days'].includes(k);
+  const barCols = t.bars === false ? [] : t.columns.filter(c => c.kind === 'money' || (c.kind === 'qty' && !/days|line|parent|component/i.test(c.label))).map(c => c.field);
+  const maxOf = {}; barCols.forEach(f => maxOf[f] = Math.max(1e-9, ...t.rows.map(r => Math.abs(r[f] || 0))));
+  const draw = () => {
+    let rows = t.rows.slice();
+    if (st.sort) { const f = st.sort; rows.sort((a, b) => { const x = a[f], y = b[f]; if (x == null) return 1; if (y == null) return -1; return (x > y ? 1 : x < y ? -1 : 0) * st.dir; }); }
+    const pages = Math.max(1, Math.ceil(rows.length / st.size)); st.page = Math.min(st.page, pages - 1);
+    const slice = rows.slice(st.page * st.size, (st.page + 1) * st.size);
+    const cell = (r, c) => {
+      const v = r[c.field];
+      if (c.kind === 'link') return v ? `<a class="btn" href="${esc(v)}">${svg('download', 12)} Excel</a>` : '';
+      if (c.kind === 'status') return v ? `<span class="pill"><span class="dot" style="background:${statusColor(v)}"></span>${esc(v)}</span>` : '–';
+      if (c.kind === 'days' && v != null) { const col = v < 7 ? '--critical' : v < 14 ? '--serious' : v < 30 ? '--warning' : v > 180 ? '--series-7' : '--good';
+        return `<span class="dchip" style="--c:${css(col)}">${esc(tableFmt(v, c.kind))}</span>`; }
+      if (c.field === 'item_class' && CLASS[v]) return `<span class="cls" style="--c:${css(CLASS[v])}">${esc(v)}</span>`;
+      if (c.field === 'abc' && v) return `<span class="abc abc-${esc(v)}">${esc(v)}</span>`;
+      return esc(tableFmt(v, c.kind));
+    };
+    const bg = (r, c) => { if (!barCols.includes(c.field) || r[c.field] == null) return ''; const p = Math.min(100, 100 * Math.abs(r[c.field]) / maxOf[c.field]);
+      return ` style="background:linear-gradient(to left, ${hexA(c.kind === 'money' ? css('--accent') : css('--series-3'), .13)} ${p}%, transparent ${p}%)"`; };
+    el.innerHTML = `<div class="tablehead"><h3 style="margin:0">${esc(t.title)} <span class="muted" style="font-weight:400">· ${t.total_rows.toLocaleString()} rows${t.total_rows > t.rows.length ? `, top ${t.rows.length} shown` : ''}</span></h3>
+      <div class="rbtns"><input class="tfilter" placeholder="Filter rows…"><button class="btn" data-csv>${svg('download', 12)} CSV</button></div></div>
+      <div class="tablewrap"><table><thead><tr>${t.columns.map(c => `<th class="${num(c.kind) ? 'num' : ''}" data-f="${c.field}">${esc(c.label)}${st.sort === c.field ? (st.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead>
+      <tbody>${slice.map(r => `<tr class="${t.drill === 'item_no' && r.item_no ? 'click' : ''}" data-i="${esc(r.item_no || '')}">${t.columns.map(c => `<td class="${num(c.kind) ? 'num' : ''}"${bg(r, c)} title="${esc(r[c.field])}">${cell(r, c)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${t.columns.length}" class="muted">No rows match.</td></tr>`}</tbody></table></div>
+      ${pages > 1 ? `<div class="pager"><button class="btn" data-p="-1">‹ Prev</button> Page ${st.page + 1} of ${pages} · ${rows.length.toLocaleString()} rows <button class="btn" data-p="1">Next ›</button></div>` : ''}`;
+    el.querySelectorAll('th').forEach(th => th.onclick = () => { const f = th.dataset.f; st.dir = st.sort === f ? -st.dir : (num(t.columns.find(c => c.field === f).kind) ? -1 : 1); st.sort = f; draw(); });
+    el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { st.page = Math.max(0, st.page + +b.dataset.p); draw(); });
+    el.querySelectorAll('tr.click').forEach(tr => tr.onclick = () => openItem(tr.dataset.i));
+    el.querySelector('[data-csv]').onclick = () => exportCsv(t);
+    const tf = el.querySelector('.tfilter'); tf.value = st.q || '';
+    tf.oninput = () => { st.q = tf.value; const q = st.q.toLowerCase(); el.querySelectorAll('tbody tr').forEach(tr => tr.style.display = !q || tr.textContent.toLowerCase().includes(q) ? '' : 'none'); };
+    if (st.q) tf.oninput();
+  };
+  draw();
+}
+
+function exportCsv(t) {
+  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const body = [t.columns.map(c => q(c.label)).join(','), ...t.rows.map(r => t.columns.map(c => q(r[c.field])).join(','))].join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([body], { type: 'text/csv' }));
+  a.download = t.title.replace(/\W+/g, '_') + '.csv'; a.click();
+}
+
+/* ---------- item detail panel ---------- */
+let drawerCharts = [];
+async function openItem(no) {
+  const dr = document.getElementById('drawer');
+  dr.innerHTML = `<div class="loading"><span class="thinking"><i></i><i></i><i></i></span> Loading ${esc(no)}…</div>`; dr.classList.add('open');
+  const d = await api('/api/item/' + encodeURIComponent(no));
+  if (d.error) { dr.innerHTML = `<div class="muted">Item ${esc(no)} not found.</div>`; return; }
+  const s = d.summary, cls = s.item_class, col = CLASS[cls] ? css(CLASS[cls]) : css('--accent');
+  const cov = s.cover_days, covPct = cov == null ? 0 : Math.min(100, cov / 90 * 100);
+  const covCol = cov == null ? css('--text-muted') : cov < 7 ? css('--critical') : cov < 14 ? css('--serious') : cov < 30 ? css('--warning') : css('--good');
+  const sections = ['stock_by_location', 'purchase_lines', 'bom_components', 'used_in'];
+  dr.innerHTML = `<div class="d-head" style="--c:${col}"><div><div class="d-tags"><span class="cls" style="--c:${col}">${esc(cls)}</span>${s.abc ? `<span class="abc abc-${esc(s.abc)}">${esc(s.abc)}</span>` : ''}${s.risk_level && s.risk_level !== 'None' ? `<span class="pill"><span class="dot" style="background:${statusColor(s.risk_level)}"></span>${esc(s.risk_level)} risk</span>` : ''}</div>
+      <h2>${esc(no)}</h2><div class="muted">${esc(s.description)} · ${esc(s.posting_group || '')} · ${esc(s.uom || '')}</div></div>
+      <div class="rbtns"><button class="btn" id="dask">${I.spark.replace('class="spark"', 'width="14" height="14" style="vertical-align:-2px"')} Ask</button><button class="btn" id="dwatch">${svg('star', 14)} Watch</button><button class="btn" id="dclose">${svg('x', 14)}</button></div></div>
+    <div class="d-hero">
+      <div class="d-cover"><div class="muted">Days of cover</div><div class="d-big" style="color:${covCol}">${cov == null ? '–' : fmt(cov, 'days')}</div>
+        <div class="kbar big"><span style="width:${covPct}%;background:${covCol}"></span></div><div class="d-scale"><span>0</span><span>7</span><span>14</span><span>30</span><span>90+</span></div>
+        <div class="muted">${esc(s.cover_status || '–')} · supply: ${esc(s.supply_status || '–')}${s.stockout_date ? ` · runs out ${esc(s.stockout_date)}` : ''}</div></div>
+      <div class="d-tiles">${[['Stock on hand', fmt(s.stock_qty, 'qty') + ' ' + (s.uom || '')], ['Stock value', fmt(s.stock_value, 'money') + ' UGX'], ['Usage / day', fmt(s.daily_usage, 'qty')],
+        ['Incoming (open PO)', fmt(s.incoming_qty, 'qty')], ['Overdue on PO', fmt(s.overdue_qty, 'qty')], ['Locations', fmt(s.locations, 'qty')]].map(([a, b]) => `<div><span>${a}</span><b>${esc(b)}</b></div>`).join('')}
+        ${d.spark && d.spark.some(x => x) ? `<div class="d-spark"><span>Weekly usage</span>${sparkSVG(d.spark, col)}</div>` : ''}</div></div>
+    ${insightsHTML(d.insights)}
+    ${d.charts.length ? `<div class="d-charts">${d.charts.map((ch, i) => `<div class="card chart-card"><div class="ch-head"><h3>${esc(ch.title)}</h3></div><div class="chartbox" style="height:220px"><canvas id="dch${i}"></canvas></div></div>`).join('')}</div>` : ''}
+    ${sections.map(k => d[k].total_rows ? `<div class="card tablecard" id="d_${k}"></div>` : '').join('')}`;
+  document.getElementById('dclose').onclick = () => dr.classList.remove('open');
+  document.getElementById('dask').onclick = () => { dr.classList.remove('open'); go('command'); setTimeout(() => ask(`What is the position, cover and supply situation for ${no}, and what should we do?`), 50); };
+  document.getElementById('dwatch').onclick = async e => { await api('/api/watchlist/' + encodeURIComponent(no), { method: 'POST' });
+    e.currentTarget.innerHTML = `${svg('check', 14)} Watching`; };
+  drawerCharts.forEach(c => c && c.destroy()); drawerCharts = d.charts.map((ch, i) => drawChart(document.getElementById('dch' + i), ch));
+  sections.forEach(k => d[k].total_rows && renderTable(document.getElementById('d_' + k), d[k], { size: 8 }));
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.getElementById('drawer').classList.remove('open'); });
+window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (v && v !== S.view) go(v); });
+
+/* ---------------- Reporting ---------------- */
+const CAT_ICON = { Inventory: 'box', Cover: 'gauge', Supply: 'truck', Risk: 'alert', Production: 'factory', Management: 'flag', Governance: 'shield', 'My reports': 'star' };
+const qsOf = o => new URLSearchParams(Object.entries(o).filter(([, v]) => v)).toString();
+const FREQ = { daily: 'Every day', weekdays: 'Weekdays (Mon–Fri)', weekly: 'Weekly', monthly: 'Monthly' };
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+async function renderReports() {
+  const d = await api('/api/reports'); S.reportCat = d;
+  const cats = [...new Set(d.catalogue.map(c => c.category))];
+  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Report library</h1><p>Standard supply chain reports from the governed model — preview, export to Excel / CSV / PDF, or schedule.</p></div>
+      <div style="display:flex;gap:8px"><button class="btn" id="toBuilder">${svg('sliders', 14)} Build a custom report</button><button class="btn" id="toSched">${svg('calendar', 14)} Schedules & history</button></div></div>
+    ${cats.map(cat => `<div class="rgroup"><h3>${svg(CAT_ICON[cat] || 'doc', 16)} ${esc(cat)}</h3><div class="rcards">${d.catalogue.filter(c => c.category === cat).map(c => `
+      <button class="rcard" data-r="${esc(c.id)}"><div class="rc-ic">${svg(CAT_ICON[cat] || 'doc', 18)}</div><div><b>${esc(c.name)}</b><div class="muted">${esc(c.description)}</div></div>${svg('arrow', 14)}</button>`).join('')}</div></div>`).join('')}`;
+  document.querySelectorAll('.rcard').forEach(b => b.onclick = () => go('report:' + b.dataset.r));
+  document.getElementById('toBuilder').onclick = () => go('builder');
+  document.getElementById('toSched').onclick = () => go('schedules');
+}
+
+async function renderReport(rid) {
+  if (!S.reportCat) S.reportCat = await api('/api/reports');
+  const meta = S.reportCat.catalogue.find(c => c.id === rid) || { name: rid, description: '' };
+  document.getElementById('pageTitle').textContent = `Reporting / ${meta.name}`;
+  const f = S.rFilters || (S.rFilters = { item_class: '', site: '', q: '' });
+  const c = document.getElementById('content');
+  c.innerHTML = `<div class="vhead"><div><h1>${esc(meta.name)}</h1><p>${esc(meta.description)}</p></div>
+      <div class="rbtns"><a class="btn primary" id="xl">${svg('download', 14)} Excel</a><a class="btn" id="csv">${svg('download', 14)} CSV</a>
+      <button class="btn" id="pdf">${svg('printer', 14)} Print / PDF</button><button class="btn" id="sch">${svg('calendar', 14)} Schedule</button>
+      <button class="btn" id="save">${svg('star', 14)} Save to history</button><button class="btn" id="askR">${I.spark.replace('class="spark"', 'width="14" height="14"')} Ask agent</button></div></div>
+    <div class="filters"><select id="f_class"><option value="">All classes</option>${['RM', 'WIP', 'FG'].map(x => `<option ${f.item_class === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
+      <select id="f_site"><option value="">All sites</option>${S.meta.sites.map(s => `<option ${f.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
+      <input id="f_q" placeholder="Search item, description, vendor, PO…" value="${esc(f.q)}"><button class="btn" id="f_clear">Clear</button></div>
+    <div id="schedBox"></div><div id="rbody"><div class="empty"><span class="thinking"><i></i><i></i><i></i></span> Building report…</div></div>`;
+  const upd = () => { S.rFilters = { item_class: f_class.value, site: f_site.value, q: f_q.value.trim() }; renderReport(rid); };
+  f_class.onchange = upd; f_site.onchange = upd; let t; f_q.oninput = () => { clearTimeout(t); t = setTimeout(upd, 500); };
+  f_clear.onclick = () => { S.rFilters = { item_class: '', site: '', q: '' }; renderReport(rid); };
+  const qs = qsOf(S.rFilters);
+  document.getElementById('xl').href = `/api/reports/export/${encodeURIComponent(rid)}?${qs}&fmt=xlsx`;
+  document.getElementById('csv').href = `/api/reports/export/${encodeURIComponent(rid)}?${qs}&fmt=csv`;
+  document.getElementById('sch').onclick = () => scheduleForm(document.getElementById('schedBox'), rid, S.rFilters);
+  document.getElementById('save').onclick = async e => { const b = e.currentTarget; b.disabled = true; b.textContent = 'Saving…';
+    const h = await api('/api/reports/generate/' + encodeURIComponent(rid), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(S.rFilters) });
+    b.innerHTML = `${svg('check', 14)} Saved (${h.rows.toLocaleString()} rows)`; };
+  document.getElementById('askR').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${meta.name}${S.rFilters.item_class ? ' for ' + S.rFilters.item_class : ''}${S.rFilters.site ? ' at ' + S.rFilters.site : ''}: key findings and what to act on.`), 50); };
+  const r = await api(`/api/reports/run/${encodeURIComponent(rid)}?${qs}`);
+  if (S.view !== 'report:' + rid) return;
+  document.getElementById('pdf').onclick = () => printReport(r);
+  drawReportBody(document.getElementById('rbody'), r);
+}
+
+function drawReportBody(el, r, opts = {}) {
+  el.innerHTML = `<div class="print-head"><b>${esc(r.name || 'Report')}</b> · ${esc(r.company || S.meta.notes.company)} · reporting date ${esc(r.reporting_date || S.meta.notes.reporting_date)} · generated ${esc(r.generated_at || '')} EAT${r.params && Object.keys(r.params).length ? ' · ' + esc(Object.entries(r.params).map(([k, v]) => k + '=' + v).join(', ')) : ''}</div>
+    ${kpisHTML(r.summary)}${insightsHTML(r.insights)}${chartsHTML(r.charts, 'rch')}
+    ${(r.sections || []).map((s, i) => `<div class="card tablecard" id="rsec${i}"></div>`).join('')}`;
+  bindKpiLinks(el);
+  mountCharts(r.charts, 'rch');
+  (r.sections || []).forEach((s, i) => renderTable(document.getElementById('rsec' + i), s, { size: opts.size || 25 }));
+}
+
+function printReport(r) {
+  drawReportBody(document.getElementById('rbody'), r, { size: 100000 });
+  document.body.classList.add('printing');
+  setTimeout(() => { window.print(); document.body.classList.remove('printing'); drawReportBody(document.getElementById('rbody'), r); }, 400);
+}
+
+function scheduleForm(box, rid, params) {
+  box.innerHTML = `<div class="card sched-form"><h3>${svg('calendar', 15)} Schedule this report</h3>
+    <div class="filters" style="margin:0">
+      <select id="s_freq">${Object.entries(FREQ).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+      <select id="s_wd" hidden>${DAYS.map((d, i) => `<option value="${i}">${d}</option>`).join('')}</select>
+      <select id="s_md" hidden>${Array.from({ length: 28 }, (_, i) => `<option>${i + 1}</option>`).join('')}</select>
+      <input type="time" id="s_time" value="07:00" style="min-width:0"> <span class="muted">EAT</span>
+      <button class="btn primary" id="s_ok">Create schedule</button><button class="btn" id="s_x">Cancel</button></div>
+    <div class="muted" style="margin-top:8px">Each run saves an Excel file to Reports → History${Object.values(params || {}).some(Boolean) ? ' with the current filters' : ''}. Email delivery can be added once a mail sender is approved.</div></div>`;
+  const fr = box.querySelector('#s_freq');
+  fr.onchange = () => { box.querySelector('#s_wd').hidden = fr.value !== 'weekly'; box.querySelector('#s_md').hidden = fr.value !== 'monthly'; };
+  box.querySelector('#s_x').onclick = () => box.innerHTML = '';
+  box.querySelector('#s_ok').onclick = async () => {
+    const s = await api('/api/schedules/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      report_id: rid, params: Object.fromEntries(Object.entries(params || {}).filter(([, v]) => v)), frequency: fr.value,
+      time: box.querySelector('#s_time').value || '07:00', weekday: box.querySelector('#s_wd').value, monthday: box.querySelector('#s_md').value }) });
+    box.innerHTML = `<div class="card">${svg('check', 15)} Scheduled — next run ${esc((s.next_run || '').replace('T', ' ').slice(0, 16))} EAT. <a href="#schedules">Manage schedules</a></div>`;
+  };
+}
+
+/* ----- report builder ----- */
+async function renderBuilder() {
+  if (!S.reportCat) S.reportCat = await api('/api/reports');
+  const D = S.reportCat.datasets, AG = S.reportCat.aggs;
+  const b = S.builder || (S.builder = { dataset: 'items', mode: 'list', columns: [], group_by: '', metrics: [{ col: '', agg: 'sum' }], conditions: [], filters: {}, sort: { col: '', dir: 'desc' }, limit: '' });
+  const cols = D[b.dataset].columns, num = cols.filter(c => ['qty', 'money', 'days'].includes(c.kind));
+  if (!b.columns.length) b.columns = cols.slice(0, 7).map(c => c.field);
+  const opt = (list, sel, blank) => (blank ? `<option value="">${blank}</option>` : '') + list.map(c => `<option value="${c.field}" ${c.field === sel ? 'selected' : ''}>${esc(c.label)}</option>`).join('');
+  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Report builder</h1><p>Pick a dataset, choose columns or group and summarise, add conditions — then export, save or schedule.</p></div></div>
+    <div class="builder"><div class="card bform">
+      <label>Dataset<select id="b_ds">${Object.entries(D).map(([k, v]) => `<option value="${k}" ${k === b.dataset ? 'selected' : ''}>${esc(v.label)}</option>`).join('')}</select></label>
+      <div class="seg"><button class="${b.mode === 'list' ? 'on' : ''}" data-mode="list">List rows</button><button class="${b.mode === 'group' ? 'on' : ''}" data-mode="group">Group & summarise</button></div>
+      ${b.mode === 'list' ? `<label>Columns</label><div class="colpick">${cols.map(c => `<label class="chk"><input type="checkbox" value="${c.field}" ${b.columns.includes(c.field) ? 'checked' : ''}> ${esc(c.label)}</label>`).join('')}</div>`
+        : `<label>Group by<select id="b_group">${opt(cols.filter(c => !['qty', 'money', 'days'].includes(c.kind)), b.group_by, 'Choose…')}</select></label>
+           <label>Measures</label>${b.metrics.map((m_, i) => `<div class="row2"><select data-mi="${i}" class="b_mcol">${opt(num, m_.col, 'Column…')}</select><select data-mi="${i}" class="b_magg">${Object.entries(AG).map(([k, v]) => `<option value="${k}" ${k === m_.agg ? 'selected' : ''}>${v}</option>`).join('')}</select><button class="btn" data-mrm="${i}">${svg('x', 12)}</button></div>`).join('')}
+           <button class="btn" id="b_madd">${svg('plus', 12)} Add measure</button>`}
+      <label>Conditions</label>${b.conditions.map((cd, i) => `<div class="row3"><select data-ci="${i}" class="b_ccol">${opt(cols, cd.col, 'Column…')}</select>
+        <select data-ci="${i}" class="b_cop">${['=', '!=', '>', '>=', '<', '<=', 'contains'].map(o => `<option ${o === cd.op ? 'selected' : ''}>${o}</option>`).join('')}</select>
+        <input data-ci="${i}" class="b_cval" value="${esc(cd.value || '')}" placeholder="value"><button class="btn" data-crm="${i}">${svg('x', 12)}</button></div>`).join('')}
+      <button class="btn" id="b_cadd">${svg('plus', 12)} Add condition</button>
+      <div class="row2"><label>Class<select id="b_cls"><option value="">All</option>${['RM', 'WIP', 'FG'].map(x => `<option ${b.filters.item_class === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
+        <label>Site<select id="b_site"><option value="">All</option>${S.meta.sites.map(s => `<option ${b.filters.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label></div>
+      <div class="row2"><label>Sort by<select id="b_sort">${opt(cols, b.sort.col, 'Default')}</select></label><label>Order<select id="b_dir"><option value="desc">High → low</option><option value="asc" ${b.sort.dir === 'asc' ? 'selected' : ''}>Low → high</option></select></label></div>
+      <label>Max rows<input id="b_lim" type="number" min="1" value="${esc(b.limit)}" placeholder="All"></label>
+      <div class="bbtns"><button class="btn primary" id="b_run">${svg('play', 14)} Run</button><button class="btn" id="b_xl">${svg('download', 14)} Excel</button><button class="btn" id="b_save">${svg('star', 14)} Save as report</button></div>
+      <div id="b_msg" class="muted"></div>
+    </div><div id="b_out"><div class="empty">${svg('sliders', 28)}<div>Configure the report and press Run.</div></div></div></div>`;
+  const read = () => {
+    b.dataset = b_ds.value;
+    if (b.mode === 'list') b.columns = [...document.querySelectorAll('.colpick input:checked')].map(x => x.value);
+    else { b.group_by = b_group.value; document.querySelectorAll('.b_mcol').forEach(x => b.metrics[+x.dataset.mi].col = x.value); document.querySelectorAll('.b_magg').forEach(x => b.metrics[+x.dataset.mi].agg = x.value); }
+    document.querySelectorAll('.b_ccol').forEach(x => b.conditions[+x.dataset.ci].col = x.value);
+    document.querySelectorAll('.b_cop').forEach(x => b.conditions[+x.dataset.ci].op = x.value);
+    document.querySelectorAll('.b_cval').forEach(x => b.conditions[+x.dataset.ci].value = x.value);
+    b.filters = { item_class: b_cls.value, site: b_site.value }; b.sort = { col: b_sort.value, dir: b_dir.value }; b.limit = b_lim.value;
+  };
+  const spec = () => ({ dataset: b.dataset, columns: b.mode === 'list' ? b.columns : [], group_by: b.mode === 'group' ? b.group_by : '',
+    metrics: b.mode === 'group' ? b.metrics.filter(x => x.col) : [], conditions: b.conditions.filter(x => x.col && x.value !== ''), filters: b.filters, sort: b.sort, limit: b.limit || null, title: D[b.dataset].label });
+  b_ds.onchange = () => { read(); b.columns = []; b.group_by = ''; b.metrics = [{ col: '', agg: 'sum' }]; b.conditions = []; b.sort = { col: '', dir: 'desc' }; renderBuilder(); };
+  document.querySelectorAll('[data-mode]').forEach(x => x.onclick = () => { read(); b.mode = x.dataset.mode; renderBuilder(); });
+  const madd = document.getElementById('b_madd'); if (madd) madd.onclick = () => { read(); b.metrics.push({ col: '', agg: 'sum' }); renderBuilder(); };
+  document.querySelectorAll('[data-mrm]').forEach(x => x.onclick = () => { read(); b.metrics.splice(+x.dataset.mrm, 1); renderBuilder(); });
+  b_cadd.onclick = () => { read(); b.conditions.push({ col: '', op: '=', value: '' }); renderBuilder(); };
+  document.querySelectorAll('[data-crm]').forEach(x => x.onclick = () => { read(); b.conditions.splice(+x.dataset.crm, 1); renderBuilder(); });
+  const run = async () => {
+    read(); if (b.mode === 'group' && !b.group_by) { b_msg.textContent = 'Choose a column to group by.'; return; }
+    b_msg.textContent = '';
+    const r = await api('/api/reports/custom/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ spec: spec() }) });
+    if (r.error) { b_msg.textContent = r.error; return; }
+    drawReportBody(document.getElementById('b_out'), { ...r, name: D[b.dataset].label });
+  };
+  b_run.onclick = run;
+  b_xl.onclick = async () => { read(); const res = await fetch('/api/reports/custom/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ spec: spec(), name: D[b.dataset].label }) });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(await res.blob()); a.download = D[b.dataset].label.replace(/\W+/g, '_') + '.xlsx'; a.click(); };
+  b_save.onclick = async () => { read(); const name = prompt('Name for this report', S.builder.savedName || ''); if (!name) return;
+    const r = await api('/api/reports/custom', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, spec: spec() }) });
+    S.reportCat = null; b_msg.innerHTML = `${svg('check', 14)} Saved as <a href="#report:custom:${r.id}">${esc(name)}</a> under My reports — you can now export or schedule it.`; };
+  if (b.ran) run();
+  b.ran = true;
+}
+
+/* ----- schedules & history ----- */
+async function renderSchedules() {
+  const [s, h, cat] = await Promise.all([api('/api/schedules'), api('/api/reports/history'), api('/api/reports')]);
+  S.reportCat = cat;
+  const when = x => x.frequency === 'weekly' ? `Weekly on ${DAYS[x.weekday]}` : x.frequency === 'monthly' ? `Monthly on day ${x.monthday}` : FREQ[x.frequency];
+  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Schedules & history</h1><p>Reports that run automatically, and every report generated by people, schedules or the agent.</p></div>
+      <button class="btn primary" id="newSch">${svg('plus', 14)} New schedule</button></div>
+    <div id="newBox"></div>
+    <div class="card"><h3>${svg('calendar', 15)} Scheduled reports</h3>${s.reports.length ? `<div class="tablewrap"><table><thead><tr><th>Report</th><th>Filters</th><th>When</th><th>Next run (EAT)</th><th>Last run</th><th>Status</th><th>Owner</th><th></th></tr></thead><tbody>
+      ${s.reports.map(x => `<tr><td>${esc(x.name)}</td><td>${esc(Object.entries(x.params || {}).map(([k, v]) => k + '=' + v).join(', ') || '–')}</td><td>${esc(when(x))} ${esc(x.time)}</td>
+        <td>${esc((x.enabled ? x.next_run || '' : 'Paused').replace('T', ' ').slice(0, 16))}</td><td>${esc((x.last_run || '–').replace('T', ' ').slice(0, 16))}</td>
+        <td>${x.last_status ? `<span class="pill"><span class="dot" style="background:${css(x.last_status === 'ok' ? '--good' : '--critical')}"></span>${esc(x.last_status)}</span>` : '–'}</td><td>${esc(x.created_by || '')}</td>
+        <td style="white-space:nowrap"><button class="btn" data-tog="${x.id}" data-en="${x.enabled ? 0 : 1}">${x.enabled ? 'Pause' : 'Resume'}</button> <button class="btn" data-del="${x.id}">${svg('trash', 12)}</button></td></tr>`).join('')}</tbody></table></div>`
+      : '<div class="muted">No scheduled reports yet. Open any report and choose <b>Schedule</b>, or use New schedule.</div>'}</div>
+    <div class="card tablecard" id="hist"></div>`;
+  document.getElementById('newSch').onclick = () => {
+    const box = document.getElementById('newBox');
+    box.innerHTML = `<div class="card"><h3>New schedule</h3><div class="filters" style="margin:0"><select id="ns_r">${cat.catalogue.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select>
+      <select id="ns_c"><option value="">All classes</option><option>RM</option><option>WIP</option><option>FG</option></select>
+      <select id="ns_s"><option value="">All sites</option>${S.meta.sites.map(x => `<option>${esc(x)}</option>`).join('')}</select></div><div id="ns_f" style="margin-top:8px"></div></div>`;
+    const draw = () => scheduleForm(document.getElementById('ns_f'), ns_r.value, { item_class: ns_c.value, site: ns_s.value });
+    ns_r.onchange = draw; ns_c.onchange = draw; ns_s.onchange = draw; draw();
+    const orig = document.getElementById('ns_f');
+    new MutationObserver(() => { if (orig.textContent.includes('Scheduled —')) setTimeout(renderSchedules, 900); }).observe(orig, { childList: true, subtree: true });
+  };
+  document.querySelectorAll('[data-tog]').forEach(x => x.onclick = async () => { await api('/api/schedules/report/' + x.dataset.tog, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: x.dataset.en === '1' }) }); renderSchedules(); });
+  document.querySelectorAll('[data-del]').forEach(x => x.onclick = async () => { if (confirm('Delete this schedule?')) { await fetch('/api/schedules/report/' + x.dataset.del, { method: 'DELETE' }); renderSchedules(); } });
+  renderTable(document.getElementById('hist'), { title: 'Report history', total_rows: h.length, drill: null,
+    columns: [{ field: 'generated_at', label: 'Generated (EAT)', kind: 'text' }, { field: 'name', label: 'Report', kind: 'text' }, { field: 'filters', label: 'Filters', kind: 'text' },
+      { field: 'by', label: 'By', kind: 'text' }, { field: 'trigger', label: 'Trigger', kind: 'text' }, { field: 'rows', label: 'Rows', kind: 'qty' }, { field: 'dl', label: '', kind: 'link' }],
+    rows: h.map(x => ({ ...x, filters: Object.entries(x.params || {}).map(([k, v]) => k + '=' + v).join(', ') || '–', dl: `/api/reports/history/${x.id}/download` })) }, { size: 20 });
+}
+
+/* ----- trends ----- */
+async function renderTrends() {
+  const d = await api('/api/trends');
+  const k = d.kpi, n = k.length;
+  const byWeek = {}; d.weekly.forEach(r => { const w = byWeek[r.week] || (byWeek[r.week] = { c: 0, o: 0, s: 0, r: 0 }); w.c += r.consumed_value; w.o += r.output_value; w.s += r.sold_value; w.r += r.received_value; });
+  const weeks = Object.keys(byWeek).sort();
+  const cls = c => weeks.map(w => (d.weekly.find(r => r.week === w && r.item_class === c) || {}).consumed_value || 0);
+  const lab = k.map(x => x.extracted_at.replace('T', ' ').slice(0, 16));
+  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Trends</h1><p>How the supply chain is moving week by week, and how the headline measures change with each data load.</p></div></div>
+    <div class="charts"><div class="card"><h3>Weekly flow at cost (UGX)</h3><div class="chartbox"><canvas id="t1"></canvas></div></div>
+      <div class="card"><h3>Weekly consumption by class (UGX)</h3><div class="chartbox"><canvas id="t2"></canvas></div></div>
+      <div class="card"><h3>Stock value by class per data load</h3><div class="chartbox"><canvas id="t3"></canvas></div>${n < 3 ? `<div class="muted">${n} load${n === 1 ? '' : 's'} so far — this line builds up with every scheduled refresh during the proof period.</div>` : ''}</div>
+      <div class="card"><h3>Risk measures per data load</h3><div class="chartbox"><canvas id="t4"></canvas></div></div></div>`;
+  S.charts.forEach(ch => ch.destroy()); S.charts = [];
+  const ser = (name, key, data) => ({ name, key, data });
+  S.charts.push(drawChart(t1, { type: 'line', unit: 'UGX', labels: weeks, series: [ser('Consumption', 'seq', weeks.map(w => byWeek[w].c)), ser('Output', 'good', weeks.map(w => byWeek[w].o)), ser('Sales (cost)', 'FG', weeks.map(w => byWeek[w].s)), ser('Purchase receipts', 'serious', weeks.map(w => byWeek[w].r))] }));
+  S.charts.push(drawChart(t2, { type: 'bar', unit: 'UGX', stacked: true, labels: weeks, series: [ser('Raw Material', 'RM', cls('RM')), ser('Work in Progress', 'WIP', cls('WIP')), ser('Finished Goods', 'FG', cls('FG'))] }));
+  S.charts.push(drawChart(t3, { type: n > 1 ? 'line' : 'bar', unit: 'UGX', labels: lab, series: [ser('Raw Material', 'RM', k.map(x => x.rm_value)), ser('Work in Progress', 'WIP', k.map(x => x.wip_value)), ser('Finished Goods', 'FG', k.map(x => x.fg_value))] }));
+  S.charts.push(drawChart(t4, { type: n > 1 ? 'line' : 'bar', unit: 'items', labels: lab, series: [ser('Out of stock', 'crit', k.map(x => x.out_of_stock)), ser('Run out ≤7 days', 'serious', k.map(x => x.run_out_7d)), ser('Overdue PO lines', 'warning', k.map(x => x.overdue_lines)), ser('Constrained products', 'seq', k.map(x => x.constrained))] }));
+}
+
+/* ----- data refresh ----- */
+async function renderDataRefresh() {
+  const [s, log] = await Promise.all([api('/api/schedules'), api('/api/refresh/log')]);
+  S.meta = await api('/api/meta');
+  const n = S.meta.notes, r = n.reconciliation, rf = s.refresh, last = log[0];
+  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Data refresh</h1><p>Read-only loads from Business Central ${esc(n.environment)}, the run log and reconciliation after each load.</p></div>
+      <button class="btn primary" id="rnow">${svg('refresh', 14)} ${S.meta.refreshing ? 'Refreshing…' : 'Refresh now'}</button></div>
+    ${S.meta.last_error ? `<div class="banner" style="border-left-color:var(--critical)">Last refresh failed: ${esc(S.meta.last_error)}</div>` : ''}
+    <div class="kpis"><div class="kpi"><div class="label">Data loaded</div><div class="value" style="font-size:20px">${esc(n.extracted_at.replace('T', ' '))}</div><div class="note">${esc(n.company)}</div></div>
+      <div class="kpi"><div class="label"><span class="dot" style="background:${css(last && last.status === 'failed' ? '--critical' : '--good')}"></span>Last run</div><div class="value" style="font-size:20px">${last ? esc(last.status) : 'Initial load'}</div><div class="note">${last ? esc((last.started || '').replace('T', ' ').slice(0, 16)) + ' · ' + esc(last.trigger || 'manual') : ''}</div></div>
+      <div class="kpi"><div class="label">Reconciliation to BC</div><div class="value">${r ? (100 * r.items_matching / r.items_compared).toFixed(1) : '–'}<small> %</small></div><div class="note">${r ? `${r.items_matching.toLocaleString()} of ${r.items_compared.toLocaleString()} items match` : ''}</div></div>
+      <div class="kpi"><div class="label">Records in last load</div><div class="value">${(n.open_ledger_entries + n.movement_entries).toLocaleString()}</div><div class="note">ledger entries (open + ${n.window_days}-day movements)</div></div></div>
+    <div class="charts"><div class="card"><h3>${svg('clock', 15)} Scheduled refresh</h3>
+      <label class="chk"><input type="checkbox" id="rf_en" ${rf.enabled ? 'checked' : ''}> Refresh automatically</label>
+      <div class="filters" style="margin:10px 0"><input type="time" id="rf_time" value="${esc(rf.time)}" style="min-width:0"> <span class="muted">EAT on</span>
+        ${DAYS.map((d, i) => `<label class="chk"><input type="checkbox" class="rf_d" value="${i}" ${rf.days.includes(i) ? 'checked' : ''}> ${d}</label>`).join('')}</div>
+      <button class="btn primary" id="rf_save">Save schedule</button> <span id="rf_msg" class="muted"></span>
+      <div class="muted" style="margin-top:8px">Last scheduled run: ${esc((rf.last_run || '–').replace('T', ' ').slice(0, 16))}. Alerts are re-checked and scheduled reports use the new data after each load.</div></div>
+      <div class="card"><h3>${svg('shield', 15)} Connection</h3><dl><dt>Source</dt><dd>${esc(n.company)} · ${esc(n.environment)}</dd><dt>Access</dt><dd>Read-only (Entra ID app, client credentials). Pulse never posts, edits or deletes Business Central records.</dd>
+        <dt>Tables</dt><dd>Item Ledger Entries, Purchase Lines, Items, Locations, Vendors, Production BOM header & lines</dd></dl></div></div>
+    <div class="card tablecard" id="rlog"></div>`;
+  rnow.onclick = async () => { await api('/api/refresh', { method: 'POST' }); rnow.textContent = 'Refreshing… (about 2 minutes)';
+    const t = setInterval(async () => { const m = await api('/api/meta'); if (!m.refreshing) { clearInterval(t); S.meta = m; renderWhen(); if (S.view === 'datarefresh') renderDataRefresh(); } }, 5000); };
+  rf_save.onclick = async () => { await api('/api/schedules/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: rf_en.checked, time: rf_time.value, days: [...document.querySelectorAll('.rf_d:checked')].map(x => +x.value) }) }); rf_msg.textContent = 'Saved.'; };
+  renderTable(document.getElementById('rlog'), { title: 'Refresh run log', total_rows: log.length, drill: null,
+    columns: [{ field: 'started', label: 'Started (EAT)', kind: 'text' }, { field: 'trigger', label: 'Trigger', kind: 'text' }, { field: 'user', label: 'By', kind: 'text' }, { field: 'status', label: 'Status', kind: 'status' },
+      { field: 'seconds', label: 'Seconds', kind: 'qty' }, { field: 'records', label: 'Records', kind: 'qty' }, { field: 'recon_pct', label: 'Reconciliation %', kind: 'days' }, { field: 'detail', label: 'Detail', kind: 'text' }],
+    rows: log.map(x => ({ ...x, started: (x.started || '').replace('T', ' ').slice(0, 19), status: x.status === 'ok' ? 'Healthy' : 'Failed', detail: x.error || (x.alerts_triggered && x.alerts_triggered.length ? 'Alerts: ' + x.alerts_triggered.join('; ') : '') })) }, { size: 15 });
+}
+
+/* ----- audit ----- */
+async function renderAudit() {
+  const rows = await api('/api/audit');
+  const types = [...new Set(rows.map(r => r.type).filter(Boolean))];
+  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Audit log</h1><p>Every question, agent run, decision, report and data refresh — with who and when.</p></div></div>
+    <div class="filters"><select id="a_t"><option value="">All events</option>${types.map(t => `<option>${esc(t)}</option>`).join('')}</select><input id="a_q" placeholder="Search user, question, report…"></div><div class="card tablecard" id="alog"></div>`;
+  const draw = () => {
+    const q = a_q.value.toLowerCase(), t = a_t.value;
+    const f = rows.filter(r => (!t || r.type === t) && (!q || JSON.stringify(r).toLowerCase().includes(q)));
+    renderTable(document.getElementById('alog'), { title: 'Events', total_rows: f.length, drill: null,
+      columns: [{ field: 'at', label: 'When', kind: 'text' }, { field: 'user', label: 'User', kind: 'text' }, { field: 'type', label: 'Type', kind: 'text' }, { field: 'event', label: 'Event', kind: 'text' }, { field: 'detail', label: 'Detail', kind: 'text' }],
+      rows: f.map(r => ({ ...r, at: String(r.at || '').replace('T', ' ').slice(0, 19) })) }, { size: 30 });
+  };
+  a_t.onchange = draw; let tm; a_q.oninput = () => { clearTimeout(tm); tm = setTimeout(draw, 300); }; draw();
+}
+
+/* ---------------- Definitions ---------------- */
+function renderDefinitions() {
+  const n = S.meta.notes, r = n.reconciliation;
+  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Definitions & data notes</h1><p>How every measure is calculated, and what the data profiling found.</p></div></div>
+    <div class="charts">
+    <div class="card"><h3>Measure definitions</h3><dl>${Object.entries(S.meta.definitions).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>
+    <div class="card"><h3>Data notes (this load)</h3><dl>
+      <dt>Source</dt><dd>${esc(n.company)} · ${esc(n.environment)} · extracted ${esc(n.extracted_at)}</dd>
+      <dt>Reporting window</dt><dd>${n.window_days} days (${n.production_days} days with production output)</dd>
+      <dt>Ledger</dt><dd>${n.open_ledger_entries.toLocaleString()} open entries (stock); ${n.movement_entries.toLocaleString()} movements in window</dd>
+      <dt>Reconciliation to BC item inventory</dt><dd>${r ? `${r.items_matching.toLocaleString()} of ${r.items_compared.toLocaleString()} items match exactly (${(100 * r.items_matching / r.items_compared).toFixed(1)}%).` : 'Run a refresh to compute.'}</dd>
+      <dt>Purchase lines</dt><dd>${n.purchase_lines_outstanding} outstanding lines; <b>${n.purchase_lines_overdue}</b> past expected receipt date, of which ${n.purchase_lines_stale} are more than ${n.stale_after_days} days overdue (stale, excluded from projections).</dd>
+      <dt>Bills of Materials</dt><dd>${n.bom_lines_certified.toLocaleString()} certified BOM item lines; <b>${n.bom_lines_zero_qty.toLocaleString()}</b> have Quantity per = 0 and are excluded.</dd>
+      <dt>Unclassified items with stock</dt><dd>${n.items_unclassified_with_stock.toLocaleString()} items (spares, consumables, stationery etc.) are outside RM/WIP/FG.</dd>
+    </dl>${r && r.mismatches.length ? '<div id="recon" style="margin-top:12px"></div>' : ''}</div></div>`;
+  if (r && r.mismatches.length) renderTable(document.getElementById('recon'), { title: 'Reconciliation mismatches', total_rows: r.mismatches.length, drill: 'item_no',
+    columns: [{ field: 'item_no', label: 'Item', kind: 'text' }, { field: 'bc', label: 'BC inventory', kind: 'qty' }, { field: 'pulse', label: 'Pulse stock', kind: 'qty' }], rows: r.mismatches }, { size: 10 });
+}
+
+init();
+</script>
+</body>
+</html>
