@@ -264,7 +264,8 @@ def inventory_position(m, f):
                        pct=pct(excess, tot))],
         "insights": [i for i in ins if i],
         "charts": [chart("doughnut", "Stock value by class", [C.CLASS_LABELS[c] for c in CLS],
-                         [("Value", "class", by.value.tolist())], "UGX", subtitle="Share of on-hand value"),
+                         [("Value", "class", by.value.tolist())], "UGX", subtitle="Share of on-hand value",
+                         extra={"quantity": [_clean(x) for x in by.qty.tolist()]}),
                    _treemap("Stock value by posting group", [(r.posting_group, r.stock_value, r.item_class)
                                                               for r in pg.itertuples()],
                             subtitle="Box size = value; colour = class", span=2),
