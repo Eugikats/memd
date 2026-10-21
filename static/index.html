@@ -328,18 +328,19 @@ dl dt { font-weight: 600; margin-top: 12px; } dl dd { margin: 2px 0 0; color: va
 }
 
 /* Inventory Position — visual redesign, scoped to that page */
-body.page-inv { background: #fff; color: #14213D; --accent: #2563EB; --accent-hover: #1D4ED8; --text-primary: #14213D; --text-secondary: #64748B; --border: #E2E8F0; --border-strong: #E2E8F0; }
-body.page-inv .shell, body.page-inv main { background: #fff; }
+body.page-inv { background: #f5f7fb; color: #14213D; --accent: #2563EB; --accent-hover: #1D4ED8; --text-primary: #14213D; --text-secondary: #64748B; --border: #E2E8F0; --border-strong: #E2E8F0; }
+body.page-inv .shell, body.page-inv main { background: #f5f7fb; }
 body.page-inv main { padding-top: 8px; }
 body.page-inv .topbar { background: #fff; border-bottom-color: #E2E8F0; }
 body.page-inv .topbar .page { display: none; }
-body.page-inv .topbar .when { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
-body.page-inv .topbar .when b { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
-body.page-inv .topbar .when a { text-decoration: none; color: #94a3b8; font-size: 12px; }
-body.page-inv .topbar .when a:hover { color: #2563EB; }
-body.page-inv #topAvatar { display: none; }
+body.page-inv .topbar .right { align-items: center; gap: 12px; }
+body.page-inv .topbar .when { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; line-height: 1.3; }
+body.page-inv .topbar .when b { font-size: 14px; font-weight: 600; letter-spacing: -.01em; color: #14213D; }
+body.page-inv .topbar .when a.inv-updated { display: block; text-decoration: none; color: #94a3b8; font-size: 12px; font-weight: 500; cursor: pointer; }
+body.page-inv .topbar .when a.inv-updated:hover { color: #2563EB; }
+body.page-inv #topAvatar { display: grid; width: 34px; height: 34px; background: #2563EB; color: #fff; font-weight: 600; }
 .inv-date { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #14213D; }
-.inv-updated { font-size: 12px; color: #94a3b8; font-weight: 500; }
+.inv-date svg { color: #64748b; }
 .inv-page { min-width: 0; }
 .inv-crumb { color: #94a3b8; font-size: 12.5px; margin: 2px 0 8px; }
 .inv-crumb span { margin: 0 4px; }
@@ -366,18 +367,23 @@ body.page-inv #topAvatar { display: none; }
 .inv-trend-tools { display: flex; align-items: center; gap: 8px; flex: none; }
 .inv-trend-tools select { height: 32px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 12px; font-weight: 600; color: #334155; background: #fff; }
 .inv-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
-.inv-kpi { position: relative; background: #fff; border: 1px solid #e6edf5; border-radius: 16px; padding: 14px 12px 12px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(15, 23, 42, .035); min-width: 0; min-height: 108px; display: flex; flex-direction: column; }
+.inv-kpi { position: relative; background: #fff; border: 1px solid #e6edf5; border-radius: 16px; padding: 14px 12px 12px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 10px 24px rgba(15, 23, 42, .04); min-width: 0; min-height: 124px; display: flex; flex-direction: column; }
 .inv-wide { margin-top: 14px; }
 .inv-kpi-top { display: flex; align-items: center; gap: 8px; min-width: 0; padding-right: 46px; min-height: 40px; }
 .inv-kpi-ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none; }
 .inv-kpi-l { margin: 0; flex: 1; min-width: 0; color: #64748b; font-size: 12px; font-weight: 600; line-height: 1.25; }
 .inv-ring { position: absolute; top: 12px; right: 10px; width: 42px; height: 42px; }
-.inv-kpi-row { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.inv-kpi-v { margin: 0; min-width: 0; color: #14213D; font-size: 22px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
+.inv-kpi-v { margin: 10px 0 0; min-width: 0; color: #14213D; font-size: 22px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
+.inv-kpi-foot { margin-top: 8px; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; min-height: 28px; }
+.inv-delta { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0; font-size: 11.5px; font-weight: 700; line-height: 1.15; }
+.inv-delta em { font-style: normal; font-weight: 500; color: #94a3b8; }
+.inv-delta.up { color: #16a34a; }
+.inv-delta.down { color: #dc2626; }
+.inv-delta.flat { color: #94a3b8; }
 .inv-kpi-v small { font-size: .72em; font-weight: 700; letter-spacing: 0; }
 .inv-kpi-v .u { font-size: 11px; font-weight: 600; color: #94a3b8; margin-left: 4px; letter-spacing: 0; }
 .inv-kpi-note { margin: 8px 0 0; color: #64748b; font-size: 11.5px; font-weight: 500; line-height: 1.35; }
-.inv-spark { width: 92px; height: 32px; flex: none; display: block; }
+.inv-spark { width: 84px; height: 28px; flex: none; display: block; margin-left: auto; }
 .inv-topcharts { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(260px, .95fr); gap: 14px; margin-top: 14px; }
 .inv-lower { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
 .inv-table { border-color: #E2E8F0; border-radius: 16px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
@@ -578,7 +584,7 @@ async function init() {
   document.getElementById('railToggle').onclick = () => isMobile() ? closeMenu() : rail.classList.toggle('collapsed');
   document.getElementById('menuBtn').onclick = () => { rail.classList.add('open'); document.body.classList.add('menu-open'); };
   document.getElementById('scrim').onclick = closeMenu;
-  document.getElementById('topAvatar').textContent = initials(S.meta.user_name);
+  document.getElementById('topAvatar').textContent = initials(S.meta.user_name) || 'P';
   const mn = document.getElementById('mobileNav');
   mn.innerHTML = '<option value="command">Command Center</option><option value="actions">Agent actions</option><option value="overview">Overview</option>' + views.map(v => `<option value="${v.id}">${v.no} ${esc(v.title)}</option>`).join('') + '<option value="reports">Report library</option><option value="builder">Report builder</option><option value="schedules">Schedules & history</option><option value="trends">Trends</option><option value="datarefresh">Data refresh</option><option value="audit">Audit log</option><option value="definitions">Definitions & data notes</option>';
   mn.onchange = () => go(mn.value);
@@ -602,11 +608,13 @@ function renderWhen() {
   const loaded = new Date(n.extracted_at);
   const time = Number.isNaN(loaded.getTime()) ? n.extracted_at.replace('T', ' ').slice(0, 16) : loaded.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   const label = inv
-    ? `<span class="inv-date">${svg('calendar', 16)}<span class="d-long">${long}</span><span class="d-short">${short}</span></span>`
+    ? `<span class="inv-date">${svg('calendar', 15)}<span class="d-long">${long}</span><span class="d-short">${short}</span></span>`
     : `<span class="d-long">${long}</span><span class="d-short">${short}</span>`;
   const refreshLong = S.meta.refreshing ? 'Refreshing from Business Central…' : S.meta.last_error ? 'Last refresh failed – retry' : 'Refresh from Business Central';
-  const updated = inv ? `<span class="inv-updated">Last updated: ${esc(time)}</span>` : '';
-  document.getElementById('when').innerHTML = `<b>${label}</b>${updated}<a id="refresh" title="Data loaded ${esc(n.extracted_at.replace('T', ' '))}. Click to refresh from Business Central."><span class="r-long">${refreshLong}</span><span class="r-short">${S.meta.refreshing ? 'Refreshing…' : '↻ Refresh'}</span></a>`;
+  const invStatus = S.meta.refreshing ? 'Refreshing from Business Central…' : S.meta.last_error ? 'Last refresh failed – retry' : `Last updated: ${esc(time)}`;
+  document.getElementById('when').innerHTML = inv
+    ? `<b>${label}</b><a id="refresh" class="inv-updated" title="Click to refresh from Business Central">${invStatus}</a>`
+    : `<b>${label}</b><a id="refresh" title="Data loaded ${esc(n.extracted_at.replace('T', ' '))}. Click to refresh from Business Central."><span class="r-long">${refreshLong}</span><span class="r-short">${S.meta.refreshing ? 'Refreshing…' : '↻ Refresh'}</span></a>`;
   document.getElementById('refresh').onclick = async () => {
     if (S.meta.refreshing) return;
     await api('/api/refresh', { method: 'POST' }); S.meta.refreshing = true; renderWhen();
@@ -826,11 +834,11 @@ function moneyRich(v) {
   if (a >= 1e6) return `${(v / 1e6).toFixed(1)}<small> M</small> <span class="u">UGX</span>`;
   return `${Math.round(v).toLocaleString()} <span class="u">UGX</span>`;
 }
-const POST_PALETTE = ['#7f97ab', '#908cab', '#7d9c90', '#b3a07e', '#8aa0b4', '#8f9a90', '#a89880', '#9aa3b0'];
+const POST_PALETTE = ['#3b82f6', '#60a5fa', '#38bdf8', '#818cf8', '#2563eb', '#7dd3fc', '#93c5fd', '#94a3b8'];
 const INV_PALETTE = {
-  RM: '#7f97ab', WIP: '#908cab', FG: '#7d9c90',
-  'Raw Material': '#7f97ab', 'Work in Progress': '#908cab', 'Finished Goods': '#7d9c90',
-  seq: '#7f97ab', good: '#7d9c90', warning: '#b3a07e', violet: '#908cab', crit: '#b08a8a', serious: '#c4a574', muted: '#94a3b8',
+  RM: '#3b82f6', WIP: '#f08a3e', FG: '#2faf78',
+  'Raw Material': '#3b82f6', 'Work in Progress': '#f08a3e', 'Finished Goods': '#2faf78',
+  seq: '#3b82f6', good: '#2faf78', warning: '#5b8def', violet: '#f08a3e', crit: '#d08080', serious: '#e0a15a', muted: '#94a3b8',
 };
 let invPostMode = 'bar';
 function postingRows(items) {
@@ -878,7 +886,7 @@ function invFilters() {
   return `<div class="filters inv-filters">
     <select id="f_class"><option value="">All classes</option>${['RM', 'WIP', 'FG'].map(c => `<option ${f.item_class === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
     <select id="f_site"><option value="">All sites</option>${m.sites.map(s => `<option ${f.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
-    <label class="inv-search">${svg('search', 15)}<input id="f_q" placeholder="Search item, description, vendor, PO…" value="${esc(f.q)}"></label>
+    <label class="inv-search">${svg('search', 15)}<input id="f_q" placeholder="Search item, description, vendor, posting group…" value="${esc(f.q)}"></label>
     <div class="inv-filterwrap"><button type="button" class="btn inv-filterbtn" id="f_filters">${svg('filter', 14)} Filters</button>
       <div class="inv-filterpop" id="f_pop" hidden><label>Location<select id="f_loc"><option value="">All locations</option>${locs.map(s => `<option ${f.location === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label></div></div>
     <button class="btn ghost" id="f_clear">Clear</button></div>`;
@@ -891,11 +899,14 @@ function renderInventory(c, d) {
     'Finished Goods': { icon: 'package', bg: '#e8f8ef', fg: '#16a34a' },
     'Excess / Not Moving': { icon: 'alert', bg: '#fff4e8', fg: '#e07a12' },
   };
+  const metricOf = { 'Total Inventory Value': 'total', 'Raw Material': 'rm', 'Work in Progress': 'wip', 'Finished Goods': 'fg' };
   const kpis = (d.kpis || []).map(k => {
     const title = { 'Total RM / WIP / FG value': 'Total Inventory Value', 'Excess / not moving': 'Excess / Not Moving' }[k.label] || k.label;
     const face = faces[title] || { icon: 'chart', bg: '#eef2f7', fg: '#475569' };
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(title)}</p>${invRing(k.pct, face.fg)}</div>
-      <div class="inv-kpi-row"><p class="inv-kpi-v">${k.kind === 'money' ? moneyRich(k.value) : esc(String(fmt(k.value, k.kind)))}</p>${cipSpark(k.spark, face.fg, title)}</div></article>`;
+    const metric = metricOf[title] || '';
+    return `<article class="inv-kpi" data-metric="${metric}"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(title)}</p>${invRing(k.pct, face.fg)}</div>
+      <p class="inv-kpi-v">${k.kind === 'money' ? moneyRich(k.value) : esc(String(fmt(k.value, k.kind)))}</p>
+      <div class="inv-kpi-foot"><span class="inv-delta"></span>${cipSpark(k.spark, face.fg, title)}</div></article>`;
   }).join('');
   const donut = (d.charts || []).find(ch => ch.type === 'doughnut');
   const posting = (d.charts || []).find(ch => ch.type === 'treemap');
@@ -907,7 +918,7 @@ function renderInventory(c, d) {
   const postPack = posting ? postingRows(postItems) : null;
   const postSub = !postPack ? '' : 'Distribution of inventory value across posting groups' + (postPack.hidden ? `. Top 8 of ${postPack.totalGroups}. Others is the sum of the remaining ${postPack.hidden}.` : '');
   const postH = postPack ? Math.max(260, postPack.rows.length * 34 + 28) : 280;
-  const postCard = posting ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(posting.title)}</h3><p>${esc(postSub)}</p></div><div class="seg inv-seg" id="postMode"><button type="button" data-mode="treemap">Treemap</button><button type="button" data-mode="bar">Bar</button><button type="button" data-mode="bubble">Bubble</button></div></div><div class="chartbox" id="postHost" style="height:${invPostMode === 'bar' ? 'auto' : postH + 'px'};min-height:240px"></div></section>` : '';
+  const postCard = posting ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(posting.title)}</h3><p>${esc(postSub)}</p></div><div class="seg inv-seg" id="postMode"><button type="button" data-mode="bar">Bar</button><button type="button" data-mode="bubble">Bubble</button><button type="button" data-mode="treemap">Treemap</button></div></div><div class="chartbox" id="postHost" style="height:${invPostMode === 'bar' ? 'auto' : postH + 'px'};min-height:240px"></div></section>` : '';
   const trendCard = `<section class="card inv-card"><div class="inv-ch-head"><div><h3>Inventory Value Trend</h3><p>On-hand value at each Business Central load</p></div><div class="inv-trend-tools"><select id="trendMetric"><option value="total">Total value</option><option value="rm">Raw Material</option><option value="wip">Work in Progress</option><option value="fg">Finished Goods</option></select><div class="seg inv-seg" id="trendRange"><button type="button" data-m="3">3M</button><button type="button" data-m="6">6M</button><button type="button" data-m="12">12M</button></div></div></div><div class="chartbox" style="height:280px"><canvas id="chTrend"></canvas></div></section>`;
   const donutCard = donut ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(donut.title)}</h3>${donut.subtitle ? `<p>${esc(donut.subtitle)}</p>` : ''}</div><div class="seg inv-seg" id="donutMode"><button type="button" data-mode="value">Value</button><button type="button" data-mode="qty">Quantity</button></div></div><div class="inv-donut"><div class="chartbox" style="height:250px"><canvas id="chDonut"></canvas></div><ul class="inv-legend" id="donutLegend"></ul></div></section>` : '';
   c.innerHTML = `<div class="inv-page"><div class="inv-crumb">Inventory <span>›</span> ${esc(d.title)}</div>
@@ -918,9 +929,9 @@ function renderInventory(c, d) {
     ${invFilters()}
     <div class="inv-kpis">${kpis}</div>
     <div class="inv-topcharts">${trendCard}${donutCard}</div>
-    <div class="inv-lower">${card(abc, 'chAbc')}${postCard}${card(health, 'chHealth')}</div>
-    ${top ? `<div class="inv-wide">${card(top, 'chTop')}</div>` : ''}
-    ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
+    <div class="inv-lower">${abc ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(abc.title)}</h3>${abc.subtitle ? `<p>${esc(abc.subtitle)}</p>` : ''}</div><div class="seg inv-seg" id="abcMode"><button type="button" data-mode="pct">%</button><button type="button" data-mode="value">Value</button></div></div><div class="chartbox" style="height:280px"><canvas id="chAbc"></canvas></div></section>` : ''}${postCard}${card(health, 'chHealth')}</div>
+    ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}
+    ${top ? `<div class="inv-wide">${card(top, 'chTop')}</div>` : ''}</div>`;
   bindFilters();
   document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
   document.getElementById('pdfThis').onclick = () => window.print();
@@ -933,8 +944,26 @@ function renderInventory(c, d) {
   };
   const glassOpts = { palette: INV_PALETTE, quiet: true, glassy: true };
   put('chTop', top, glassOpts);
-  put('chAbc', abc, glassOpts);
   put('chHealth', health, Object.assign({ keepLabels: true, labelLen: 18 }, glassOpts));
+  if (abc) {
+    let abcMode = 'pct';
+    const showAbc = mode => {
+      abcMode = mode;
+      document.querySelectorAll('#abcMode button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+      const el = document.getElementById('chAbc');
+      S.charts = S.charts.filter(ch => { if (ch && ch.canvas === el) { ch.destroy(); return false; } return true; });
+      const ex = abc.extra || {};
+      const chart = mode === 'value'
+        ? drawChart(el, { type: 'bar', labels: abc.labels, unit: 'UGX', quiet: true, glassy: true, palette: INV_PALETTE, dual: true, series: [
+            { name: 'Items', key: 'seq', data: ex.items || [], axis: 'y1' },
+            { name: 'Usage value', key: 'FG', data: ex.usage || [] },
+            { name: 'Stock value', key: 'WIP', data: ex.stock || [] }] })
+        : drawChart(el, Object.assign({}, abc, glassOpts));
+      if (chart) S.charts.push(chart);
+    };
+    document.querySelectorAll('#abcMode button').forEach(b => b.onclick = () => showAbc(b.dataset.mode));
+    showAbc(abcMode);
+  }
   if (donut) {
     const showDonut = mode => {
       invDonutMode = mode;
@@ -952,7 +981,7 @@ function renderInventory(c, d) {
       if (leg) leg.innerHTML = labels.map((lb, i) => {
         const v = Number(data[i]) || 0, share = total ? Math.round(100 * v / total) : 0, col = INV_PALETTE[lb] || '#94a3b8';
         const shown = mode === 'qty' ? fmt(v, 'qty') : fmt(v, 'money');
-        return `<li><i style="background:${hexA(col, .22)};box-shadow:inset 0 0 0 1.5px ${col}"></i><span class="nm"><b>${esc(lb)}</b><span class="sh">${share}%</span></span><em>${shown}</em></li>`;
+        return `<li><i style="background:${col}"></i><span class="nm"><b>${esc(lb)}</b><span class="sh">${share}%</span></span><em>${shown}</em></li>`;
       }).join('');
     };
     document.querySelectorAll('#donutMode button').forEach(b => b.onclick = () => showDonut(b.dataset.mode));
@@ -992,15 +1021,39 @@ async function mountInventoryTrend() {
     const val = r => invTrendMetric === 'rm' ? r.rm_value : invTrendMetric === 'wip' ? r.wip_value : invTrendMetric === 'fg' ? r.fg_value : (Number(r.rm_value) || 0) + (Number(r.wip_value) || 0) + (Number(r.fg_value) || 0);
     const labels = use.map(r => new Date(r.extracted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
     const data = use.map(val);
+    const nums = data.map(Number);
+    const hi = nums.length ? Math.max(...nums) : 0, lo = nums.length ? Math.min(...nums) : 0;
+    const tight = nums.length > 0 && hi > 0 && (hi - lo) / hi < 0.02;
     S.charts = S.charts.filter(ch => { if (ch && ch.canvas === canvas) { ch.destroy(); return false; } return true; });
     if (!data.length) { canvas.parentElement.innerHTML = '<div class="muted">No stock-value loads recorded yet.</div>'; return; }
-    const chart = drawChart(canvas, { type: 'line', unit: 'UGX', labels, quiet: true, glassy: true, hideLegend: true, series: [{ name: 'Inventory value', key: 'seq', data }], palette: INV_PALETTE });
+    const chart = drawChart(canvas, { type: 'line', unit: 'UGX', labels, quiet: true, glassy: true, hideLegend: true, tight, tightMin: tight ? hi * 0.985 : undefined, tightMax: tight ? hi * 1.015 : undefined, series: [{ name: 'Inventory value', key: 'seq', data }], palette: INV_PALETTE });
+    paintLoadDelta(sorted);
     if (chart) S.charts.push(chart);
   };
   const metric = document.getElementById('trendMetric');
   if (metric) { metric.value = invTrendMetric; metric.onchange = () => { invTrendMetric = metric.value; draw(); }; }
   document.querySelectorAll('#trendRange button').forEach(b => { b.classList.toggle('on', +b.dataset.m === invTrendMonths); b.onclick = () => { invTrendMonths = +b.dataset.m; draw(); }; });
   draw();
+}
+
+function paintLoadDelta(rows) {
+  const sorted = (rows || []).slice().sort((a, b) => String(a.extracted_at).localeCompare(String(b.extracted_at)));
+  if (sorted.length < 2) return;
+  const prev = sorted[sorted.length - 2], cur = sorted[sorted.length - 1];
+  const pick = (r, key) => key === 'rm' ? Number(r.rm_value) || 0 : key === 'wip' ? Number(r.wip_value) || 0 : key === 'fg' ? Number(r.fg_value) || 0 : (Number(r.rm_value) || 0) + (Number(r.wip_value) || 0) + (Number(r.fg_value) || 0);
+  document.querySelectorAll('.inv-kpi[data-metric]').forEach(card => {
+    const key = card.dataset.metric;
+    const slot = card.querySelector('.inv-delta');
+    if (!key || !slot) return;
+    const a = pick(prev, key), b = pick(cur, key);
+    if (!a) return;
+    const pct = (b - a) / Math.abs(a) * 100;
+    const cls = pct > 0.05 ? 'up' : pct < -0.05 ? 'down' : 'flat';
+    const arrow = cls === 'up' ? '↑' : cls === 'down' ? '↓' : '–';
+    const n = `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
+    slot.className = `inv-delta ${cls}`;
+    slot.innerHTML = `${arrow} ${n} <em>vs last load</em>`;
+  });
 }
 
 async function loadView() {
@@ -1193,13 +1246,13 @@ function drawChart(el, ch) {
 
   const horizontal = ch.type === 'hbar', area = ch.type === 'area';
   const type = horizontal ? 'bar' : area ? 'line' : ch.type;
-  const glassOf = c => Array.isArray(c) ? c.map(x => hexA(x, .2)) : hexA(c, .18);
+  const glassOf = c => Array.isArray(c) ? c.map(x => hexA(x, .28)) : hexA(c, .26);
   const datasets = ch.series.map((s, i) => {
     const col = seriesColor(s, i, ch.labels, ch);
     if (type === 'line' && ch.extra && (ch.extra.seriesTypes || [])[i] === 'bar') return { type: 'bar', label: s.name, data: s.data, backgroundColor: ch.glassy ? glassOf(col) : hexA(col, .75), borderColor: col, borderWidth: ch.glassy ? 1.5 : 0, borderRadius: 4, maxBarThickness: 22, order: 2 };
-    if (type === 'line') return { label: s.name, data: s.data, borderColor: col, backgroundColor: (area || ch.glassy) ? hexA(Array.isArray(col) ? col[0] : col, ch.glassy ? .16 : (ch.stacked ? .55 : .18)) : col,
-      fill: (area || ch.glassy) ? (ch.stacked ? (i === 0 ? 'origin' : '-1') : 'origin') : false, borderWidth: ch.glassy ? 1.75 : 2, pointRadius: ch.labels.length > 20 ? 0 : 3, pointHoverRadius: 5, pointBackgroundColor: '#fff', pointBorderColor: col, pointBorderWidth: 1.5, tension: .35 };
-    return { label: s.name, data: s.data, backgroundColor: ch.glassy ? glassOf(col) : col, borderColor: ch.glassy ? col : surf, borderWidth: ch.glassy ? 1.5 : (type === 'doughnut' ? 2 : 0),
+    if (type === 'line') return { label: s.name, data: s.data, borderColor: col, backgroundColor: (area || ch.glassy) ? hexA(Array.isArray(col) ? col[0] : col, ch.glassy ? .18 : (ch.stacked ? .55 : .18)) : col, yAxisID: s.axis || 'y',
+      fill: (area || (ch.glassy && !ch.tight)) ? (ch.stacked ? (i === 0 ? 'origin' : '-1') : 'origin') : false, borderWidth: ch.glassy ? 1.75 : 2, pointRadius: ch.labels.length > 20 ? 0 : 3.5, pointHoverRadius: 5, pointBackgroundColor: '#fff', pointBorderColor: col, pointBorderWidth: 1.5, tension: .35 };
+    return { label: s.name, data: s.data, yAxisID: s.axis || 'y', backgroundColor: ch.glassy ? glassOf(col) : col, borderColor: ch.glassy ? col : surf, borderWidth: ch.glassy ? 1.75 : (type === 'doughnut' ? 2 : 0),
       borderRadius: type === 'doughnut' ? 4 : 5, borderSkipped: 'start', maxBarThickness: horizontal ? 22 : 34, categoryPercentage: .78, barPercentage: .9 };
   });
   const total = type === 'doughnut' ? (ch.series[0]?.data || []).reduce((a, b) => a + (b || 0), 0) : 0;
@@ -1210,16 +1263,16 @@ function drawChart(el, ch) {
       interaction: { mode: type === 'line' ? 'index' : 'nearest', intersect: false },
       plugins: {
         legend: { ...legend, display: ch.hideLegend ? false : (ch.series.length > 1 || type === 'doughnut'), position: type === 'doughnut' && el.parentElement.clientWidth > 460 ? 'right' : 'bottom' },
-        tooltip: { ...tooltip, callbacks: { label: c => `${type === 'doughnut' ? c.label : c.dataset.label}: ${vfmt(c.raw)}${type === 'doughnut' && total ? ` (${(100 * c.raw / total).toFixed(0)}%)` : ''}` } },
+        tooltip: { ...tooltip, callbacks: { label: c => ch.dual && c.dataset.yAxisID === 'y1' ? `${c.dataset.label}: ${Number(c.raw).toLocaleString()}` : `${type === 'doughnut' ? c.label : c.dataset.label}: ${vfmt(c.raw)}${type === 'doughnut' && total ? ` (${(100 * c.raw / total).toFixed(0)}%)` : ''}` } },
         centerText: type === 'doughnut' ? { mid: true, text: money ? fmt(total, 'money') : Number(total).toLocaleString(undefined, ch.glassy ? { maximumFractionDigits: 0 } : undefined), sub: money ? 'UGX total' : 'total' } : undefined,
         refLines: { y: ch.extra && ch.extra.zeroLine ? [0] : [] },
       },
       cutout: type === 'doughnut' ? (ch.cutout || '66%') : undefined,
       layout: type === 'doughnut' ? { padding: 6 } : undefined,
-      scales: type === 'doughnut' ? {} : {
+      scales: type === 'doughnut' ? {} : Object.assign({
         x: { stacked: ch.stacked, border: { display: false }, grid: { color: horizontal ? grid : 'transparent' }, ticks: { color: ink, maxRotation: 0, autoSkip: !ch.keepLabels, autoSkipPadding: 12, font: { size: ch.keepLabels ? 10 : 12 }, callback: horizontal ? tick : function (v) { const l = this.getLabelForValue(v); const lim = ch.labelLen || 14; return String(l).length > lim ? String(l).slice(0, lim - 1) + '…' : l; } } },
-        y: { stacked: ch.stacked, beginAtZero: true, border: { display: false }, grid: { color: horizontal ? 'transparent' : grid }, ticks: { color: ink, autoSkip: !horizontal, font: { size: horizontal ? 11 : 12 }, callback: horizontal ? function (v) { const l = String(this.getLabelForValue(v)); return l.length > 30 ? l.slice(0, 29) + '…' : l; } : tick } },
-      },
+        y: Object.assign({ stacked: ch.stacked, beginAtZero: !ch.tight, border: { display: false }, grid: { color: horizontal ? 'transparent' : grid }, ticks: { color: ink, autoSkip: !horizontal, font: { size: horizontal ? 11 : 12 }, callback: horizontal ? function (v) { const l = String(this.getLabelForValue(v)); return l.length > 30 ? l.slice(0, 29) + '…' : l; } : tick } }, ch.tight ? { min: ch.tightMin, max: ch.tightMax } : {}),
+      }, ch.dual ? { y1: { position: 'right', beginAtZero: true, border: { display: false }, grid: { display: false }, ticks: { color: ink, callback: v => Number(v).toLocaleString() } } } : {}),
     },
   });
 }

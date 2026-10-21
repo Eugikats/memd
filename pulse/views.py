@@ -151,7 +151,7 @@ def apply_filters(df, f):
         df = df[df.location == f["location"]]
     if f.get("q"):
         q = f["q"].lower()
-        cols = [c for c in ("item_no", "description", "vendor_name", "po_no") if c in df]
+        cols = [c for c in ("item_no", "description", "vendor_name", "po_no", "posting_group") if c in df]
         mask = np.zeros(len(df), bool)
         for c in cols:
             mask |= df[c].astype(str).str.lower().str.contains(q, regex=False).to_numpy()
@@ -279,7 +279,10 @@ def inventory_position(m, f):
                          [("% of items", "seq", [pct(x, abc["items"].sum()) for x in abc["items"]]),
                           ("% of usage value", "FG", [pct(x, abc.uv.sum()) for x in abc.uv]),
                           ("% of stock value", "WIP", [pct(x, abc.sv.sum()) for x in abc.sv])], "%",
-                         subtitle="Few A items drive most usage — focus control there")],
+                         subtitle="Few A items drive most usage — focus control there",
+                         extra={"items": [_clean(x) for x in abc["items"].tolist()],
+                                "usage": [_clean(x) for x in abc.uv.tolist()],
+                                "stock": [_clean(x) for x in abc.sv.tolist()]})],
         "tables": [table("Stock on hand by item", it, ITEM_COLS + [
             ("abc", "ABC", "text"), ("posting_group", "Posting group", "text"), ("stock_qty", "Stock", "qty"),
             ("uom", "UoM", "text"), ("stock_value", "Value (UGX)", "money"), ("cover_days", "Cover days", "days"),
