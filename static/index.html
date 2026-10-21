@@ -355,22 +355,25 @@ body.page-inv .topbar .when a:hover { color: #2563EB; }
 .inv-search input { border: 0 !important; outline: 0; background: transparent; min-width: 0 !important; width: 100%; padding: 8px 0; box-shadow: none; }
 .inv-filters .btn.ghost { border-color: transparent; background: transparent; color: #475569; }
 .inv-filters .btn.ghost:hover { color: var(--accent); border-color: transparent; }
-.inv-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-.inv-kpi { background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 14px 14px 12px; box-shadow: none; min-width: 0; }
-.inv-kpi-top { display: flex; align-items: center; gap: 8px; }
-.inv-ico { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none; }
-.inv-kpi-l { flex: 1; min-width: 0; color: #64748B; font-size: 12.5px; font-weight: 500; line-height: 1.25; }
-.inv-kpi-v { margin-top: 10px; font-size: 26px; font-weight: 700; letter-spacing: -.4px; font-variant-numeric: tabular-nums; line-height: 1.1; color: #14213D; }
-.inv-kpi-v small { font-size: 18px; font-weight: 700; margin-left: 1px; }
-.inv-kpi-v .u { font-size: 12px; font-weight: 600; color: #94a3b8; margin-left: 4px; }
-.inv-kpi-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: 8px; min-height: 28px; color: #64748B; font-size: 12px; line-height: 1.35; }
-.inv-kpi-foot .spark-svg { width: 88px; height: 28px; }
+.inv-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+.inv-kpi { background: #fff; border: 1px solid rgba(226, 232, 240, .8); border-radius: 16px; padding: 12px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); min-width: 0; min-height: 88px; display: flex; flex-direction: column; justify-content: center; }
+.inv-kpi-l { margin: 0; color: #64748b; font-size: 11px; font-weight: 600; line-height: 16px; }
+.inv-kpi-row { margin-top: 6px; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.inv-kpi-v { margin: 0; min-width: 0; color: #0B1640; font-size: 18px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
+.inv-kpi-v small { font-size: 1em; font-weight: 700; }
+.inv-kpi-v .u { font-size: 11px; font-weight: 600; color: #64748b; margin-left: 3px; }
+.inv-kpi-note { margin: 8px 0 0; color: #64748b; font-size: 11px; font-weight: 500; line-height: 1.35; }
+.inv-spark { width: 96px; height: 36px; flex: none; display: block; }
+.inv-notrend { flex: none; width: 6.5rem; height: 36px; display: flex; align-items: center; justify-content: center; border: 1px dashed #e2e8f0; border-radius: 6px; color: #94a3b8; font-size: 9px; font-weight: 600; }
 .inv-topcharts { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(260px, .95fr); gap: 14px; margin-top: 14px; }
 .inv-lower { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
-.inv-card, .inv-table { border-color: #E2E8F0; border-radius: 16px; box-shadow: none; }
-.inv-ch-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
-.inv-ch-head h3 { margin: 0; font-size: 14.5px; }
-.inv-ch-head p { margin: 3px 0 0; color: var(--text-muted); font-size: 12px; }
+.inv-table { border-color: #E2E8F0; border-radius: 16px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
+.inv-card { padding: 0; overflow: hidden; border: 1px solid rgba(226, 232, 240, .9); border-radius: 12px; box-shadow: 0 1px 2px rgba(15, 23, 42, .03); background: #fff; }
+.inv-ch-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin: 0; padding: 14px 20px; border-bottom: 1px solid #f1f5f9; }
+.inv-ch-head h3 { margin: 0; font-size: 15px; font-weight: 600; color: #0B1640; }
+.inv-ch-head p { margin: 2px 0 0; color: #64748b; font-size: 12px; }
+.inv-card .chartbox { margin: 0; padding: 8px 12px 14px; }
+.inv-card .inv-donut { padding: 8px 16px 16px; }
 .inv-ch-head .seg { flex: none; }
 .inv-pill { background: #eef4ff; color: #2457d6; font-size: 12px; font-weight: 600; border-radius: 8px; padding: 4px 8px; flex: none; }
 .inv-donut { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(150px, .95fr); align-items: center; gap: 6px; }
@@ -415,7 +418,8 @@ body.page-inv .topbar .when a:hover { color: #2563EB; }
 @media (max-width: 700px) {
   .inv-kpis { grid-template-columns: 1fr 1fr; }
   .inv-head h1 { font-size: 24px; }
-  .inv-kpi-v { font-size: 22px; }
+  .inv-kpi-v { font-size: 16px; }
+  .inv-spark, .inv-notrend { width: 72px; }
   .inv-donut { grid-template-columns: 1fr; }
   .inv-actions .btn { flex: 1; justify-content: center; }
 }
@@ -759,13 +763,22 @@ const INV_CLASS = {
   RM: '#3b82f6', WIP: '#7c5cf0', FG: '#16a34a',
   'Raw Material': '#3b82f6', 'Work in Progress': '#7c5cf0', 'Finished Goods': '#16a34a',
 };
-const KPI_FACE = [
-  { test: /total/i, icon: 'box', bg: '#e8f1ff', fg: '#2f6bff' },
-  { test: /raw material/i, icon: 'box', bg: '#e8f1ff', fg: '#2f6bff' },
-  { test: /work in progress|^wip$/i, icon: 'layers', bg: '#f1ebff', fg: '#7c5cf0' },
-  { test: /finished/i, icon: 'package', bg: '#e7f8ef', fg: '#16a34a' },
-  { test: /excess|not moving/i, icon: 'alert', bg: '#fff4e8', fg: '#e07a12' },
-];
+function cipSpark(vals, label) {
+  const v = (vals || []).filter(x => x != null);
+  if (v.length < 2) return `<div class="inv-notrend" title="No historical series for this measure">No trend</div>`;
+  const w = 112, h = 40, pad = 3.5;
+  const mn = Math.min(...v), mx = Math.max(...v), rg = (mx - mn) || 1;
+  const pts = v.map((x, i) => [pad + (i / (v.length - 1)) * (w - pad * 2), h - pad - ((x - mn) / rg) * (h - pad * 2)]);
+  let d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for (let i = 1; i < pts.length; i++) {
+    const prev = pts[i - 1], p = pts[i], cx = prev[0] + (p[0] - prev[0]) * 0.5;
+    d += ` C ${cx.toFixed(1)} ${prev[1].toFixed(1)}, ${cx.toFixed(1)} ${p[1].toFixed(1)}, ${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
+  }
+  const first = pts[0], last = pts[pts.length - 1];
+  const area = `${d} L ${last[0].toFixed(1)} ${h - pad} L ${first[0].toFixed(1)} ${h - pad} Z`;
+  const gid = `spk${v.length}${Math.round(last[0])}`;
+  return `<svg class="inv-spark" viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(label)} trend" title="Weekly receipts"><defs><linearGradient id="${gid}" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="rgba(79,70,229,0.14)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></linearGradient></defs><path d="${area}" fill="url(#${gid})"/><path d="${d}" fill="none" stroke="#4F46E5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.2" fill="#4338CA" stroke="#fff" stroke-width="1.3"/></svg>`;
+}
 function moneyRich(v) {
   if (v == null || v === '') return '–';
   const a = Math.abs(v);
@@ -809,14 +822,12 @@ function invFilters() {
     <button class="btn ghost" id="f_clear">Clear</button></div>`;
 }
 function renderInventory(c, d) {
-  const faceOf = label => KPI_FACE.find(f => f.test.test(label)) || { icon: 'chart', bg: '#eef2f7', fg: '#475569' };
   const kpis = (d.kpis || []).map(k => {
-    const f = faceOf(k.label);
     const title = { 'Total RM / WIP / FG value': 'Total Inventory Value', 'Excess / not moving': 'Excess / Not Moving' }[k.label] || k.label;
-    const spark = k.spark ? `<span title="Weekly receipts">${sparkSVG(k.spark, '#2563EB')}</span>` : '';
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-ico" style="background:${f.bg};color:${f.fg}">${svg(f.icon, 16)}</span><span class="inv-kpi-l">${esc(title)}</span></div>
-      <div class="inv-kpi-v">${k.kind === 'money' ? moneyRich(k.value) : esc(String(fmt(k.value, k.kind)))}</div>
-      <div class="inv-kpi-foot">${k.note ? `<span>${esc(k.note)}</span>` : '<span></span>'}${spark}</div></article>`;
+    const trend = cipSpark(k.spark, title);
+    return `<article class="inv-kpi"><p class="inv-kpi-l">${esc(title)}</p>
+      <div class="inv-kpi-row"><p class="inv-kpi-v">${k.kind === 'money' ? moneyRich(k.value) : esc(String(fmt(k.value, k.kind)))}</p>${trend}</div>
+      ${k.note ? `<p class="inv-kpi-note">${esc(k.note)}</p>` : ''}</article>`;
   }).join('');
   const donut = (d.charts || []).find(ch => ch.type === 'doughnut');
   const posting = (d.charts || []).find(ch => ch.type === 'treemap');
