@@ -333,14 +333,18 @@ body.page-inv .shell, body.page-inv main { background: #f5f7fb; }
 body.page-inv main { padding-top: 8px; }
 body.page-inv .topbar { background: #fff; border-bottom-color: #E2E8F0; }
 body.page-inv .topbar .page { display: none; }
-body.page-inv .topbar .right { align-items: center; gap: 12px; }
-body.page-inv .topbar .when { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; line-height: 1.3; }
-body.page-inv .topbar .when b { font-size: 14px; font-weight: 600; letter-spacing: -.01em; color: #14213D; }
-body.page-inv .topbar .when a.inv-updated { display: block; text-decoration: none; color: #94a3b8; font-size: 12px; font-weight: 500; cursor: pointer; }
-body.page-inv .topbar .when a.inv-updated:hover { color: #2563EB; }
-body.page-inv #topAvatar { display: grid; width: 34px; height: 34px; background: #2563EB; color: #fff; font-weight: 600; }
-.inv-date { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #14213D; }
-.inv-date svg { color: #64748b; }
+body.page-inv .topbar .right { align-items: center; }
+body.page-inv .topbar .when { line-height: 1.2; text-align: left; }
+body.page-inv .topbar .when b { font-weight: 600; display: inline; }
+body.page-inv .topbar .when a.inv-updated { text-decoration: none; color: #94a3b8; font-size: 12px; font-weight: 500; }
+body.page-inv .topbar .when a.inv-updated:hover { color: #2563EB; text-decoration: none; }
+body.page-inv #topAvatar { display: none; }
+.inv-when { display: flex; align-items: center; gap: 10px; }
+.inv-cal { display: grid; place-items: center; color: #334155; flex: none; }
+.inv-when-text { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.inv-date { font-size: 13.5px; font-weight: 650; color: #0f172a; letter-spacing: -.01em; line-height: 1.25; }
+.inv-updated { cursor: pointer; }
+.inv-avatar { width: 34px; height: 34px; margin-left: 4px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 13px; font-weight: 600; color: #0f172a; background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(15, 23, 42, .05); }
 .inv-page { min-width: 0; }
 .inv-crumb { color: #94a3b8; font-size: 12.5px; margin: 2px 0 8px; }
 .inv-crumb span { margin: 0 4px; }
@@ -367,23 +371,18 @@ body.page-inv #topAvatar { display: grid; width: 34px; height: 34px; background:
 .inv-trend-tools { display: flex; align-items: center; gap: 8px; flex: none; }
 .inv-trend-tools select { height: 32px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 12px; font-weight: 600; color: #334155; background: #fff; }
 .inv-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
-.inv-kpi { position: relative; background: #fff; border: 1px solid #e6edf5; border-radius: 16px; padding: 14px 12px 12px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 10px 24px rgba(15, 23, 42, .04); min-width: 0; min-height: 124px; display: flex; flex-direction: column; }
+.inv-kpi { position: relative; background: #fff; border: 1px solid #e6edf5; border-radius: 16px; padding: 14px 12px 12px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(15, 23, 42, .035); min-width: 0; min-height: 108px; display: flex; flex-direction: column; }
 .inv-wide { margin-top: 14px; }
 .inv-kpi-top { display: flex; align-items: center; gap: 8px; min-width: 0; padding-right: 46px; min-height: 40px; }
 .inv-kpi-ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none; }
 .inv-kpi-l { margin: 0; flex: 1; min-width: 0; color: #64748b; font-size: 12px; font-weight: 600; line-height: 1.25; }
 .inv-ring { position: absolute; top: 12px; right: 10px; width: 42px; height: 42px; }
-.inv-kpi-v { margin: 10px 0 0; min-width: 0; color: #14213D; font-size: 22px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
-.inv-kpi-foot { margin-top: 8px; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; min-height: 28px; }
-.inv-delta { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 0; font-size: 11.5px; font-weight: 700; line-height: 1.15; }
-.inv-delta em { font-style: normal; font-weight: 500; color: #94a3b8; }
-.inv-delta.up { color: #16a34a; }
-.inv-delta.down { color: #dc2626; }
-.inv-delta.flat { color: #94a3b8; }
+.inv-kpi-row { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.inv-kpi-v { margin: 0; min-width: 0; color: #14213D; font-size: 22px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
 .inv-kpi-v small { font-size: .72em; font-weight: 700; letter-spacing: 0; }
 .inv-kpi-v .u { font-size: 11px; font-weight: 600; color: #94a3b8; margin-left: 4px; letter-spacing: 0; }
 .inv-kpi-note { margin: 8px 0 0; color: #64748b; font-size: 11.5px; font-weight: 500; line-height: 1.35; }
-.inv-spark { width: 84px; height: 28px; flex: none; display: block; margin-left: auto; }
+.inv-spark { width: 92px; height: 32px; flex: none; display: block; }
 .inv-topcharts { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(260px, .95fr); gap: 14px; margin-top: 14px; }
 .inv-lower { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
 .inv-table { border-color: #E2E8F0; border-radius: 16px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
@@ -398,8 +397,12 @@ body.page-inv #topAvatar { display: grid; width: 34px; height: 34px; background:
 .post-bars { display: flex; flex-direction: column; gap: 11px; padding: 14px 16px 16px; }
 .post-row { display: grid; grid-template-columns: minmax(72px, 132px) minmax(0, 1fr) auto; gap: 10px; align-items: center; }
 .post-name { font-size: 12px; font-weight: 600; color: #14213D; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.post-track { height: 10px; background: #f1f5f9; border-radius: 99px; overflow: hidden; }
-.post-track span { display: block; height: 100%; border-radius: 99px; min-width: 2px; }
+.post-track { height: 12px; background: transparent; border-radius: 99px; overflow: visible; }
+.post-track span { display: block; height: 100%; border-radius: 99px; min-width: 6px; box-shadow: inset 0 1px 0 rgba(255,255,255,.72), inset 0 -1px 0 rgba(15, 23, 42, .08); }
+.post-axis { display: grid; grid-template-columns: minmax(72px, 132px) minmax(0, 1fr) auto; gap: 10px; margin-top: 6px; }
+.post-ticks { display: flex; justify-content: space-between; color: #94a3b8; font-size: 11px; font-variant-numeric: tabular-nums; }
+.post-axis { display: grid; grid-template-columns: minmax(72px, 132px) minmax(0, 1fr) auto; gap: 10px; margin-top: 4px; }
+.post-ticks { display: flex; justify-content: space-between; color: #94a3b8; font-size: 11px; font-variant-numeric: tabular-nums; }
 .post-val { font-size: 12px; font-weight: 600; color: #14213D; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .post-val em { font-style: normal; color: #64748b; font-weight: 500; }
 .post-bubbles { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 14px; padding: 18px 16px 20px; min-height: 260px; }
@@ -453,8 +456,9 @@ body.page-inv #topAvatar { display: grid; width: 34px; height: 34px; background:
   .inv-kpi-v { font-size: 18px; }
   .inv-spark { width: 64px; }
   .inv-ring { width: 36px; height: 36px; }
-  .post-row { grid-template-columns: minmax(64px, 100px) minmax(0, 1fr); }
+  .post-row, .post-axis { grid-template-columns: minmax(64px, 100px) minmax(0, 1fr); }
   .post-val { grid-column: 2; justify-self: end; }
+  .post-axis span:last-child { display: none; }
   .inv-donut { grid-template-columns: 1fr; }
   .inv-actions .btn { flex: 1; justify-content: center; }
 }
@@ -607,13 +611,12 @@ function renderWhen() {
   const inv = document.body.classList.contains('page-inv');
   const loaded = new Date(n.extracted_at);
   const time = Number.isNaN(loaded.getTime()) ? n.extracted_at.replace('T', ' ').slice(0, 16) : loaded.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  const label = inv
-    ? `<span class="inv-date">${svg('calendar', 15)}<span class="d-long">${long}</span><span class="d-short">${short}</span></span>`
-    : `<span class="d-long">${long}</span><span class="d-short">${short}</span>`;
+  const label = `<span class="d-long">${long}</span><span class="d-short">${short}</span>`;
   const refreshLong = S.meta.refreshing ? 'Refreshing from Business Central…' : S.meta.last_error ? 'Last refresh failed – retry' : 'Refresh from Business Central';
   const invStatus = S.meta.refreshing ? 'Refreshing from Business Central…' : S.meta.last_error ? 'Last refresh failed – retry' : `Last updated: ${esc(time)}`;
+  const mark = esc(initials(S.meta.user_name) || 'P');
   document.getElementById('when').innerHTML = inv
-    ? `<b>${label}</b><a id="refresh" class="inv-updated" title="Click to refresh from Business Central">${invStatus}</a>`
+    ? `<div class="inv-when"><span class="inv-cal">${svg('calendar', 16)}</span><div class="inv-when-text"><span class="inv-date">${label}</span><a id="refresh" class="inv-updated" title="Click to refresh from Business Central">${invStatus}</a></div><div class="inv-avatar" aria-hidden="true">${mark}</div></div>`
     : `<b>${label}</b><a id="refresh" title="Data loaded ${esc(n.extracted_at.replace('T', ' '))}. Click to refresh from Business Central."><span class="r-long">${refreshLong}</span><span class="r-short">${S.meta.refreshing ? 'Refreshing…' : '↻ Refresh'}</span></a>`;
   document.getElementById('refresh').onclick = async () => {
     if (S.meta.refreshing) return;
@@ -834,7 +837,7 @@ function moneyRich(v) {
   if (a >= 1e6) return `${(v / 1e6).toFixed(1)}<small> M</small> <span class="u">UGX</span>`;
   return `${Math.round(v).toLocaleString()} <span class="u">UGX</span>`;
 }
-const POST_PALETTE = ['#3b82f6', '#60a5fa', '#38bdf8', '#818cf8', '#2563eb', '#7dd3fc', '#93c5fd', '#94a3b8'];
+const POST_PALETTE = ['#3b82f6', '#34d399', '#8b7cf6', '#fb923c', '#60a5fa', '#2dd4bf', '#a78bfa', '#38bdf8'];
 const INV_PALETTE = {
   RM: '#3b82f6', WIP: '#f08a3e', FG: '#2faf78',
   'Raw Material': '#3b82f6', 'Work in Progress': '#f08a3e', 'Finished Goods': '#2faf78',
@@ -858,7 +861,7 @@ function drawPosting(host, items, mode) {
       const size = Math.round(54 + Math.sqrt((Number(r.value) || 0) / total) * 150);
       const stroke = postColor(r, i);
       const label = size >= 78 ? `<b>${esc(r.label)}</b><span>${fmt(r.value, 'money')}</span>` : `<b>${esc(fmt(r.value, 'money'))}</b>`;
-      return `<div class="post-bub" style="width:${size}px;height:${size}px;background:${hexA(stroke, .16)};border:1.5px solid ${stroke};color:#14213D" title="${esc(r.label)}: ${fmt(r.value, 'money')} UGX (${(100 * r.value / total).toFixed(1)}%)">${label}</div>`;
+      return `<div class="post-bub" style="width:${size}px;height:${size}px;background:radial-gradient(circle at 32% 28%, ${mixWhite(stroke, .62)}, ${stroke} 58%, ${shadeHex(stroke, .8)});color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.45)" title="${esc(r.label)}: ${fmt(r.value, 'money')} UGX (${(100 * r.value / total).toFixed(1)}%)">${label}</div>`;
     }).join('')}</div>`;
     return null;
   }
@@ -870,11 +873,13 @@ function drawPosting(host, items, mode) {
     });
   }
   const max = Math.max(...rows.map(r => Number(r.value) || 0), 1);
+  const axisTop = (() => { const p = Math.pow(10, Math.floor(Math.log10(max))); const n = max / p; const s = n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10; return s * p; })();
+  const ticks = [0, .25, .5, .75, 1].map(t => fmt(axisTop * t, 'money'));
   host.innerHTML = `<div class="post-bars">${rows.map((r, i) => {
     const share = (100 * (Number(r.value) || 0) / total).toFixed(1);
     const stroke = postColor(r, i);
-    return `<div class="post-row" title="${esc(r.label)}: ${fmt(r.value, 'money')} UGX (${share}% of posting-group value)"><span class="post-name">${esc(r.label)}</span><span class="post-track"><span style="width:${Math.max(2, 100 * r.value / max)}%;background:${hexA(stroke, .2)};box-shadow:inset 0 0 0 1.5px ${stroke}"></span></span><span class="post-val">${fmt(r.value, 'money')} <em>(${share}%)</em></span></div>`;
-  }).join('')}</div>`;
+    return `<div class="post-row" title="${esc(r.label)}: ${fmt(r.value, 'money')} UGX (${share}% of posting-group value)"><span class="post-name">${esc(r.label)}</span><span class="post-track"><span style="width:${Math.max(2, 100 * r.value / axisTop)}%;background:${glassCss(stroke)}"></span></span><span class="post-val">${fmt(r.value, 'money')} <em>(${share}%)</em></span></div>`;
+  }).join('')}<div class="post-axis"><span></span><span class="post-ticks">${ticks.map(t => `<span>${t}</span>`).join('')}</span><span></span></div></div>`;
   return null;
 }
 let invDonutMode = 'value';
@@ -899,14 +904,11 @@ function renderInventory(c, d) {
     'Finished Goods': { icon: 'package', bg: '#e8f8ef', fg: '#16a34a' },
     'Excess / Not Moving': { icon: 'alert', bg: '#fff4e8', fg: '#e07a12' },
   };
-  const metricOf = { 'Total Inventory Value': 'total', 'Raw Material': 'rm', 'Work in Progress': 'wip', 'Finished Goods': 'fg' };
   const kpis = (d.kpis || []).map(k => {
     const title = { 'Total RM / WIP / FG value': 'Total Inventory Value', 'Excess / not moving': 'Excess / Not Moving' }[k.label] || k.label;
     const face = faces[title] || { icon: 'chart', bg: '#eef2f7', fg: '#475569' };
-    const metric = metricOf[title] || '';
-    return `<article class="inv-kpi" data-metric="${metric}"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(title)}</p>${invRing(k.pct, face.fg)}</div>
-      <p class="inv-kpi-v">${k.kind === 'money' ? moneyRich(k.value) : esc(String(fmt(k.value, k.kind)))}</p>
-      <div class="inv-kpi-foot"><span class="inv-delta"></span>${cipSpark(k.spark, face.fg, title)}</div></article>`;
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(title)}</p>${invRing(k.pct, face.fg)}</div>
+      <div class="inv-kpi-row"><p class="inv-kpi-v">${k.kind === 'money' ? moneyRich(k.value) : esc(String(fmt(k.value, k.kind)))}</p>${cipSpark(k.spark, face.fg, title)}</div></article>`;
   }).join('');
   const donut = (d.charts || []).find(ch => ch.type === 'doughnut');
   const posting = (d.charts || []).find(ch => ch.type === 'treemap');
@@ -974,7 +976,7 @@ function renderInventory(c, d) {
       const data = mode === 'qty' ? qty : values;
       const el = document.getElementById('chDonut');
       S.charts = S.charts.filter(ch => { if (ch && ch.canvas === el) { ch.destroy(); return false; } return true; });
-      const chart = drawChart(el, { type: 'doughnut', labels, unit: mode === 'qty' ? '' : 'UGX', hideLegend: true, cutout: '72%', palette: INV_PALETTE, quiet: true, glassy: true, series: [{ name: mode === 'qty' ? 'Quantity' : 'Value', key: 'class', data }] });
+      const chart = drawChart(el, { type: 'doughnut', labels, unit: mode === 'qty' ? '' : 'UGX', hideLegend: true, cutout: '68%', palette: INV_PALETTE, quiet: true, glassy: true, series: [{ name: mode === 'qty' ? 'Quantity' : 'Value', key: 'class', data }] });
       if (chart) S.charts.push(chart);
       const total = data.reduce((a, b) => a + (Number(b) || 0), 0);
       const leg = document.getElementById('donutLegend');
@@ -1027,33 +1029,12 @@ async function mountInventoryTrend() {
     S.charts = S.charts.filter(ch => { if (ch && ch.canvas === canvas) { ch.destroy(); return false; } return true; });
     if (!data.length) { canvas.parentElement.innerHTML = '<div class="muted">No stock-value loads recorded yet.</div>'; return; }
     const chart = drawChart(canvas, { type: 'line', unit: 'UGX', labels, quiet: true, glassy: true, hideLegend: true, tight, tightMin: tight ? hi * 0.985 : undefined, tightMax: tight ? hi * 1.015 : undefined, series: [{ name: 'Inventory value', key: 'seq', data }], palette: INV_PALETTE });
-    paintLoadDelta(sorted);
     if (chart) S.charts.push(chart);
   };
   const metric = document.getElementById('trendMetric');
   if (metric) { metric.value = invTrendMetric; metric.onchange = () => { invTrendMetric = metric.value; draw(); }; }
   document.querySelectorAll('#trendRange button').forEach(b => { b.classList.toggle('on', +b.dataset.m === invTrendMonths); b.onclick = () => { invTrendMonths = +b.dataset.m; draw(); }; });
   draw();
-}
-
-function paintLoadDelta(rows) {
-  const sorted = (rows || []).slice().sort((a, b) => String(a.extracted_at).localeCompare(String(b.extracted_at)));
-  if (sorted.length < 2) return;
-  const prev = sorted[sorted.length - 2], cur = sorted[sorted.length - 1];
-  const pick = (r, key) => key === 'rm' ? Number(r.rm_value) || 0 : key === 'wip' ? Number(r.wip_value) || 0 : key === 'fg' ? Number(r.fg_value) || 0 : (Number(r.rm_value) || 0) + (Number(r.wip_value) || 0) + (Number(r.fg_value) || 0);
-  document.querySelectorAll('.inv-kpi[data-metric]').forEach(card => {
-    const key = card.dataset.metric;
-    const slot = card.querySelector('.inv-delta');
-    if (!key || !slot) return;
-    const a = pick(prev, key), b = pick(cur, key);
-    if (!a) return;
-    const pct = (b - a) / Math.abs(a) * 100;
-    const cls = pct > 0.05 ? 'up' : pct < -0.05 ? 'down' : 'flat';
-    const arrow = cls === 'up' ? '↑' : cls === 'down' ? '↓' : '–';
-    const n = `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
-    slot.className = `inv-delta ${cls}`;
-    slot.innerHTML = `${arrow} ${n} <em>vs last load</em>`;
-  });
 }
 
 async function loadView() {
@@ -1162,6 +1143,49 @@ const KEYS = { seq: '--series-1', crit: '--critical', serious: '--serious', warn
 const tok = k => CLASS[k] ? css(CLASS[k]) : KEYS[k] ? css(KEYS[k]) : css('--series-1');
 const catCol = i => css('--series-' + ((i % 8) + 1));
 function hexA(hex, a) { const h = hex.replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map(x => x + x).join('') : h, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+function hexRgb(hex) { const h = String(hex).replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map(x => x + x).join('') : h, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function mixWhite(hex, t) { const [r, g, b] = hexRgb(hex); const m = c => Math.round(c + (255 - c) * t); return `rgb(${m(r)},${m(g)},${m(b)})`; }
+function shadeHex(hex, t) { const [r, g, b] = hexRgb(hex); return `rgb(${Math.round(r * t)},${Math.round(g * t)},${Math.round(b * t)})`; }
+function glassCss(hex) { return `linear-gradient(90deg, ${mixWhite(hex, .52)} 0%, ${hex} 42%, ${hex} 100%)`; }
+function glassFill(ctx, color, kind) {
+  const chart = ctx.chart, area = chart && chart.chartArea;
+  const c = Array.isArray(color) ? color[ctx.dataIndex] : color;
+  if (!c || typeof c !== 'string' || c[0] !== '#') return c || color;
+  const x = chart.ctx, el = ctx.element;
+  if (kind === 'line') {
+    if (!area) return hexA(c, .2);
+    const g = x.createLinearGradient(0, area.top, 0, area.bottom);
+    g.addColorStop(0, hexA(c, .45)); g.addColorStop(.55, hexA(c, .14)); g.addColorStop(1, hexA(c, 0));
+    return g;
+  }
+  if (kind === 'doughnut') {
+    if (!area) return c;
+    const cx = (area.left + area.right) / 2, cy = (area.top + area.bottom) / 2;
+    const rad = Math.max(area.right - area.left, area.bottom - area.top) / 2;
+    const g = x.createRadialGradient(cx - rad * .22, cy - rad * .3, rad * .08, cx, cy, rad);
+    g.addColorStop(0, mixWhite(c, .5)); g.addColorStop(.4, c); g.addColorStop(1, shadeHex(c, .9));
+    return g;
+  }
+  const horizontal = kind === 'hbar' || (el && el.horizontal);
+  if (el && el.base != null && el.x != null) {
+    if (horizontal) {
+      const x0 = Math.min(el.x, el.base), x1 = Math.max(el.x, el.base);
+      if (x1 - x0 < 1) return c;
+      const g = x.createLinearGradient(x0, 0, x1, 0);
+      g.addColorStop(0, mixWhite(c, .52)); g.addColorStop(.4, c); g.addColorStop(1, c);
+      return g;
+    }
+    const y0 = Math.min(el.y, el.base), y1 = Math.max(el.y, el.base);
+    if (y1 - y0 < 1) return c;
+    const g = x.createLinearGradient(0, y0, 0, y1);
+    g.addColorStop(0, mixWhite(c, .5)); g.addColorStop(.22, c); g.addColorStop(1, c);
+    return g;
+  }
+  if (!area) return c;
+  const g = x.createLinearGradient(0, area.top, 0, area.bottom);
+  g.addColorStop(0, mixWhite(c, .5)); g.addColorStop(1, c);
+  return g;
+}
 const classPaint = (ch, k, fallback) => (ch && ch.palette && ch.palette[k]) || (ch && ch.classColors && ch.classColors[k]) || fallback;
 function seriesColor(s, i, labels, ch) {
   if (ch && ch.palette) {
@@ -1195,13 +1219,34 @@ const centerText = { id: 'centerText', afterDraw(c, _, o) {
   ctx.fillText(o.text, cx, y); ctx.font = '11.5px Inter'; ctx.fillStyle = css('--text-muted');
   if (o.sub) ctx.fillText(o.sub, cx, mid ? y + 17 : a.bottom + 2); ctx.restore(); } };
 
+const glassPaint = { id: 'glassPaint', beforeDatasetsDraw(chart) {
+  chart.data.datasets.forEach((ds, di) => {
+    if (!ds._glassKind || ds._solid == null) return;
+    const meta = chart.getDatasetMeta(di);
+    if (ds._glassKind === 'line') {
+      const g = glassFill({ chart, dataIndex: 0, element: null }, Array.isArray(ds._solid) ? ds._solid[0] : ds._solid, 'line');
+      if (meta.dataset && meta.dataset.options) meta.dataset.options.backgroundColor = g;
+      return;
+    }
+    meta.data.forEach((el, i) => {
+      if (!el || el._glassWrapped) return;
+      const inner = el.draw;
+      el.draw = function () {
+        const col = Array.isArray(ds._solid) ? (ds._solid[i] || '#94a3b8') : ds._solid;
+        this.options = Object.assign({}, this.options, { backgroundColor: glassFill({ chart, dataIndex: i, element: this }, col, ds._glassKind) });
+        return inner.apply(this, arguments);
+      };
+      el._glassWrapped = true;
+    });
+  });
+} };
 function drawChart(el, ch) {
   const grid = ch.quiet ? '#f1f5f9' : css('--grid'), ink = css('--text-secondary'), surf = css('--surface-1');
   const money = ch.unit && String(ch.unit).startsWith('UGX');
   const vfmt = v => v == null ? '–' : money ? Math.round(v).toLocaleString() + ' UGX' : Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 }) + (ch.unit && ch.unit !== 'UGX' ? ' ' + ch.unit : '');
   const tick = v => money ? fmt(v, 'money') : Number(v).toLocaleString();
   const tooltip = { backgroundColor: '#0f1b33', padding: 10, cornerRadius: 8, titleFont: { weight: '600' } };
-  const legend = { position: 'bottom', labels: { color: ink, boxWidth: 10, boxHeight: 10, usePointStyle: true, padding: 14 } };
+  const legend = { position: 'bottom', labels: { color: ink, boxWidth: 10, boxHeight: 10, usePointStyle: !ch.glassy, pointStyle: 'rectRounded', padding: 14 } };
 
   if (ch.type === 'heatmap') return drawHeatmap(el, ch);
 
@@ -1218,8 +1263,8 @@ function drawChart(el, ch) {
     const glass = !!ch.glassy;
     return new Chart(el, { type: 'treemap', data: { datasets: [{ tree: items, key: 'value', borderWidth: glass ? 1.5 : 2, spacing: 0, borderRadius: 4,
       borderColor: c => !glass || c.type !== 'data' ? (glass ? 'transparent' : surf) : gcol(c.raw._data.group),
-      backgroundColor: c => c.type !== 'data' ? 'transparent' : hexA(gcol(c.raw._data.group), glass ? .2 : .82),
-      labels: { display: true, align: 'left', position: 'top', color: glass ? '#3d4d63' : '#fff', font: [{ size: 12, weight: '600' }, { size: 11 }], overflow: 'hidden',
+      backgroundColor: c => c.type !== 'data' ? 'transparent' : (glass ? gcol(c.raw._data.group) : hexA(gcol(c.raw._data.group), .82)),
+      labels: { display: true, align: 'left', position: 'top', color: '#fff', font: [{ size: 12, weight: '600' }, { size: 11 }], overflow: 'hidden',
         formatter: c => c.type !== 'data' ? '' : [c.raw._data.label, money ? fmt(c.raw.v, 'money') : Number(c.raw.v).toLocaleString()] } }] },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false },
         tooltip: { ...tooltip, callbacks: { title: i => i[0].raw._data.label, label: c => `${c.raw._data.group}: ${vfmt(c.raw.v)}` } } } } });
@@ -1246,18 +1291,19 @@ function drawChart(el, ch) {
 
   const horizontal = ch.type === 'hbar', area = ch.type === 'area';
   const type = horizontal ? 'bar' : area ? 'line' : ch.type;
-  const glassOf = c => Array.isArray(c) ? c.map(x => hexA(x, .28)) : hexA(c, .26);
+  const glassKind = type === 'doughnut' ? 'doughnut' : horizontal ? 'hbar' : type === 'line' ? 'line' : 'bar';
   const datasets = ch.series.map((s, i) => {
     const col = seriesColor(s, i, ch.labels, ch);
-    if (type === 'line' && ch.extra && (ch.extra.seriesTypes || [])[i] === 'bar') return { type: 'bar', label: s.name, data: s.data, backgroundColor: ch.glassy ? glassOf(col) : hexA(col, .75), borderColor: col, borderWidth: ch.glassy ? 1.5 : 0, borderRadius: 4, maxBarThickness: 22, order: 2 };
-    if (type === 'line') return { label: s.name, data: s.data, borderColor: col, backgroundColor: (area || ch.glassy) ? hexA(Array.isArray(col) ? col[0] : col, ch.glassy ? .18 : (ch.stacked ? .55 : .18)) : col, yAxisID: s.axis || 'y',
-      fill: (area || (ch.glassy && !ch.tight)) ? (ch.stacked ? (i === 0 ? 'origin' : '-1') : 'origin') : false, borderWidth: ch.glassy ? 1.75 : 2, pointRadius: ch.labels.length > 20 ? 0 : 3.5, pointHoverRadius: 5, pointBackgroundColor: '#fff', pointBorderColor: col, pointBorderWidth: 1.5, tension: .35 };
-    return { label: s.name, data: s.data, yAxisID: s.axis || 'y', backgroundColor: ch.glassy ? glassOf(col) : col, borderColor: ch.glassy ? col : surf, borderWidth: ch.glassy ? 1.75 : (type === 'doughnut' ? 2 : 0),
-      borderRadius: type === 'doughnut' ? 4 : 5, borderSkipped: 'start', maxBarThickness: horizontal ? 22 : 34, categoryPercentage: .78, barPercentage: .9 };
+    const mark = ch.glassy ? { _solid: col, _glassKind: glassKind } : {};
+    if (type === 'line' && ch.extra && (ch.extra.seriesTypes || [])[i] === 'bar') return Object.assign({ type: 'bar', label: s.name, data: s.data, backgroundColor: ch.glassy ? col : hexA(col, .75), borderColor: col, borderWidth: 0, borderRadius: 6, maxBarThickness: 22, order: 2 }, ch.glassy ? { _solid: col, _glassKind: 'bar' } : {});
+    if (type === 'line') return Object.assign({ label: s.name, data: s.data, borderColor: col, backgroundColor: ch.glassy ? hexA(Array.isArray(col) ? col[0] : col, .28) : (area ? (ctx) => glassFill(ctx, Array.isArray(col) ? col[0] : col, 'line') : col), yAxisID: s.axis || 'y',
+      fill: (area || ch.glassy) ? (ch.tight ? { target: { value: ch.tightMin } } : (ch.stacked ? (i === 0 ? 'origin' : '-1') : 'origin')) : false, borderWidth: ch.glassy ? 2.5 : 2, pointRadius: ch.labels.length > 20 ? 0 : 4, pointHoverRadius: 6, pointBackgroundColor: '#fff', pointBorderColor: col, pointBorderWidth: 2, tension: .35 }, ch.glassy ? { _solid: Array.isArray(col) ? col[0] : col, _glassKind: 'line' } : {});
+    return Object.assign({ label: s.name, data: s.data, yAxisID: s.axis || 'y', backgroundColor: col, borderColor: ch.glassy ? (type === 'doughnut' ? '#fff' : 'transparent') : surf, borderWidth: ch.glassy ? (type === 'doughnut' ? 3 : 0) : (type === 'doughnut' ? 2 : 0),
+      borderRadius: type === 'doughnut' ? 4 : (ch.stacked ? 0 : (horizontal ? 8 : 7)), borderSkipped: ch.stacked ? true : (horizontal ? false : 'start'), maxBarThickness: horizontal ? 16 : 28, categoryPercentage: .72, barPercentage: .82 }, mark);
   });
   const total = type === 'doughnut' ? (ch.series[0]?.data || []).reduce((a, b) => a + (b || 0), 0) : 0;
   return new Chart(el, {
-    type, data: { labels: ch.labels, datasets }, plugins: type === 'doughnut' ? [centerText] : [refLines],
+    type, data: { labels: ch.labels, datasets }, plugins: type === 'doughnut' ? [centerText, glassPaint] : [refLines, glassPaint],
     options: {
       indexAxis: horizontal ? 'y' : 'x', responsive: true, maintainAspectRatio: false,
       interaction: { mode: type === 'line' ? 'index' : 'nearest', intersect: false },
