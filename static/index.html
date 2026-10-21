@@ -225,7 +225,7 @@ main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 .charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
 .charts > .card { min-width: 0; } .span-2 { grid-column: span 2; } .span-3 { grid-column: 1 / -1; }
 @media (max-width: 1200px) { .charts { grid-template-columns: repeat(2, minmax(0, 1fr)); } .span-3 { grid-column: 1 / -1; } }
-@media (max-width: 800px) { .charts { grid-template-columns: 1fr; } .span-2, .span-3 { grid-column: auto; } }
+@media (max-width: 800px) { .charts, .inv-charts2 { grid-template-columns: 1fr; } .span-2, .span-3 { grid-column: auto; } }
 .chart-card { display: flex; flex-direction: column; transition: box-shadow .15s; } .chart-card:hover { box-shadow: var(--shadow); }
 .ch-head h3 { margin: 0; } .ch-head p { margin: 3px 0 0; color: var(--text-muted); font-size: 12px; }
 .ch-head { margin-bottom: 10px; }
@@ -491,6 +491,7 @@ body.page-inv #topAvatar { display: none; }
 }
 .inv-topcharts { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(260px, .95fr); gap: 14px; margin-top: 14px; }
 .inv-lower { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+.inv-charts2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
 .inv-table { border-color: #E2E8F0; border-radius: 16px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
 .inv-card { padding: 0; overflow: hidden; border: 1px solid rgba(226, 232, 240, .9); border-radius: 12px; box-shadow: 0 1px 2px rgba(15, 23, 42, .03); background: #fff; }
 .inv-ch-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin: 0; padding: 14px 20px; border-bottom: 1px solid #f1f5f9; }
@@ -1063,7 +1064,7 @@ function go(v, force) {
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
   S.view = v;
-  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview', reports: 'Report library', builder: 'Report builder', schedules: 'Schedules & history' };
+  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview', reports: 'Report library', builder: 'Report builder', schedules: 'Schedules & history', trends: 'Trends' };
   const invShell = Object.prototype.hasOwnProperty.call(INV_SHELL, v);
   document.body.classList.toggle('page-inv', invShell);
   renderWhen();
@@ -2607,7 +2608,7 @@ function drawChart(el, ch) {
     const mark = ch.glassy ? { _solid: col, _glassKind: glassKind } : {};
     if (type === 'line' && ch.extra && (ch.extra.seriesTypes || [])[i] === 'bar') return Object.assign({ type: 'bar', label: s.name, data: s.data, backgroundColor: ch.glassy ? col : hexA(col, .75), borderColor: col, borderWidth: 0, borderRadius: 0, maxBarThickness: 22, order: 2 }, ch.glassy ? { _solid: col, _glassKind: 'bar' } : {});
     if (type === 'line') return Object.assign({ label: s.name, data: s.data, borderColor: col, backgroundColor: ch.glassy ? hexA(Array.isArray(col) ? col[0] : col, .28) : (area ? (ctx) => glassFill(ctx, Array.isArray(col) ? col[0] : col, 'line') : col), yAxisID: s.axis || 'y',
-      fill: (area || ch.glassy) ? (ch.tight ? { target: { value: ch.tightMin } } : (ch.stacked ? (i === 0 ? 'origin' : '-1') : 'origin')) : false, borderWidth: ch.glassy ? 2.5 : 2, pointRadius: ch.labels.length > 20 ? 0 : 4, pointHoverRadius: 6, pointBackgroundColor: '#fff', pointBorderColor: col, pointBorderWidth: 2, tension: .35 }, ch.glassy ? { _solid: Array.isArray(col) ? col[0] : col, _glassKind: 'line' } : {});
+      fill: (area || (ch.glassy && ch.series.length < 2)) ? (ch.tight ? { target: { value: ch.tightMin } } : (ch.stacked ? (i === 0 ? 'origin' : '-1') : 'origin')) : false, borderWidth: ch.glassy ? 2.5 : 2, pointRadius: ch.labels.length > 20 ? 0 : 4, pointHoverRadius: 6, pointBackgroundColor: '#fff', pointBorderColor: col, pointBorderWidth: 2, tension: .35 }, ch.glassy ? { _solid: Array.isArray(col) ? col[0] : col, _glassKind: 'line' } : {});
     return Object.assign({ label: s.name, data: s.data, yAxisID: s.axis || 'y', backgroundColor: col, borderColor: ch.glassy ? (type === 'doughnut' ? '#fff' : 'transparent') : surf, borderWidth: ch.glassy ? (type === 'doughnut' ? 3 : 0) : (type === 'doughnut' ? 2 : 0),
       borderRadius: 0, borderSkipped: true, maxBarThickness: horizontal ? 16 : 28, categoryPercentage: .72, barPercentage: .82 }, mark);
   });
@@ -3027,22 +3028,53 @@ async function renderSchedules() {
 /* ----- trends ----- */
 async function renderTrends() {
   const d = await api('/api/trends');
+  if (S.view !== 'trends') return;
   const k = d.kpi, n = k.length;
   const byWeek = {}; d.weekly.forEach(r => { const w = byWeek[r.week] || (byWeek[r.week] = { c: 0, o: 0, s: 0, r: 0 }); w.c += r.consumed_value; w.o += r.output_value; w.s += r.sold_value; w.r += r.received_value; });
   const weeks = Object.keys(byWeek).sort();
   const cls = c => weeks.map(w => (d.weekly.find(r => r.week === w && r.item_class === c) || {}).consumed_value || 0);
   const lab = k.map(x => x.extracted_at.replace('T', ' ').slice(0, 16));
-  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Trends</h1><p>How the supply chain is moving week by week, and how the headline measures change with each data load.</p></div>${sectionTabs('trends')}</div>
-    <div class="charts"><div class="card"><h3>Weekly flow at cost (UGX)</h3><div class="chartbox"><canvas id="t1"></canvas></div></div>
-      <div class="card"><h3>Weekly consumption by class (UGX)</h3><div class="chartbox"><canvas id="t2"></canvas></div></div>
-      <div class="card"><h3>Stock value by class per data load</h3><div class="chartbox"><canvas id="t3"></canvas></div>${n < 3 ? `<div class="muted">${n} load${n === 1 ? '' : 's'} so far — this line builds up with every scheduled refresh during the proof period.</div>` : ''}</div>
-      <div class="card"><h3>Risk measures per data load</h3><div class="chartbox"><canvas id="t4"></canvas></div></div></div>`;
+  const lastWeek = weeks.length ? weeks[weeks.length - 1] : '';
+  const latest = lastWeek ? byWeek[lastWeek] : { c: 0, o: 0, s: 0, r: 0 };
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const weekNote = lastWeek ? `Week of ${months[+lastWeek.slice(5, 7) - 1]} ${+lastWeek.slice(8)}` : 'No weekly movement';
+  const faces = {
+    'Consumption': { icon: 'trend', bg: '#e8f1ff', fg: '#2563EB' },
+    'Output': { icon: 'factory', bg: '#e8f8ef', fg: '#16a34a' },
+    'Sales': { icon: 'truck', bg: '#f3eefe', fg: '#7c5cf0' },
+    'Receipts': { icon: 'package', bg: '#fff4e8', fg: '#e07a12' },
+  };
+  const cards = [
+    { label: 'Consumption', value: moneyRich(latest.c), spark: weeks.map(w => byWeek[w].c) },
+    { label: 'Output', value: moneyRich(latest.o), spark: weeks.map(w => byWeek[w].o) },
+    { label: 'Sales', value: moneyRich(latest.s), spark: weeks.map(w => byWeek[w].s) },
+    { label: 'Receipts', value: moneyRich(latest.r), spark: weeks.map(w => byWeek[w].r) },
+  ];
+  const kpis = cards.map(c => {
+    const face = faces[c.label];
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(c.label)}</p></div>
+      <div class="inv-kpi-row"><p class="inv-kpi-v">${c.value}</p>${cipSpark(c.spark, face.fg, c.label)}</div><p class="inv-kpi-note">${esc(weekNote)}</p></article>`;
+  }).join('');
+  const loadNote = n < 3 ? `${n} load${n === 1 ? '' : 's'} so far — this line builds up with every scheduled refresh during the proof period.` : 'On-hand value at each Business Central load';
+  const card = (title, sub, id) => `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${title}</h3><p>${sub}</p></div></div><div class="chartbox" style="height:280px"><canvas id="${id}"></canvas></div></section>`;
+  document.getElementById('content').innerHTML = `<div class="inv-page">
+    <div class="inv-head">${sectionTabs('trends')}<div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button></div></div>
+    <div class="inv-kpis cols-4">${kpis}</div>
+    <div class="inv-charts2">
+      ${card('Weekly flow at cost (UGX)', 'Consumption, output, sales and purchase receipts', 't1')}
+      ${card('Weekly consumption by class (UGX)', 'Raw material, WIP and finished goods', 't2')}
+      ${card('Stock value by class per data load', esc(loadNote), 't3')}
+      ${card('Risk measures per data load', 'Out of stock, short cover, overdue lines and constrained products', 't4')}
+    </div></div>`;
+  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('How are weekly consumption, output, sales and receipts moving, and what changed in stock and risk at the last data load?'), 50); };
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
   const ser = (name, key, data) => ({ name, key, data });
-  S.charts.push(drawChart(t1, { type: 'line', unit: 'UGX', labels: weeks, series: [ser('Consumption', 'seq', weeks.map(w => byWeek[w].c)), ser('Output', 'good', weeks.map(w => byWeek[w].o)), ser('Sales (cost)', 'FG', weeks.map(w => byWeek[w].s)), ser('Purchase receipts', 'serious', weeks.map(w => byWeek[w].r))] }));
-  S.charts.push(drawChart(t2, { type: 'bar', unit: 'UGX', stacked: true, labels: weeks, series: [ser('Raw Material', 'RM', cls('RM')), ser('Work in Progress', 'WIP', cls('WIP')), ser('Finished Goods', 'FG', cls('FG'))] }));
-  S.charts.push(drawChart(t3, { type: n > 1 ? 'line' : 'bar', unit: 'UGX', labels: lab, series: [ser('Raw Material', 'RM', k.map(x => x.rm_value)), ser('Work in Progress', 'WIP', k.map(x => x.wip_value)), ser('Finished Goods', 'FG', k.map(x => x.fg_value))] }));
-  S.charts.push(drawChart(t4, { type: n > 1 ? 'line' : 'bar', unit: 'items', labels: lab, series: [ser('Out of stock', 'crit', k.map(x => x.out_of_stock)), ser('Run out ≤7 days', 'serious', k.map(x => x.run_out_7d)), ser('Overdue PO lines', 'warning', k.map(x => x.overdue_lines)), ser('Constrained products', 'seq', k.map(x => x.constrained))] }));
+  const glass = { quiet: true, glassy: true };
+  const classGlass = Object.assign({ palette: INV_PALETTE }, glass);
+  S.charts.push(drawChart(t1, Object.assign({ type: 'line', unit: 'UGX', labels: weeks, series: [ser('Consumption', 'seq', weeks.map(w => byWeek[w].c)), ser('Output', 'good', weeks.map(w => byWeek[w].o)), ser('Sales (cost)', 'FG', weeks.map(w => byWeek[w].s)), ser('Purchase receipts', 'serious', weeks.map(w => byWeek[w].r))] }, glass)));
+  S.charts.push(drawChart(t2, Object.assign({ type: 'bar', unit: 'UGX', stacked: true, labels: weeks, series: [ser('Raw Material', 'RM', cls('RM')), ser('Work in Progress', 'WIP', cls('WIP')), ser('Finished Goods', 'FG', cls('FG'))] }, classGlass)));
+  S.charts.push(drawChart(t3, Object.assign({ type: n > 1 ? 'line' : 'bar', unit: 'UGX', labels: lab, series: [ser('Raw Material', 'RM', k.map(x => x.rm_value)), ser('Work in Progress', 'WIP', k.map(x => x.wip_value)), ser('Finished Goods', 'FG', k.map(x => x.fg_value))] }, classGlass)));
+  S.charts.push(drawChart(t4, { type: n > 1 ? 'line' : 'bar', unit: 'items', quiet: true, glassy: true, labels: lab, series: [ser('Out of stock', 'crit', k.map(x => x.out_of_stock)), ser('Run out ≤7 days', 'serious', k.map(x => x.run_out_7d)), ser('Overdue PO lines', 'warning', k.map(x => x.overdue_lines)), ser('Constrained products', 'seq', k.map(x => x.constrained))] }));
 }
 
 /* ----- data refresh ----- */
