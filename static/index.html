@@ -29,18 +29,20 @@ button { font: inherit; }
 .app { display: grid; grid-template-columns: auto 1fr; min-height: 100vh; }
 
 /* ---------- side rail ---------- */
-.rail { width: 260px; background: var(--surface-1); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; transition: width .18s; overflow: hidden; }
-.rail.collapsed { width: 64px; }
-.rail.peek { position: fixed; left: 0; top: 0; width: 260px; z-index: 45; box-shadow: 12px 0 36px rgba(15, 27, 51, .16); }
-.rail .logo { display: flex; align-items: center; gap: 10px; padding: 14px 14px 6px; }
-.logo-img { width: 40px; height: 40px; flex: none; object-fit: contain; background: transparent; border: 0; padding: 0; }
-.rail.collapsed .logo { padding-left: 10px; }
+.rail-slot { width: 260px; position: relative; }
+.rail-slot.collapsed { width: 64px; }
+.rail { width: 100%; background: var(--surface-1); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow: hidden; }
+.rail-slot.collapsed.peeking .rail { position: absolute; left: 0; top: 0; width: 260px; height: 100vh; z-index: 45; box-shadow: 12px 0 36px rgba(15, 27, 51, .16); }
+.rail-head { height: 56px; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--border); }
+.rail.collapsed:not(.peek):not(.open) .rail-head { flex-direction: column; height: auto; justify-content: center; gap: 4px; padding: 8px 4px; }
+.rail .logo { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0; text-decoration: none; color: inherit; }
+.logo-img { width: 32px; height: 32px; flex: none; object-fit: contain; background: transparent; border: 0; padding: 0; border-radius: 8px; }
 .logo-mark { width: 36px; height: 36px; flex: none; border-radius: 11px; display: grid; place-items: center; color: #fff; font-weight: 700; font-family: var(--serif); font-size: 20px;
   background: linear-gradient(135deg, #1f6bff, #4aa3ff); box-shadow: 0 4px 10px -3px rgba(31,107,255,.5); }
-.logo-text { font-weight: 700; letter-spacing: .3px; white-space: nowrap; }
+.logo-text { font-weight: 700; font-size: 14px; letter-spacing: -.01em; white-space: nowrap; }
 .logo-text small { display: block; font-weight: 500; font-size: 11px; color: var(--text-muted); letter-spacing: 0; }
-.rail .toggle { margin: 4px 14px 8px; width: 36px; height: 28px; border: 0; background: none; color: var(--text-muted); border-radius: 6px; cursor: pointer; display: grid; place-items: center; }
-.rail .toggle:hover { background: var(--surface-3); }
+.rail .toggle { margin: 0; width: 28px; height: 28px; border: 0; background: none; color: #94a3b8; border-radius: 6px; cursor: pointer; display: grid; place-items: center; flex: none; padding: 0; }
+.rail .toggle:hover { background: #f1f5f9; color: #334155; }
 .rail .scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 4px 10px 10px; display: flex; flex-direction: column; min-height: 0; }
 .nav-block { display: flex; flex-direction: column; gap: 2px; }
 .nav-break { height: 0; border-top: 1px solid #f1f5f9; margin: 12px 6px; }
@@ -59,7 +61,8 @@ button { font: inherit; }
 .rail.collapsed:not(.peek) .recent-label,
 .rail.collapsed:not(.peek) .recent-body,
 .rail.collapsed:not(.peek) .recent-new span { display: none; }
-.rail.collapsed:not(.peek) .recent { flex: none; margin-top: auto; align-items: center; padding-top: 10px; }
+.rail.collapsed:not(.peek) .recent { flex: none; margin-top: 16px; align-items: center; padding-top: 12px; }
+.rail.collapsed:not(.peek) .recent-head { justify-content: center; padding: 0; }
 .rail.collapsed.peek .recent-body { display: block; }
 .rail .sep { height: 1px; background: var(--border); margin: 10px 4px; }
 .rail .group { font-size: 10.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); padding: 8px 8px 4px; white-space: nowrap; }
@@ -294,6 +297,8 @@ dl dt { font-weight: 600; margin-top: 12px; } dl dd { margin: 2px 0 0; color: va
 .scrim { display: none; }
 @media (max-width: 900px) {
   .app { grid-template-columns: 1fr; }
+  .rail-slot, .rail-slot.collapsed { width: 0; }
+  .rail.collapsed:not(.peek):not(.open) .rail-head, .rail-head { flex-direction: row; height: 56px; justify-content: space-between; padding: 0 12px; }
   /* slide-out navigation */
   .rail { position: fixed; left: 0; top: 0; bottom: 0; z-index: 40; width: 280px !important; height: 100vh; transform: translateX(-102%);
     transition: transform .22s ease; box-shadow: 8px 0 30px rgba(15,27,51,.18); }
@@ -348,7 +353,9 @@ dl dt { font-weight: 600; margin-top: 12px; } dl dd { margin: 2px 0 0; color: va
 }
 @media (min-width: 901px) and (max-width: 1200px) {
   main { padding: 16px 18px 48px; }
-  .rail { width: 232px; }
+  .rail-slot { width: 232px; }
+  .rail-slot.collapsed { width: 64px; }
+  .rail-slot.collapsed.peeking .rail { width: 260px; }
 }
 
 /* Inventory Position — visual redesign, scoped to that page */
@@ -556,7 +563,7 @@ body.page-inv .tablehead.inv-tablehead .rbtns { width: auto; }
 </head>
 <body>
 <div class="app">
-  <aside class="rail" id="rail"></aside>
+  <div class="rail-slot" id="railSlot"><aside class="rail" id="rail"></aside></div>
   <div class="shell">
     <header class="topbar">
       <button class="menu-btn" id="menuBtn" aria-label="Open menu"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
@@ -588,7 +595,8 @@ const I = {
   monitor: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="16" height="12" rx="2"/><path d="M7 20h6M10 16v4"/><circle cx="19" cy="6" r="3"/></svg>',
   chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>',
   book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5"/></svg>',
-  side: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>',
+  side: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg>',
+  panelOpen: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="m14 9 3 3-3 3"/></svg>',
   spark: '<svg class="spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M10 3l1.6 4.4L16 9l-4.4 1.6L10 15l-1.6-4.4L4 9l4.4-1.6z"/><path d="M18 13l.8 2.2L21 16l-2.2.8L18 19l-.8-2.2L15 16l2.2-.8zM17 3l.5 1.5L19 5l-1.5.5L17 7l-.5-1.5L15 5l1.5-.5z"/></svg>',
   up: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
 };
@@ -626,6 +634,7 @@ const P = {
   printer: '<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/>',
   play: '<path d="M7 4l13 8-13 8z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  chatPlus: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M12 7v6M9 10h6"/>',
   trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.2-3.2"/>',
@@ -767,7 +776,7 @@ function paintChats() {
   const fit = 5;
   const shown = chatsExpanded ? S.chats : S.chats.slice(0, fit);
   const hidden = chatsExpanded ? 0 : Math.max(0, S.chats.length - fit);
-  box.innerHTML = `<div class="recent-head"><span class="recent-label">Recent chats</span><button type="button" class="recent-new" data-new title="New chat">${svg('plus', 14)}<span>New</span></button></div>
+  box.innerHTML = `<div class="recent-head"><span class="recent-label">Recent chats</span><button type="button" class="recent-new" data-new title="New chat">${svg('chatPlus', 14)}<span>New</span></button></div>
     <div class="recent-body">${S.chats.length ? `<div class="recent-list">${shown.map(c => `<button type="button" class="recent-item${c.id === S.chatId ? ' on' : ''}" data-chat="${esc(c.id)}"><b>${esc(c.title || 'New chat')}</b><em><span>${esc(c.preview || 'Conversation')}</span><span>${esc(relTime(c.updatedAt))}</span></em></button>`).join('')}</div>${hidden ? `<button type="button" class="recent-new" data-more>View more (${hidden})</button>` : chatsExpanded && S.chats.length > fit ? `<button type="button" class="recent-new" data-less>Show less</button>` : ''}` : `<p class="recent-empty">No conversations yet</p>`}</div>`;
   box.querySelector('[data-new]').onclick = e => { e.stopPropagation(); newChat(); };
   const more = box.querySelector('[data-more]'), less = box.querySelector('[data-less]');
@@ -798,6 +807,8 @@ function openSettings(id) {
   const root = document.getElementById('settings');
   const already = !root.hidden && root._esc;
   root.hidden = false;
+  const gear = document.getElementById('railSettings');
+  if (gear) gear.classList.add('active');
   paintSettings();
   if (!already) {
     const onKey = e => { if (e.key === 'Escape') closeSettings(); };
@@ -809,6 +820,8 @@ function closeSettings() {
   const root = document.getElementById('settings');
   root.hidden = true;
   root.innerHTML = '';
+  const gear = document.getElementById('railSettings');
+  if (gear) gear.classList.remove('active');
   if (root._esc) document.removeEventListener('keydown', root._esc);
 }
 function paintSettings() {
@@ -942,19 +955,49 @@ async function init() {
   const rail = document.getElementById('rail');
   const navLink = s => `<a data-v="${s.views[0]}" data-sec="${s.key}" title="${esc(s.label)}">${svg(s.icon)}<span class="lbl">${esc(s.label)}</span>${s.badge ? '<span class="badge" id="badge" hidden></span>' : ''}</a>`;
   const navGroups = [['command', 'actions', 'overview'], ['inventory_position', 'in_transit_overdue', 'inventory_risk'], ['reporting', 'governance']];
-  rail.innerHTML = `<div class="logo"><img class="logo-img" src="/static/pulse-logo.png" alt="Pulse"><div class="logo-text">Pulse</div></div>
-    <button class="toggle" id="railToggle" title="Collapse sidebar">${I.side}</button>
+  rail.innerHTML = `<div class="rail-head"><a class="logo" href="#command" data-v="command" title="Pulse"><img class="logo-img" src="/static/pulse-logo.png" alt="Pulse"><div class="logo-text">Pulse</div></a>
+    <button class="toggle" id="railToggle" type="button" title="Collapse sidebar" aria-label="Collapse sidebar">${I.side}</button></div>
     <div class="scroll">
       ${navGroups.map(keys => `<div class="nav-block">${keys.map(k => navLink(SECTIONS.find(s => s.key === k))).join('')}</div>`).join('<div class="nav-break"></div>')}
+      <div class="nav-break"></div>
+      <a id="railSettings" title="Settings">${svg('gear')}<span class="lbl">Settings</span></a>
       <div class="recent" id="recent"></div>
     </div>
-    <div class="foot"><button type="button" class="rail-user" id="railProfile" title="Settings"><div class="avatar" id="railAvatar">${esc(initials(profile().fullName || S.meta.user_name) || 'P')}</div><div class="who lbl" style="font-size:12px;color:var(--text-secondary);white-space:nowrap"><b id="railName" style="color:var(--text-primary);font-weight:600">${esc(profile().fullName || S.meta.user_name || 'Supply Chain')}</b><br><span class="muted">${esc(S.meta.notes.environment)}</span></div></button></div>`;
-  rail.onclick = e => { const a = e.target.closest('a'); if (a) { rail.classList.remove('peek'); go(a.dataset.v); } };
+    <div class="foot"><button type="button" class="rail-user" id="railProfile" title="Profile"><div class="avatar" id="railAvatar">${esc(initials(profile().fullName || S.meta.user_name) || 'P')}</div><div class="who lbl" style="font-size:12px;color:var(--text-secondary);white-space:nowrap"><b id="railName" style="color:var(--text-primary);font-weight:600">${esc(profile().fullName || S.meta.user_name || 'Supply Chain')}</b><br><span class="muted">${esc(S.meta.notes.environment)}</span></div></button></div>`;
+  const slot = document.getElementById('railSlot');
+  const syncRail = () => {
+    const collapsed = rail.classList.contains('collapsed');
+    slot.classList.toggle('collapsed', collapsed);
+    slot.classList.toggle('peeking', collapsed && rail.classList.contains('peek'));
+    const btn = document.getElementById('railToggle');
+    const pinned = !collapsed;
+    btn.innerHTML = pinned ? I.side : I.panelOpen;
+    btn.title = pinned ? 'Collapse sidebar' : 'Keep sidebar expanded';
+    btn.setAttribute('aria-label', btn.title);
+  };
+  rail.onclick = e => {
+    const a = e.target.closest('a');
+    if (!a) return;
+    if (a.classList.contains('logo')) { rail.classList.remove('peek'); syncRail(); return; }
+    rail.classList.remove('peek');
+    syncRail();
+    if (a.id === 'railSettings') { openSettings('security'); return; }
+    if (a.dataset.v) go(a.dataset.v);
+  };
   document.getElementById('railProfile').onclick = () => openSettings('profile');
-  document.getElementById('railToggle').onclick = () => { if (isMobile()) closeMenu(); else { rail.classList.remove('peek'); rail.classList.toggle('collapsed'); } };
+  document.getElementById('railToggle').onclick = () => {
+    if (isMobile()) { closeMenu(); return; }
+    rail.classList.remove('peek');
+    rail.classList.toggle('collapsed');
+    syncRail();
+  };
   let peekTimer;
-  rail.addEventListener('pointerenter', e => { if (e.pointerType !== 'mouse' || isMobile() || !rail.classList.contains('collapsed')) return; clearTimeout(peekTimer); peekTimer = setTimeout(() => rail.classList.add('peek'), 120); });
-  rail.addEventListener('pointerleave', e => { if (e.pointerType !== 'mouse') return; clearTimeout(peekTimer); rail.classList.remove('peek'); });
+  const clearPeek = () => { clearTimeout(peekTimer); peekTimer = null; };
+  rail.addEventListener('pointerenter', e => { if (e.pointerType !== 'mouse' || isMobile() || !rail.classList.contains('collapsed')) return; clearPeek(); peekTimer = setTimeout(() => { rail.classList.add('peek'); syncRail(); }, 120); });
+  rail.addEventListener('pointerleave', e => { if (e.pointerType !== 'mouse') return; clearPeek(); rail.classList.remove('peek'); syncRail(); });
+  rail.addEventListener('focusin', () => { if (isMobile() || !rail.classList.contains('collapsed')) return; rail.classList.add('peek'); syncRail(); });
+  rail.addEventListener('focusout', e => { if (rail.contains(e.relatedTarget)) return; clearPeek(); rail.classList.remove('peek'); syncRail(); });
+  syncRail();
   S.chats = loadChats();
   paintChats();
   document.getElementById('menuBtn').onclick = () => { rail.classList.add('open'); document.body.classList.add('menu-open'); };
