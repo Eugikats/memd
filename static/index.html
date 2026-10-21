@@ -468,6 +468,7 @@ body.page-inv #topAvatar { display: none; }
 .inv-kpis.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .inv-kpis.cols-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .inv-kpi { position: relative; container-type: inline-size; background: #fff; border: 1px solid #e6edf5; border-radius: 16px; padding: 14px 12px 12px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(15, 23, 42, .035); min-width: 0; min-height: 108px; display: flex; flex-direction: column; }
+.inv-kpi.link { cursor: pointer; }
 .inv-wide { margin-top: 14px; }
 .inv-kpi-top { display: flex; align-items: center; gap: 8px; min-width: 0; padding-right: 46px; min-height: 40px; }
 .inv-kpi-ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none; }
@@ -1062,7 +1063,7 @@ function go(v, force) {
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
   S.view = v;
-  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes' };
+  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview' };
   const invShell = Object.prototype.hasOwnProperty.call(INV_SHELL, v);
   document.body.classList.toggle('page-inv', invShell);
   renderWhen();
@@ -2264,6 +2265,7 @@ async function loadView() {
   if (view === 'location_risk') { renderLocRisk(c, d); return; }
   if (view === 'bom_readiness') { renderBom(c, d); return; }
   if (view === 'exceptions') { renderExceptions(c, d); return; }
+  if (view === 'overview') { renderOverview(c, d); return; }
   c.innerHTML = `<div class="vhead"><div><h1>${d.no ? `<span class="no">${d.no}</span> · ` : ''}${esc(d.title)}</h1><p>${esc(d.question)}</p></div>
       <div class="page-tools">${sectionTabs(view)}<div class="rbtns"><button class="btn" id="askThis">${I.spark.replace('class="spark"', 'width="14" height="14" style="vertical-align:-2px"')} Ask about this view</button>
       <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button></div></div></div>
@@ -2280,15 +2282,102 @@ async function loadView() {
   document.getElementById('pdfThis').onclick = () => window.print();
   mountCharts(d.charts, 'ch');
   d.tables.forEach((t, i) => renderTable(document.getElementById('tb' + i), t));
-  if (view === 'overview') renderOverviewExtras();
+}
+
+function renderOverview(c, d) {
+  const short = {
+    'Stock value (RM/WIP/FG)': 'Stock value',
+    'Out of stock (in use)': 'Out of stock',
+    'Run out within 7 days': 'Within 7 days',
+    'High-risk items': 'High risk',
+    'Overdue PO value (≤ 90d)': 'Overdue POs',
+    'Constrained products': 'Constrained',
+    'Site shortages': 'Shortages',
+    'High exceptions': 'Exceptions',
+  };
+  const faces = {
+    'Stock value': { icon: 'box', bg: '#e8f1ff', fg: '#2563EB' },
+    'Out of stock': { icon: 'alert', bg: '#fdecec', fg: '#d03b3b' },
+    'Within 7 days': { icon: 'clock', bg: '#fff4e8', fg: '#e07a12' },
+    'High risk': { icon: 'alert', bg: '#fdecec', fg: '#b42318' },
+    'Overdue POs': { icon: 'truck', bg: '#fff1ea', fg: '#e07a12' },
+    'Constrained': { icon: 'factory', bg: '#f3eefe', fg: '#7c5cf0' },
+    'Shortages': { icon: 'pin', bg: '#fff8e8', fg: '#c26a00' },
+    'Exceptions': { icon: 'flag', bg: '#fdecec', fg: '#d03b3b' },
+  };
+  const unit = label => label === 'Constrained' ? 'products' : label === 'Exceptions' ? 'exceptions' : 'items';
+  const kpiValue = (k, label) => {
+    if (k.kind === 'money') return moneyRich(k.value);
+    if (k.kind === 'qty') return `${esc(String(fmt(k.value, 'qty')))}<small> ${unit(label)}</small>`;
+    return esc(String(k.value ?? '–'));
+  };
+  const kpis = (d.kpis || []).map(k => {
+    const label = short[k.label] || k.label;
+    const face = faces[label] || { icon: 'grid', bg: '#eef2f7', fg: '#475569' };
+    return `<article class="inv-kpi${k.view ? ' link' : ''}" ${k.view ? `data-view="${esc(k.view)}"` : ''}><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
+      <div class="inv-kpi-row"><p class="inv-kpi-v">${kpiValue(k, label)}</p>${cipSpark(k.spark, face.fg, label)}</div>${k.note ? `<p class="inv-kpi-note">${esc(k.note)}</p>` : ''}</article>`;
+  }).join('');
+  const find = re => (d.charts || []).find(ch => re.test(ch.title));
+  const gauges = (d.charts || []).filter(ch => ch.type === 'gauge');
+  const flow = find(/weekly flow/i);
+  const donut = find(/stock value by class/i);
+  const bars = find(/exceptions by type/i);
+  const card = (ch, inner) => ch ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(ch.title)}</h3>${ch.subtitle ? `<p>${esc(ch.subtitle)}</p>` : ''}</div></div>${inner}</section>` : '';
+  c.innerHTML = `<div class="inv-page">
+    <div class="inv-head"><div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
+      <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
+      <button class="btn primary" id="exportInv">${svg('download', 14)} Export</button></div></div>
+    ${invFilters()}
+    <div class="inv-kpis cols-4">${kpis}</div>
+    ${insightsHTML(d.insights)}
+    <div class="inv-lower">${gauges.map((ch, i) => card(ch, `<div class="chartbox" style="height:200px"><canvas id="chOvG${i}"></canvas></div>`)).join('')}</div>
+    <div class="inv-topcharts">
+      ${card(flow, `<div class="chartbox" style="height:280px"><canvas id="chOvFlow"></canvas></div>`)}
+      ${donut ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(donut.title)}</h3>${donut.subtitle ? `<p>${esc(donut.subtitle)}</p>` : '<p>On-hand value by class</p>'}</div></div><div class="inv-donut"><div class="chartbox" style="height:250px"><canvas id="chOvDonut"></canvas></div><ul class="inv-legend" id="ovLegend"></ul></div></section>` : ''}
+    </div>
+    ${bars ? `<div class="inv-wide">${card(bars, `<div class="chartbox" style="height:${Math.max(bars.height || 320, (bars.labels || []).length * 32 + 40)}px"><canvas id="chOvEx"></canvas></div>`)}</div>` : ''}
+    ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}
+    <div id="ovx"></div></div>`;
+  bindFilters();
+  c.querySelectorAll('.inv-kpi.link').forEach(el => el.onclick = () => go(el.dataset.view));
+  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Summarise the overview: what needs attention across inventory, supply, production and exceptions?'), 50); };
+  document.getElementById('pdfThis').onclick = () => window.print();
+  if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
+  S.charts.forEach(ch => ch.destroy()); S.charts = [];
+  const glass = { quiet: true, glassy: true };
+  const put = (id, ch, extra) => {
+    const el = document.getElementById(id); if (!el || !ch) return;
+    try { const chart = drawChart(el, Object.assign({}, ch, glass, extra || {})); if (chart) S.charts.push(chart); }
+    catch (e) { el.parentElement.innerHTML = `<div class="muted">Chart unavailable (${esc(e.message)})</div>`; }
+  };
+  gauges.forEach((ch, i) => put('chOvG' + i, ch, { glassy: false, quiet: false }));
+  put('chOvFlow', flow, { palette: INV_PALETTE });
+  put('chOvEx', bars);
+  if (donut) {
+    const labels = (donut.labels || []).map(niceLabel);
+    const data = (donut.series[0] && donut.series[0].data) || [];
+    const chart = drawChart(document.getElementById('chOvDonut'), Object.assign({}, donut, { labels }, glass, { hideLegend: true, cutout: '68%', palette: INV_PALETTE }));
+    if (chart) S.charts.push(chart);
+    const total = data.reduce((a, b) => a + (Number(b) || 0), 0);
+    const leg = document.getElementById('ovLegend');
+    if (leg) leg.innerHTML = labels.map((lb, i) => {
+      const v = Number(data[i]) || 0, share = total ? Math.round(100 * v / total) : 0;
+      return `<li><i style="background:${INV_PALETTE[lb] || '#94a3b8'}"></i><span class="nm"><b>${esc(lb)}</b><span class="sh">${share}%</span></span><em>${fmt(v, 'money')}</em></li>`;
+    }).join('');
+  }
+  d.tables.forEach((t, i) => renderTable(document.getElementById('tb' + i), t, { variant: 'inventory', size: 10, search: 'Search item, type…' }));
+  renderOverviewExtras();
 }
 
 async function renderOverviewExtras() {
   const box = document.getElementById('ovx');
-  box.innerHTML = `<div class="tiles">${GROUPS.map(([g, ids]) => `<div class="card"><h3>${esc(g)}</h3>${ids.map(id => `<a class="tile" data-v="${id}">${svg(VIEW_ICON[id], 16)}<span>${esc(viewTitle(id))}</span>${svg('arrow', 14)}</a>`).join('')}</div>`).join('')}</div>
-    <div class="charts"><div class="card span-2"><h3>${svg('star', 15)} Watchlist</h3><div id="ov_watch"></div></div><div class="card"><h3>${svg('bell', 15)} Alerts</h3><div id="ov_alerts"></div></div></div>`;
+  if (!box || S.view !== 'overview') return;
+  box.innerHTML = `<div class="inv-lower">${GROUPS.map(([g, ids]) => `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(g)}</h3></div></div><div class="inv-pad tiles">${ids.map(id => `<a class="tile" data-v="${id}">${svg(VIEW_ICON[id], 16)}<span>${esc(viewTitle(id))}</span>${svg('arrow', 14)}</a>`).join('')}</div></section>`).join('')}</div>
+    <div class="inv-topcharts"><section class="card inv-card"><div class="inv-ch-head"><div><h3>Watchlist</h3></div></div><div class="inv-pad" id="ov_watch"></div></section>
+      <section class="card inv-card"><div class="inv-ch-head"><div><h3>Alerts</h3></div></div><div class="inv-pad" id="ov_alerts"></div></section></div>`;
   box.querySelectorAll('.tile').forEach(t => t.onclick = () => go(t.dataset.v));
   const [watch, alerts] = await Promise.all([api('/api/watchlist'), api('/api/alerts')]);
+  if (S.view !== 'overview' || !document.getElementById('ov_watch')) return;
   renderWatch(document.getElementById('ov_watch'), watch, () => go('overview', true));
   const act = alerts.filter(r => r.active);
   document.getElementById('ov_alerts').innerHTML = act.length ? act.map(r => `<div class="alert-row"><span class="dot" style="background:${css(r.triggered ? '--critical' : '--good')}"></span><b>${r.triggered ? 'Triggered' : 'OK'}</b> · ${esc(r.name)} <span class="muted">(now ${r.last_value ?? '–'})</span></div>`).join('')
