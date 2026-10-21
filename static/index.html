@@ -1059,7 +1059,7 @@ function go(v, force) {
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
   S.view = v;
-  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness' };
+  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions' };
   const invShell = Object.prototype.hasOwnProperty.call(INV_SHELL, v);
   document.body.classList.toggle('page-inv', invShell);
   renderWhen();
@@ -2138,6 +2138,80 @@ function renderBom(c, d) {
   d.tables.forEach((t, i) => renderTable(document.getElementById('tb' + i), t, { variant: 'inventory', size: 10, search: 'Search product, component…' }));
 }
 
+function renderExceptions(c, d) {
+  const short = {
+    'Exceptions': 'Exceptions',
+    'High': 'High',
+    'Medium': 'Medium',
+    'Low': 'Low',
+  };
+  const faces = {
+    'Exceptions': { icon: 'flag', bg: '#eef2ff', fg: '#4f46e5' },
+    'High': { icon: 'alert', bg: '#fdecec', fg: '#d03b3b' },
+    'Medium': { icon: 'alert', bg: '#fff4e8', fg: '#e07a12' },
+    'Low': { icon: 'alert', bg: '#fff8e8', fg: '#c26a00' },
+  };
+  const kpiValue = k => {
+    if (k.kind === 'money') return moneyRich(k.value);
+    if (k.kind === 'qty') return `${esc(String(fmt(k.value, 'qty')))}<small> exceptions</small>`;
+    return esc(String(k.value ?? '–'));
+  };
+  const kpis = (d.kpis || []).map(k => {
+    const label = short[k.label] || k.label;
+    const face = faces[label] || { icon: 'flag', bg: '#eef2f7', fg: '#475569' };
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
+      <div class="inv-kpi-row"><p class="inv-kpi-v">${kpiValue(k)}</p>${cipSpark(k.spark, face.fg, label)}</div></article>`;
+  }).join('');
+  const find = re => (d.charts || []).find(ch => re.test(ch.title));
+  const byType = find(/by type and severity/i);
+  const donut = (d.charts || []).find(ch => ch.type === 'doughnut');
+  const byClass = find(/item class/i);
+  const stake = find(/value at stake/i);
+  const named = ch => ch && Object.assign({}, ch, { series: (ch.series || []).map(s => Object.assign({}, s, { name: niceLabel(s.name) })) });
+  const card = (ch, inner) => ch ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(ch.title)}</h3>${ch.subtitle ? `<p>${esc(ch.subtitle)}</p>` : ''}</div></div>${inner}</section>` : '';
+  c.innerHTML = `<div class="inv-page">
+    <div class="inv-head">${sectionTabs('exceptions')}<div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
+      <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
+      <button class="btn primary" id="exportInv">${svg('download', 14)} Export</button></div></div>
+    ${invFilters()}
+    <div class="inv-kpis cols-4">${kpis}</div>
+    <div class="inv-topcharts">
+      ${byType ? card(byType, `<div class="chartbox" style="height:${Math.max(byType.height || 320, (byType.labels || []).length * 36 + 40)}px"><canvas id="chExType"></canvas></div>`) : ''}
+      ${donut ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(donut.title)}</h3>${donut.subtitle ? `<p>${esc(donut.subtitle)}</p>` : '<p>Exceptions split by severity</p>'}</div></div><div class="inv-donut"><div class="chartbox" style="height:250px"><canvas id="chExDonut"></canvas></div><ul class="inv-legend" id="exLegend"></ul></div></section>` : ''}
+    </div>
+    ${byClass ? `<div class="inv-wide">${card(byClass, `<div class="chartbox" style="height:280px"><canvas id="chExClass"></canvas></div>`)}</div>` : ''}
+    ${stake ? `<div class="inv-wide">${card(stake, `<div class="chartbox" style="height:${Math.max(stake.height || 300, (stake.labels || []).length * 32 + 36)}px"><canvas id="chExStake"></canvas></div>`)}</div>` : ''}
+    ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
+  bindFilters();
+  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('pdfThis').onclick = () => window.print();
+  if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
+  S.charts.forEach(ch => ch.destroy()); S.charts = [];
+  const glass = { quiet: true, glassy: true };
+  const put = (id, ch, extra) => {
+    const el = document.getElementById(id); if (!el || !ch) return;
+    try { const chart = drawChart(el, Object.assign({}, named(ch), glass, extra || {})); if (chart) S.charts.push(chart); }
+    catch (e) { el.parentElement.innerHTML = `<div class="muted">Chart unavailable (${esc(e.message)})</div>`; }
+  };
+  put('chExType', byType);
+  put('chExClass', byClass);
+  put('chExStake', stake);
+  if (donut) {
+    const labels = (donut.labels || []).map(niceLabel);
+    const data = (donut.series[0] && donut.series[0].data) || [];
+    const paint = (donut.colors || []).map(col => (col && String(col)[0] === '#') ? col : tok(col));
+    const chart = drawChart(document.getElementById('chExDonut'), Object.assign({}, donut, { labels }, { quiet: true, glassy: true, hideLegend: true, cutout: '68%' }));
+    if (chart) S.charts.push(chart);
+    const total = data.reduce((a, b) => a + (Number(b) || 0), 0);
+    const leg = document.getElementById('exLegend');
+    if (leg) leg.innerHTML = labels.map((lb, i) => {
+      const v = Number(data[i]) || 0, share = total ? Math.round(100 * v / total) : 0;
+      return `<li><i style="background:${paint[i] || '#94a3b8'}"></i><span class="nm"><b>${esc(lb)}</b><span class="sh">${share}%</span></span><em>${fmt(v, 'qty')} exceptions</em></li>`;
+    }).join('');
+  }
+  d.tables.forEach((t, i) => renderTable(document.getElementById('tb' + i), t, { variant: 'inventory', size: 10, search: 'Search item, type, location…' }));
+}
+
 async function mountInventoryTrend() {
   const el = document.getElementById('chTrend');
   if (!el) return;
@@ -2186,6 +2260,7 @@ async function loadView() {
   if (view === 'inventory_risk') { renderRisk(c, d); return; }
   if (view === 'location_risk') { renderLocRisk(c, d); return; }
   if (view === 'bom_readiness') { renderBom(c, d); return; }
+  if (view === 'exceptions') { renderExceptions(c, d); return; }
   c.innerHTML = `<div class="vhead"><div><h1>${d.no ? `<span class="no">${d.no}</span> · ` : ''}${esc(d.title)}</h1><p>${esc(d.question)}</p></div>
       <div class="page-tools">${sectionTabs(view)}<div class="rbtns"><button class="btn" id="askThis">${I.spark.replace('class="spark"', 'width="14" height="14" style="vertical-align:-2px"')} Ask about this view</button>
       <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button></div></div></div>
