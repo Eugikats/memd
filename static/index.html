@@ -69,7 +69,7 @@ button { font: inherit; }
 .rail.collapsed .group, .rail.collapsed .lbl, .rail.collapsed .logo-text, .rail.collapsed .foot .who { display: none; }
 .rail.collapsed.peek .lbl, .rail.peek .lbl, .rail.collapsed.peek .logo-text, .rail.peek .logo-text, .rail.collapsed.peek .foot .who, .rail.peek .foot .who { display: block; }
 .rail a { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 8px; color: var(--text-secondary); text-decoration: none; cursor: pointer; font-size: 13px; white-space: nowrap; }
-.rail a svg { flex: none; width: 18px; height: 18px; }
+.rail a svg { flex: none; width: 16px; height: 16px; }
 .rail a .no { flex: none; width: 18px; text-align: center; font-size: 11px; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .rail a:hover { background: var(--surface-2); color: var(--text-primary); }
 .rail a .lbl { overflow: hidden; text-overflow: ellipsis; }
@@ -465,6 +465,7 @@ body.page-inv #topAvatar { display: none; }
 .inv-trend-tools { display: flex; align-items: center; gap: 8px; flex: none; }
 .inv-trend-tools select { height: 32px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 12px; font-weight: 600; color: #334155; background: #fff; }
 .inv-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+.inv-kpis.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .inv-kpi { position: relative; background: #fff; border: 1px solid #e6edf5; border-radius: 16px; padding: 14px 12px 12px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(15, 23, 42, .035); min-width: 0; min-height: 108px; display: flex; flex-direction: column; }
 .inv-wide { margin-top: 14px; }
 .inv-kpi-top { display: flex; align-items: center; gap: 8px; min-width: 0; padding-right: 46px; min-height: 40px; }
@@ -473,6 +474,7 @@ body.page-inv #topAvatar { display: none; }
 .inv-ring { position: absolute; top: 12px; right: 10px; width: 42px; height: 42px; }
 .inv-kpi-row { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .inv-kpi-v { margin: 0; min-width: 0; color: #14213D; font-family: "Times New Roman", "Source Serif 4", Times, serif; font-size: 22px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: normal; line-height: 1; white-space: nowrap; }
+.inv-kpi-v.text { font-size: 18px; line-height: 1.15; white-space: normal; }
 .inv-kpi-v small { font-family: "Times New Roman", "Source Serif 4", Times, serif; font-size: .72em; font-weight: 700; letter-spacing: -.03em; }
 .inv-kpi-v .u { font-size: 11px; font-weight: 600; color: #94a3b8; margin-left: 4px; letter-spacing: 0; }
 .inv-kpi-note { margin: 8px 0 0; color: #64748b; font-size: 11.5px; font-weight: 500; line-height: 1.35; }
@@ -485,6 +487,7 @@ body.page-inv #topAvatar { display: none; }
 .inv-ch-head h3 { margin: 0; font-size: 15px; font-weight: 600; color: #0B1640; }
 .inv-ch-head p { margin: 2px 0 0; color: #64748b; font-size: 12px; }
 .inv-card .chartbox { margin: 0; padding: 8px 12px 14px; }
+.inv-heat { padding: 8px 12px 14px; max-height: 320px; }
 .inv-card .inv-donut { padding: 8px 16px 16px; }
 .inv-ch-head .seg { flex: none; }
 .inv-seg button { padding: 5px 10px; font-size: 12px; font-weight: 600; }
@@ -641,7 +644,7 @@ const P = {
   filter: '<path d="M4 5h16l-6.2 7.2V19l-3.6-2v-4.8z"/>',
   lines: '<path d="M4 7h16M7 12h10M10 17h4"/>',
   sparkle: '<path d="M12 3l1.1 3.4L16.5 7.5 13.1 8.6 12 12l-1.1-3.4L7.5 7.5l3.4-1.1z"/><path d="M18 13l.6 1.8L20.5 15.4 18.6 16 18 17.8 17.4 16 15.5 15.4l1.9-.6z"/>',
-  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v2.2M12 19.3v2.2M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"/>',
+  gear: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
   card: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/>',
   users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="3"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a3 3 0 0 1 0 5.75"/>',
   building: '<path d="M4 21V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16"/><path d="M15 9h3a2 2 0 0 1 2 2v10"/><path d="M8 7h2M8 11h2M8 15h2M4 21h16"/>',
@@ -1050,7 +1053,8 @@ function go(v, force) {
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
   S.view = v;
-  document.body.classList.toggle('page-inv', v === 'inventory_position');
+  const invShell = v === 'inventory_position' || v === 'inventory_by_location';
+  document.body.classList.toggle('page-inv', invShell);
   renderWhen();
   if (location.hash.slice(1) !== v) location.hash = v;
   const navKey = v.startsWith('report:') ? 'reports' : v;
@@ -1059,7 +1063,7 @@ function go(v, force) {
   document.getElementById('mobileNav').value = sec ? sec.views[0] : navKey;
   const meta = S.meta.views.find(x => x.id === v);
   const grp = (GROUPS.find(([, ids]) => ids.includes(v)) || [''])[0];
-  document.getElementById('pageTitle').textContent = v === 'inventory_position' ? (meta ? meta.title : 'Inventory Position') : ({ command: 'Command Center', definitions: 'Definitions & data notes', actions: 'Agent actions', overview: 'Overview', reports: 'Reporting / Report library', builder: 'Reporting / Report builder', schedules: 'Reporting / Schedules & history', trends: 'Reporting / Trends', datarefresh: 'Governance / Data refresh', audit: 'Governance / Audit log' }[v] || `${grp} / ${meta ? meta.title : ''}`);
+  document.getElementById('pageTitle').textContent = invShell ? (meta ? meta.title : (v === 'inventory_by_location' ? 'Inventory by Location' : 'Inventory Position')) : ({ command: 'Command Center', definitions: 'Definitions & data notes', actions: 'Agent actions', overview: 'Overview', reports: 'Reporting / Report library', builder: 'Reporting / Report builder', schedules: 'Reporting / Schedules & history', trends: 'Reporting / Trends', datarefresh: 'Governance / Data refresh', audit: 'Governance / Audit log' }[v] || `${grp} / ${meta ? meta.title : ''}`);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
   if (v === 'command') return renderCommand();
   if (v === 'actions') return renderActions();
@@ -1425,6 +1429,66 @@ function renderInventory(c, d) {
   d.tables.forEach((t, i) => renderTable(document.getElementById('tb' + i), t, { variant: 'inventory', size: 10 }));
 }
 
+function renderLocation(c, d) {
+  const faces = {
+    'Locations holding stock': { icon: 'pin', bg: '#e8f1ff', fg: '#2563EB' },
+    'Largest site': { icon: 'building', bg: '#f3eefe', fg: '#7c5cf0' },
+    'Top 3 locations share': { icon: 'trend', bg: '#e8f8ef', fg: '#16a34a' },
+    'Stock in transit locations': { icon: 'truck', bg: '#fff4e8', fg: '#e07a12' },
+  };
+  const kpiValue = k => {
+    if (k.label === 'Top 3 locations share') return `${Number(k.value || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}<small>%</small>`;
+    if (k.kind === 'money') return moneyRich(k.value);
+    if (k.kind === 'text') return esc(String(k.value ?? '–'));
+    return esc(String(fmt(k.value, k.kind)));
+  };
+  const kpis = (d.kpis || []).map(k => {
+    const face = faces[k.label] || { icon: 'pin', bg: '#eef2f7', fg: '#475569' };
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
+      <div class="inv-kpi-row"><p class="inv-kpi-v${k.kind === 'text' ? ' text' : ''}">${kpiValue(k)}</p>${cipSpark(k.spark, face.fg, k.label)}</div></article>`;
+  }).join('');
+  const find = title => (d.charts || []).find(ch => ch.title === title);
+  const site = find('Stock value by site');
+  const heat = find('Value heatmap: site × class');
+  const tree = find('Locations sized by value');
+  const top = find('Top 15 locations by stock value');
+  const held = find('Distinct items held per site');
+  const card = (ch, inner) => ch ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(ch.title)}</h3>${ch.subtitle ? `<p>${esc(ch.subtitle)}</p>` : ''}</div></div>${inner}</section>` : '';
+  c.innerHTML = `<div class="inv-page">
+    <div class="inv-head">${sectionTabs('inventory_by_location')}<div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
+      <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
+      <button class="btn primary" id="exportInv">${svg('download', 14)} Export</button></div></div>
+    ${invFilters()}
+    <div class="inv-kpis cols-4">${kpis}</div>
+    <div class="inv-topcharts">
+      ${card(site, `<div class="chartbox" style="height:${site && site.height || 280}px"><canvas id="chSite"></canvas></div>`)}
+      ${card(heat, `<div class="heat inv-heat" id="chHeat"></div>`)}
+    </div>
+    <div class="inv-lower">
+      ${card(tree, `<div class="chartbox" style="height:280px"><canvas id="chTree"></canvas></div>`)}
+      ${card(top, `<div class="chartbox" style="height:${top && top.height || 320}px"><canvas id="chTopLoc"></canvas></div>`)}
+      ${card(held, `<div class="chartbox" style="height:280px"><canvas id="chHeld"></canvas></div>`)}
+    </div>
+    ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
+  bindFilters();
+  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('pdfThis').onclick = () => window.print();
+  if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
+  S.charts.forEach(ch => ch.destroy()); S.charts = [];
+  const glassOpts = { palette: INV_PALETTE, quiet: true, glassy: true };
+  const put = (id, ch) => {
+    const el = document.getElementById(id); if (!el || !ch) return;
+    try { const chart = drawChart(el, Object.assign({}, ch, glassOpts)); if (chart) S.charts.push(chart); }
+    catch (e) { el.parentElement.innerHTML = `<div class="muted">Chart unavailable (${esc(e.message)})</div>`; }
+  };
+  put('chSite', site);
+  put('chTree', tree);
+  put('chTopLoc', top);
+  put('chHeld', held);
+  if (heat) drawHeatmap(document.getElementById('chHeat'), Object.assign({}, heat, { classCols: true }));
+  d.tables.forEach((t, i) => renderTable(document.getElementById('tb' + i), t, { variant: 'inventory', size: 10, search: i === 0 ? 'Search location…' : 'Search items…' }));
+}
+
 async function mountInventoryTrend() {
   const el = document.getElementById('chTrend');
   if (!el) return;
@@ -1464,6 +1528,7 @@ async function loadView() {
   const d = await api(`/api/view/${view}?${qs}`);
   if (S.view !== view) return;
   if (view === 'inventory_position') { renderInventory(c, d); return; }
+  if (view === 'inventory_by_location') { renderLocation(c, d); return; }
   c.innerHTML = `<div class="vhead"><div><h1>${d.no ? `<span class="no">${d.no}</span> · ` : ''}${esc(d.title)}</h1><p>${esc(d.question)}</p></div>
       <div class="page-tools">${sectionTabs(view)}<div class="rbtns"><button class="btn" id="askThis">${I.spark.replace('class="spark"', 'width="14" height="14" style="vertical-align:-2px"')} Ask about this view</button>
       <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button></div></div></div>
@@ -1747,9 +1812,10 @@ function drawChart(el, ch) {
 function drawHeatmap(el, ch) {
   const e = ch.extra, vals = e.values.flat().filter(v => v != null), mx = Math.max(1, ...vals);
   const base = tok(e.key), money = ch.unit === 'UGX';
+  const colColor = name => (ch.classCols && INV_CLASS[name]) || base;
   el.innerHTML = `<table class="heat-t"><thead><tr><th></th>${e.cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>
-    ${ch.labels.map((r, i) => `<tr><th>${esc(r)}</th>${e.values[i].map((v, j) => { const a = v ? .1 + .85 * (v / mx) : 0;
-      return `<td style="background:${v ? hexA(base, a) : 'transparent'};color:${a > .55 ? '#fff' : 'var(--text-primary)'}" title="${esc(r)} · ${esc(e.cols[j])}: ${money ? Math.round(v || 0).toLocaleString() + ' UGX' : (v || 0)}">${v ? (money ? fmt(v, 'money') : Number(v).toLocaleString()) : '·'}</td>`; }).join('')}</tr>`).join('')}</tbody></table>`;
+    ${ch.labels.map((r, i) => `<tr><th>${esc(r)}</th>${e.values[i].map((v, j) => { const a = v ? .1 + .85 * (v / mx) : 0; const paint = colColor(e.cols[j]);
+      return `<td style="background:${v ? hexA(paint, a) : 'transparent'};color:${a > .55 ? '#fff' : 'var(--text-primary)'}" title="${esc(r)} · ${esc(e.cols[j])}: ${money ? Math.round(v || 0).toLocaleString() + ' UGX' : (v || 0)}">${v ? (money ? fmt(v, 'money') : Number(v).toLocaleString()) : '·'}</td>`; }).join('')}</tr>`).join('')}</tbody></table>`;
   return null;
 }
 
@@ -1797,7 +1863,7 @@ function renderTable(el, t, opts = {}) {
     seq.forEach(n => { if (prevN >= 0 && n - prevN > 1) pgBtns.push('<span class="ellipsis">…</span>'); pgBtns.push(`<button type="button" class="pg${n === st.page ? ' on' : ''}" data-go="${n}">${n + 1}</button>`); prevN = n; });
     const head = inv
       ? `<div class="tablehead inv-tablehead"><h3 style="margin:0">${esc(t.title)} <span class="muted" style="font-weight:400">${t.total_rows.toLocaleString()} rows${t.total_rows > t.rows.length ? `, top ${t.rows.length} shown` : ''}</span></h3>
-        <div class="rbtns"><label class="inv-search">${svg('search', 14)}<input class="tfilter" placeholder="Search items…"></label>
+        <div class="rbtns"><label class="inv-search">${svg('search', 14)}<input class="tfilter" placeholder="${esc(opts.search || 'Search items…')}"></label>
         <div class="colmenu-wrap"><button type="button" class="btn" data-cols>${svg('sliders', 12)} Columns</button><div class="colmenu${st.colsOpen ? ' open' : ''}">${t.columns.map(c => `<label><input type="checkbox" data-col="${c.field}" ${hidden.has(c.field) ? '' : 'checked'}> ${esc(c.label)}</label>`).join('')}</div></div>
         <button type="button" class="btn" data-csv>${svg('download', 12)} CSV</button></div></div>`
       : `<div class="tablehead"><h3 style="margin:0">${esc(t.title)} <span class="muted" style="font-weight:400">· ${t.total_rows.toLocaleString()} rows${t.total_rows > t.rows.length ? `, top ${t.rows.length} shown` : ''}</span></h3>
