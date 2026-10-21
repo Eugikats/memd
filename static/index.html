@@ -479,6 +479,9 @@ body.page-inv #topAvatar { display: none; }
 .inv-kpi-v small { font-family: "Times New Roman", "Source Serif 4", Times, serif; font-size: .72em; font-weight: 700; letter-spacing: -.03em; }
 .inv-kpi-v .u { font-size: 11px; font-weight: 600; color: #94a3b8; margin-left: 4px; letter-spacing: 0; }
 .inv-kpi-note { margin: 8px 0 0; color: #64748b; font-size: 11.5px; font-weight: 500; line-height: 1.35; }
+.inv-pad { padding: 16px 20px 18px; }
+.inv-days { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 12px 0; }
+.inv-days input[type="time"] { height: 36px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0 8px; font: inherit; color: #14213D; background: #fff; }
 .inv-spark { flex: 1 1 36px; width: auto; min-width: 36px; max-width: 92px; height: 32px; margin-left: auto; display: block; }
 @container (max-width: 150px) {
   .inv-kpi-row { flex-wrap: wrap; row-gap: 6px; }
@@ -1059,7 +1062,7 @@ function go(v, force) {
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
   S.view = v;
-  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions' };
+  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh' };
   const invShell = Object.prototype.hasOwnProperty.call(INV_SHELL, v);
   document.body.classList.toggle('page-inv', invShell);
   renderWhen();
@@ -2869,31 +2872,66 @@ async function renderTrends() {
 /* ----- data refresh ----- */
 async function renderDataRefresh() {
   const [s, log] = await Promise.all([api('/api/schedules'), api('/api/refresh/log')]);
+  if (S.view !== 'datarefresh') return;
   S.meta = await api('/api/meta');
+  if (S.view !== 'datarefresh') return;
   const n = S.meta.notes, r = n.reconciliation, rf = s.refresh, last = log[0];
-  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Data refresh</h1><p>Read-only loads from Business Central ${esc(n.environment)}, the run log and reconciliation after each load.</p></div>
-      <div class="page-tools">${sectionTabs('datarefresh')}<button class="btn primary" id="rnow">${svg('refresh', 14)} ${S.meta.refreshing ? 'Refreshing…' : 'Refresh now'}</button></div></div>
-    ${S.meta.last_error ? `<div class="banner" style="border-left-color:var(--critical)">Last refresh failed: ${esc(S.meta.last_error)}</div>` : ''}
-    <div class="kpis"><div class="kpi"><div class="label">Data loaded</div><div class="value" style="font-size:20px">${esc(n.extracted_at.replace('T', ' '))}</div><div class="note">${esc(n.company)}</div></div>
-      <div class="kpi"><div class="label"><span class="dot" style="background:${css(last && last.status === 'failed' ? '--critical' : '--good')}"></span>Last run</div><div class="value" style="font-size:20px">${last ? esc(last.status) : 'Initial load'}</div><div class="note">${last ? esc((last.started || '').replace('T', ' ').slice(0, 16)) + ' · ' + esc(last.trigger || 'manual') : ''}</div></div>
-      <div class="kpi"><div class="label">Reconciliation to BC</div><div class="value">${r ? (100 * r.items_matching / r.items_compared).toFixed(1) : '–'}<small> %</small></div><div class="note">${r ? `${r.items_matching.toLocaleString()} of ${r.items_compared.toLocaleString()} items match` : ''}</div></div>
-      <div class="kpi"><div class="label">Records in last load</div><div class="value">${(n.open_ledger_entries + n.movement_entries).toLocaleString()}</div><div class="note">ledger entries (open + ${n.window_days}-day movements)</div></div></div>
-    <div class="charts"><div class="card"><h3>${svg('clock', 15)} Scheduled refresh</h3>
-      <label class="chk"><input type="checkbox" id="rf_en" ${rf.enabled ? 'checked' : ''}> Refresh automatically</label>
-      <div class="filters" style="margin:10px 0"><input type="time" id="rf_time" value="${esc(rf.time)}" style="min-width:0"> <span class="muted">EAT on</span>
-        ${DAYS.map((d, i) => `<label class="chk"><input type="checkbox" class="rf_d" value="${i}" ${rf.days.includes(i) ? 'checked' : ''}> ${d}</label>`).join('')}</div>
-      <button class="btn primary" id="rf_save">Save schedule</button> <span id="rf_msg" class="muted"></span>
-      <div class="muted" style="margin-top:8px">Last scheduled run: ${esc((rf.last_run || '–').replace('T', ' ').slice(0, 16))}. Alerts are re-checked and scheduled reports use the new data after each load.</div></div>
-      <div class="card"><h3>${svg('shield', 15)} Connection</h3><dl><dt>Source</dt><dd>${esc(n.company)} · ${esc(n.environment)}</dd><dt>Access</dt><dd>Read-only (Entra ID app, client credentials). Pulse never posts, edits or deletes Business Central records.</dd>
-        <dt>Tables</dt><dd>Item Ledger Entries, Purchase Lines, Items, Locations, Vendors, Production BOM header & lines</dd></dl></div></div>
-    <div class="card tablecard" id="rlog"></div>`;
-  rnow.onclick = async () => { await api('/api/refresh', { method: 'POST' }); rnow.textContent = 'Refreshing… (about 2 minutes)';
-    const t = setInterval(async () => { const m = await api('/api/meta'); if (!m.refreshing) { clearInterval(t); S.meta = m; renderWhen(); if (S.view === 'datarefresh') renderDataRefresh(); } }, 5000); };
-  rf_save.onclick = async () => { await api('/api/schedules/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: rf_en.checked, time: rf_time.value, days: [...document.querySelectorAll('.rf_d:checked')].map(x => +x.value) }) }); rf_msg.textContent = 'Saved.'; };
-  renderTable(document.getElementById('rlog'), { title: 'Refresh run log', total_rows: log.length, drill: null,
+  const loadedAt = new Date(n.extracted_at);
+  const loadedLabel = Number.isNaN(loadedAt.getTime()) ? String(n.extracted_at || '').replace('T', ' ').slice(0, 16) : loadedAt.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const runLabel = !last ? 'Initial' : last.status === 'ok' ? 'OK' : 'Failed';
+  const match = r && r.items_compared ? 100 * r.items_matching / r.items_compared : null;
+  const entries = (n.open_ledger_entries || 0) + (n.movement_entries || 0);
+  const hist = log.slice().reverse();
+  const faces = {
+    'Loaded': { icon: 'clock', bg: '#e8f1ff', fg: '#2563EB' },
+    'Last run': { icon: last && last.status === 'failed' ? 'alert' : 'check', bg: last && last.status === 'failed' ? '#fdecec' : '#e8f8ef', fg: last && last.status === 'failed' ? '#d03b3b' : '#16a34a' },
+    'Match to BC': { icon: 'shield', bg: '#eef2ff', fg: '#4f46e5' },
+    'Records': { icon: 'doc', bg: '#e8f1ff', fg: '#2563EB' },
+  };
+  const cards = [
+    { label: 'Loaded', value: esc(loadedLabel), spark: null },
+    { label: 'Last run', value: `${esc(runLabel)}${last ? `<small> ${esc(last.trigger || 'manual')}</small>` : ''}`, spark: null, note: last ? (last.started || '').replace('T', ' ').slice(0, 16) : '' },
+    { label: 'Match to BC', value: match == null ? '–' : `${match.toFixed(1)}<small> %</small>`, spark: hist.map(x => x.recon_pct).filter(x => x != null), note: r ? `${r.items_matching.toLocaleString()} of ${r.items_compared.toLocaleString()} items` : '' },
+    { label: 'Records', value: `${entries.toLocaleString()}<small> entries</small>`, spark: hist.map(x => x.records).filter(x => x != null), note: `open + ${n.window_days}-day movements` },
+  ];
+  const kpis = cards.map(k => {
+    const face = faces[k.label];
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p></div>
+      <div class="inv-kpi-row"><p class="inv-kpi-v">${k.value}</p>${cipSpark(k.spark, face.fg, k.label)}</div>${k.note ? `<p class="inv-kpi-note">${esc(k.note)}</p>` : ''}</article>`;
+  }).join('');
+  const logTable = { title: 'Refresh run log', total_rows: log.length, drill: null,
     columns: [{ field: 'started', label: 'Started (EAT)', kind: 'text' }, { field: 'trigger', label: 'Trigger', kind: 'text' }, { field: 'user', label: 'By', kind: 'text' }, { field: 'status', label: 'Status', kind: 'status' },
       { field: 'seconds', label: 'Seconds', kind: 'qty' }, { field: 'records', label: 'Records', kind: 'qty' }, { field: 'recon_pct', label: 'Reconciliation %', kind: 'days' }, { field: 'detail', label: 'Detail', kind: 'text' }],
-    rows: log.map(x => ({ ...x, started: (x.started || '').replace('T', ' ').slice(0, 19), status: x.status === 'ok' ? 'Healthy' : 'Failed', detail: x.error || (x.alerts_triggered && x.alerts_triggered.length ? 'Alerts: ' + x.alerts_triggered.join('; ') : '') })) }, { size: 15 });
+    rows: log.map(x => ({ ...x, started: (x.started || '').replace('T', ' ').slice(0, 19), status: x.status === 'ok' ? 'Healthy' : 'Failed', detail: x.error || (x.alerts_triggered && x.alerts_triggered.length ? 'Alerts: ' + x.alerts_triggered.join('; ') : '') })) };
+  document.getElementById('content').innerHTML = `<div class="inv-page">
+    <div class="inv-head">${sectionTabs('datarefresh')}<div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
+      <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
+      <button class="btn primary" id="rnow">${svg('refresh', 14)} ${S.meta.refreshing ? 'Refreshing…' : 'Refresh now'}</button></div></div>
+    ${S.meta.last_error ? `<div class="banner" style="border-left-color:var(--critical);margin-top:14px">Last refresh failed: ${esc(S.meta.last_error)}</div>` : ''}
+    <div class="inv-kpis cols-4">${kpis}</div>
+    <div class="inv-topcharts">
+      <section class="card inv-card"><div class="inv-ch-head"><div><h3>Scheduled refresh</h3><p>Last scheduled run: ${esc((rf.last_run || '–').replace('T', ' ').slice(0, 16))}. Alerts are re-checked after each load.</p></div></div>
+        <div class="inv-pad"><label class="chk"><input type="checkbox" id="rf_en" ${rf.enabled ? 'checked' : ''}> Refresh automatically</label>
+          <div class="inv-days"><input type="time" id="rf_time" value="${esc(rf.time)}"> <span class="muted">EAT on</span>
+            ${DAYS.map((d, i) => `<label class="chk"><input type="checkbox" class="rf_d" value="${i}" ${rf.days.includes(i) ? 'checked' : ''}> ${d}</label>`).join('')}</div>
+          <button class="btn primary" id="rf_save">Save schedule</button> <span id="rf_msg" class="muted"></span></div></section>
+      <section class="card inv-card"><div class="inv-ch-head"><div><h3>Connection</h3><p>Read-only Business Central</p></div></div>
+        <div class="inv-pad"><dl><dt>Source</dt><dd>${esc(n.company)} · ${esc(n.environment)}</dd><dt>Access</dt><dd>Read-only (Entra ID app, client credentials). Pulse never posts, edits or deletes Business Central records.</dd>
+          <dt>Tables</dt><dd>Item Ledger Entries, Purchase Lines, Items, Locations, Vendors, Production BOM header &amp; lines</dd></dl></div></section>
+    </div>
+    <div class="card tablecard inv-table" id="rlog"></div></div>`;
+  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Summarise the data refresh: when did Business Central last load, did it reconcile, and is the schedule healthy?'), 50); };
+  document.getElementById('pdfThis').onclick = () => window.print();
+  document.getElementById('rnow').onclick = async () => {
+    await api('/api/refresh', { method: 'POST' });
+    rnow.textContent = 'Refreshing… (about 2 minutes)';
+    const t = setInterval(async () => { const m = await api('/api/meta'); if (!m.refreshing) { clearInterval(t); S.meta = m; renderWhen(); if (S.view === 'datarefresh') renderDataRefresh(); } }, 5000);
+  };
+  document.getElementById('rf_save').onclick = async () => {
+    await api('/api/schedules/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: rf_en.checked, time: rf_time.value, days: [...document.querySelectorAll('.rf_d:checked')].map(x => +x.value) }) });
+    rf_msg.textContent = 'Saved.';
+  };
+  renderTable(document.getElementById('rlog'), logTable, { variant: 'inventory', size: 15, search: 'Search trigger, user, detail…' });
 }
 
 /* ----- audit ----- */
