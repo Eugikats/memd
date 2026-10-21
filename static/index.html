@@ -332,8 +332,8 @@ body.page-inv { background: #f5f7fb; color: #14213D; --accent: #2563EB; --accent
 body.page-inv .shell, body.page-inv main { background: #f5f7fb; }
 body.page-inv main { padding-top: 8px; }
 body.page-inv .topbar { background: #fff; border-bottom-color: #E2E8F0; }
-body.page-inv .topbar .page { display: none; }
-body.page-inv .topbar .right { align-items: center; }
+body.page-inv .topbar .page { display: block; font-size: 14px; font-weight: 500; color: #0f172a; }
+body.page-inv .topbar .right { align-items: center; margin-left: auto; }
 body.page-inv .topbar .when { line-height: 1.2; text-align: left; }
 body.page-inv .topbar .when b { font-weight: 600; display: inline; }
 body.page-inv .topbar .when a.inv-updated { text-decoration: none; color: #94a3b8; font-size: 12px; font-weight: 500; }
@@ -348,7 +348,7 @@ body.page-inv #topAvatar { display: none; }
 .inv-page { min-width: 0; }
 .inv-crumb { color: #94a3b8; font-size: 12.5px; margin: 2px 0 8px; }
 .inv-crumb span { margin: 0 4px; }
-.inv-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.inv-head { display: flex; justify-content: flex-end; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
 .inv-head h1 { margin: 0; font-family: Inter, system-ui, sans-serif; font-size: 30px; font-weight: 700; letter-spacing: -.45px; color: #14213D; }
 .inv-head p { margin: 4px 0 0; color: #64748B; font-family: Inter, system-ui, sans-serif; font-size: 14.5px; }
 .inv-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -378,8 +378,8 @@ body.page-inv #topAvatar { display: none; }
 .inv-kpi-l { margin: 0; flex: 1; min-width: 0; color: #64748b; font-size: 12px; font-weight: 600; line-height: 1.25; }
 .inv-ring { position: absolute; top: 12px; right: 10px; width: 42px; height: 42px; }
 .inv-kpi-row { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.inv-kpi-v { margin: 0; min-width: 0; color: #14213D; font-size: 22px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
-.inv-kpi-v small { font-size: .72em; font-weight: 700; letter-spacing: 0; }
+.inv-kpi-v { margin: 0; min-width: 0; color: #14213D; font-family: "Times New Roman", "Source Serif 4", Times, serif; font-size: 22px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: normal; line-height: 1; white-space: nowrap; }
+.inv-kpi-v small { font-family: "Times New Roman", "Source Serif 4", Times, serif; font-size: .72em; font-weight: 700; letter-spacing: -.03em; }
 .inv-kpi-v .u { font-size: 11px; font-weight: 600; color: #94a3b8; margin-left: 4px; letter-spacing: 0; }
 .inv-kpi-note { margin: 8px 0 0; color: #64748b; font-size: 11.5px; font-weight: 500; line-height: 1.35; }
 .inv-spark { width: 92px; height: 32px; flex: none; display: block; }
@@ -397,8 +397,8 @@ body.page-inv #topAvatar { display: none; }
 .post-bars { display: flex; flex-direction: column; gap: 11px; padding: 14px 16px 16px; }
 .post-row { display: grid; grid-template-columns: minmax(72px, 132px) minmax(0, 1fr) auto; gap: 10px; align-items: center; }
 .post-name { font-size: 12px; font-weight: 600; color: #14213D; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.post-track { height: 12px; background: transparent; border-radius: 99px; overflow: visible; }
-.post-track span { display: block; height: 100%; border-radius: 99px; min-width: 6px; box-shadow: inset 0 1px 0 rgba(255,255,255,.72), inset 0 -1px 0 rgba(15, 23, 42, .08); }
+.post-track { height: 12px; background: transparent; border-radius: 0; overflow: visible; }
+.post-track span { display: block; height: 100%; border-radius: 0; min-width: 6px; }
 .post-axis { display: grid; grid-template-columns: minmax(72px, 132px) minmax(0, 1fr) auto; gap: 10px; margin-top: 6px; }
 .post-ticks { display: flex; justify-content: space-between; color: #94a3b8; font-size: 11px; font-variant-numeric: tabular-nums; }
 .post-axis { display: grid; grid-template-columns: minmax(72px, 132px) minmax(0, 1fr) auto; gap: 10px; margin-top: 4px; }
@@ -422,7 +422,10 @@ body.page-inv #topAvatar { display: none; }
 .inv-pager button:disabled { opacity: .45; cursor: default; }
 .page-inv .insights-card, body.page-inv .insights-card { border-radius: 16px; }
 .inv-table { border-radius: 16px; }
-.inv-tablehead h3 { font-size: 15px; }
+.inv-tablehead { flex-wrap: nowrap; align-items: center; }
+.inv-tablehead h3 { font-size: 15px; min-width: 0; }
+.inv-tablehead .rbtns { flex-wrap: nowrap; width: auto; flex: none; }
+body.page-inv .tablehead.inv-tablehead .rbtns { width: auto; }
 .inv-table .tablewrap { border: 0; border-radius: 0; }
 .inv-table th { background: #f8fafc; font-size: 12px; }
 .inv-table tbody tr:hover td { background: #f8fbff; }
@@ -539,6 +542,7 @@ const P = {
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.2-3.2"/>',
   filter: '<path d="M4 5h16l-6.2 7.2V19l-3.6-2v-4.8z"/>',
+  lines: '<path d="M4 7h16M7 12h10M10 17h4"/>',
   sparkle: '<path d="M12 3l1.1 3.4L16.5 7.5 13.1 8.6 12 12l-1.1-3.4L7.5 7.5l3.4-1.1z"/><path d="M18 13l.6 1.8L20.5 15.4 18.6 16 18 17.8 17.4 16 15.5 15.4l1.9-.6z"/>',
 };
 const svg = (n, s = 18) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${P[n] || ''}</svg>`;
@@ -640,7 +644,7 @@ function go(v, force) {
   document.getElementById('mobileNav').value = navKey;
   const meta = S.meta.views.find(x => x.id === v);
   const grp = (GROUPS.find(([, ids]) => ids.includes(v)) || [''])[0];
-  document.getElementById('pageTitle').textContent = { command: 'Command Center', definitions: 'Definitions & data notes', actions: 'Agent actions', overview: 'Overview', reports: 'Reporting / Report library', builder: 'Reporting / Report builder', schedules: 'Reporting / Schedules & history', trends: 'Reporting / Trends', datarefresh: 'Governance / Data refresh', audit: 'Governance / Audit log' }[v] || `${grp} / ${meta ? meta.title : ''}`;
+  document.getElementById('pageTitle').textContent = v === 'inventory_position' ? (meta ? meta.title : 'Inventory Position') : ({ command: 'Command Center', definitions: 'Definitions & data notes', actions: 'Agent actions', overview: 'Overview', reports: 'Reporting / Report library', builder: 'Reporting / Report builder', schedules: 'Reporting / Schedules & history', trends: 'Reporting / Trends', datarefresh: 'Governance / Data refresh', audit: 'Governance / Audit log' }[v] || `${grp} / ${meta ? meta.title : ''}`);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
   if (v === 'command') return renderCommand();
   if (v === 'actions') return renderActions();
@@ -892,7 +896,7 @@ function invFilters() {
     <select id="f_class"><option value="">All classes</option>${['RM', 'WIP', 'FG'].map(c => `<option ${f.item_class === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
     <select id="f_site"><option value="">All sites</option>${m.sites.map(s => `<option ${f.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
     <label class="inv-search">${svg('search', 15)}<input id="f_q" placeholder="Search item, description, vendor, posting group…" value="${esc(f.q)}"></label>
-    <div class="inv-filterwrap"><button type="button" class="btn inv-filterbtn" id="f_filters">${svg('filter', 14)} Filters</button>
+    <div class="inv-filterwrap"><button type="button" class="btn inv-filterbtn" id="f_filters">${svg('lines', 14)} Filters</button>
       <div class="inv-filterpop" id="f_pop" hidden><label>Location<select id="f_loc"><option value="">All locations</option>${locs.map(s => `<option ${f.location === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label></div></div>
     <button class="btn ghost" id="f_clear">Clear</button></div>`;
 }
@@ -923,17 +927,16 @@ function renderInventory(c, d) {
   const postCard = posting ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(posting.title)}</h3><p>${esc(postSub)}</p></div><div class="seg inv-seg" id="postMode"><button type="button" data-mode="bar">Bar</button><button type="button" data-mode="bubble">Bubble</button><button type="button" data-mode="treemap">Treemap</button></div></div><div class="chartbox" id="postHost" style="height:${invPostMode === 'bar' ? 'auto' : postH + 'px'};min-height:240px"></div></section>` : '';
   const trendCard = `<section class="card inv-card"><div class="inv-ch-head"><div><h3>Inventory Value Trend</h3><p>On-hand value at each Business Central load</p></div><div class="inv-trend-tools"><select id="trendMetric"><option value="total">Total value</option><option value="rm">Raw Material</option><option value="wip">Work in Progress</option><option value="fg">Finished Goods</option></select><div class="seg inv-seg" id="trendRange"><button type="button" data-m="3">3M</button><button type="button" data-m="6">6M</button><button type="button" data-m="12">12M</button></div></div></div><div class="chartbox" style="height:280px"><canvas id="chTrend"></canvas></div></section>`;
   const donutCard = donut ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(donut.title)}</h3>${donut.subtitle ? `<p>${esc(donut.subtitle)}</p>` : ''}</div><div class="seg inv-seg" id="donutMode"><button type="button" data-mode="value">Value</button><button type="button" data-mode="qty">Quantity</button></div></div><div class="inv-donut"><div class="chartbox" style="height:250px"><canvas id="chDonut"></canvas></div><ul class="inv-legend" id="donutLegend"></ul></div></section>` : '';
-  c.innerHTML = `<div class="inv-page"><div class="inv-crumb">Inventory <span>›</span> ${esc(d.title)}</div>
-    <div class="inv-head"><div><h1>${esc(d.title)}</h1><p>${esc(d.question)}</p></div>
-      <div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
+  c.innerHTML = `<div class="inv-page">
+    <div class="inv-head"><div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
       <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
       <button class="btn primary" id="exportInv">${svg('download', 14)} Export</button></div></div>
     ${invFilters()}
     <div class="inv-kpis">${kpis}</div>
     <div class="inv-topcharts">${trendCard}${donutCard}</div>
     <div class="inv-lower">${abc ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(abc.title)}</h3>${abc.subtitle ? `<p>${esc(abc.subtitle)}</p>` : ''}</div><div class="seg inv-seg" id="abcMode"><button type="button" data-mode="pct">%</button><button type="button" data-mode="value">Value</button></div></div><div class="chartbox" style="height:280px"><canvas id="chAbc"></canvas></div></section>` : ''}${postCard}${card(health, 'chHealth')}</div>
-    ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}
-    ${top ? `<div class="inv-wide">${card(top, 'chTop')}</div>` : ''}</div>`;
+    ${top ? `<div class="inv-wide">${card(top, 'chTop')}</div>` : ''}
+    ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
   document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
   document.getElementById('pdfThis').onclick = () => window.print();
@@ -1146,7 +1149,7 @@ function hexA(hex, a) { const h = hex.replace('#', ''); const n = parseInt(h.len
 function hexRgb(hex) { const h = String(hex).replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map(x => x + x).join('') : h, 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
 function mixWhite(hex, t) { const [r, g, b] = hexRgb(hex); const m = c => Math.round(c + (255 - c) * t); return `rgb(${m(r)},${m(g)},${m(b)})`; }
 function shadeHex(hex, t) { const [r, g, b] = hexRgb(hex); return `rgb(${Math.round(r * t)},${Math.round(g * t)},${Math.round(b * t)})`; }
-function glassCss(hex) { return `linear-gradient(90deg, ${mixWhite(hex, .52)} 0%, ${hex} 42%, ${hex} 100%)`; }
+function glassCss(hex) { return `linear-gradient(90deg, ${hex} 0%, ${mixWhite(hex, .42)} 100%)`; }
 function glassFill(ctx, color, kind) {
   const chart = ctx.chart, area = chart && chart.chartArea;
   const c = Array.isArray(color) ? color[ctx.dataIndex] : color;
@@ -1159,11 +1162,13 @@ function glassFill(ctx, color, kind) {
     return g;
   }
   if (kind === 'doughnut') {
-    if (!area) return c;
-    const cx = (area.left + area.right) / 2, cy = (area.top + area.bottom) / 2;
-    const rad = Math.max(area.right - area.left, area.bottom - area.top) / 2;
-    const g = x.createRadialGradient(cx - rad * .22, cy - rad * .3, rad * .08, cx, cy, rad);
-    g.addColorStop(0, mixWhite(c, .5)); g.addColorStop(.4, c); g.addColorStop(1, shadeHex(c, .9));
+    const cx = el && el.x != null ? el.x : area ? (area.left + area.right) / 2 : 0;
+    const cy = el && el.y != null ? el.y : area ? (area.top + area.bottom) / 2 : 0;
+    const inner = el && el.innerRadius > 2 ? el.innerRadius : 0;
+    const outer = el && el.outerRadius > inner ? el.outerRadius : 0;
+    if (!outer) return c;
+    const g = x.createRadialGradient(cx, cy, inner, cx, cy, outer);
+    g.addColorStop(0, mixWhite(c, .58)); g.addColorStop(1, c);
     return g;
   }
   const horizontal = kind === 'hbar' || (el && el.horizontal);
@@ -1172,13 +1177,13 @@ function glassFill(ctx, color, kind) {
       const x0 = Math.min(el.x, el.base), x1 = Math.max(el.x, el.base);
       if (x1 - x0 < 1) return c;
       const g = x.createLinearGradient(x0, 0, x1, 0);
-      g.addColorStop(0, mixWhite(c, .52)); g.addColorStop(.4, c); g.addColorStop(1, c);
+      g.addColorStop(0, c); g.addColorStop(1, mixWhite(c, .48));
       return g;
     }
     const y0 = Math.min(el.y, el.base), y1 = Math.max(el.y, el.base);
     if (y1 - y0 < 1) return c;
-    const g = x.createLinearGradient(0, y0, 0, y1);
-    g.addColorStop(0, mixWhite(c, .5)); g.addColorStop(.22, c); g.addColorStop(1, c);
+    const g = x.createLinearGradient(0, y1, 0, y0);
+    g.addColorStop(0, c); g.addColorStop(1, mixWhite(c, .5));
     return g;
   }
   if (!area) return c;
@@ -1295,11 +1300,11 @@ function drawChart(el, ch) {
   const datasets = ch.series.map((s, i) => {
     const col = seriesColor(s, i, ch.labels, ch);
     const mark = ch.glassy ? { _solid: col, _glassKind: glassKind } : {};
-    if (type === 'line' && ch.extra && (ch.extra.seriesTypes || [])[i] === 'bar') return Object.assign({ type: 'bar', label: s.name, data: s.data, backgroundColor: ch.glassy ? col : hexA(col, .75), borderColor: col, borderWidth: 0, borderRadius: 6, maxBarThickness: 22, order: 2 }, ch.glassy ? { _solid: col, _glassKind: 'bar' } : {});
+    if (type === 'line' && ch.extra && (ch.extra.seriesTypes || [])[i] === 'bar') return Object.assign({ type: 'bar', label: s.name, data: s.data, backgroundColor: ch.glassy ? col : hexA(col, .75), borderColor: col, borderWidth: 0, borderRadius: 0, maxBarThickness: 22, order: 2 }, ch.glassy ? { _solid: col, _glassKind: 'bar' } : {});
     if (type === 'line') return Object.assign({ label: s.name, data: s.data, borderColor: col, backgroundColor: ch.glassy ? hexA(Array.isArray(col) ? col[0] : col, .28) : (area ? (ctx) => glassFill(ctx, Array.isArray(col) ? col[0] : col, 'line') : col), yAxisID: s.axis || 'y',
       fill: (area || ch.glassy) ? (ch.tight ? { target: { value: ch.tightMin } } : (ch.stacked ? (i === 0 ? 'origin' : '-1') : 'origin')) : false, borderWidth: ch.glassy ? 2.5 : 2, pointRadius: ch.labels.length > 20 ? 0 : 4, pointHoverRadius: 6, pointBackgroundColor: '#fff', pointBorderColor: col, pointBorderWidth: 2, tension: .35 }, ch.glassy ? { _solid: Array.isArray(col) ? col[0] : col, _glassKind: 'line' } : {});
     return Object.assign({ label: s.name, data: s.data, yAxisID: s.axis || 'y', backgroundColor: col, borderColor: ch.glassy ? (type === 'doughnut' ? '#fff' : 'transparent') : surf, borderWidth: ch.glassy ? (type === 'doughnut' ? 3 : 0) : (type === 'doughnut' ? 2 : 0),
-      borderRadius: type === 'doughnut' ? 4 : (ch.stacked ? 0 : (horizontal ? 8 : 7)), borderSkipped: ch.stacked ? true : (horizontal ? false : 'start'), maxBarThickness: horizontal ? 16 : 28, categoryPercentage: .72, barPercentage: .82 }, mark);
+      borderRadius: 0, borderSkipped: true, maxBarThickness: horizontal ? 16 : 28, categoryPercentage: .72, barPercentage: .82 }, mark);
   });
   const total = type === 'doughnut' ? (ch.series[0]?.data || []).reduce((a, b) => a + (b || 0), 0) : 0;
   return new Chart(el, {
