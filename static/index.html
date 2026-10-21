@@ -1063,7 +1063,7 @@ function go(v, force) {
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
   S.view = v;
-  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview' };
+  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview', reports: 'Report library' };
   const invShell = Object.prototype.hasOwnProperty.call(INV_SHELL, v);
   document.body.classList.toggle('page-inv', invShell);
   renderWhen();
@@ -2766,15 +2766,53 @@ const FREQ = { daily: 'Every day', weekdays: 'Weekdays (Mon–Fri)', weekly: 'We
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 async function renderReports() {
-  const d = await api('/api/reports'); S.reportCat = d;
+  const d = await api('/api/reports');
+  if (S.view !== 'reports') return;
+  S.reportCat = d;
   const cats = [...new Set(d.catalogue.map(c => c.category))];
-  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Report library</h1><p>Standard supply chain reports from the governed model — preview, export to Excel / CSV / PDF, or schedule.</p></div>
-      <div class="page-tools">${sectionTabs('reports')}<div class="rbtns"><button class="btn" id="toBuilder">${svg('sliders', 14)} Build a custom report</button><button class="btn" id="toSched">${svg('calendar', 14)} Schedules & history</button></div></div></div>
-    ${cats.map(cat => `<div class="rgroup"><h3>${svg(CAT_ICON[cat] || 'doc', 16)} ${esc(cat)}</h3><div class="rcards">${d.catalogue.filter(c => c.category === cat).map(c => `
-      <button class="rcard" data-r="${esc(c.id)}"><div class="rc-ic">${svg(CAT_ICON[cat] || 'doc', 18)}</div><div><b>${esc(c.name)}</b><div class="muted">${esc(c.description)}</div></div>${svg('arrow', 14)}</button>`).join('')}</div></div>`).join('')}`;
+  const standard = d.catalogue.filter(c => !c.custom).length;
+  const custom = d.catalogue.filter(c => c.custom).length;
+  const faces = {
+    'Reports': { icon: 'doc', bg: '#e8f1ff', fg: '#2563EB' },
+    'Standard': { icon: 'book', bg: '#eef2ff', fg: '#4f46e5' },
+    'Custom': { icon: 'star', bg: '#fff4e8', fg: '#e07a12' },
+    'Categories': { icon: 'grid', bg: '#e8f8ef', fg: '#16a34a' },
+  };
+  const cards = [
+    { label: 'Reports', n: d.catalogue.length, unit: 'reports' },
+    { label: 'Standard', n: standard, unit: 'reports' },
+    { label: 'Custom', n: custom, unit: 'reports' },
+    { label: 'Categories', n: cats.length, unit: 'groups' },
+  ];
+  const kpis = cards.map(k => {
+    const face = faces[k.label];
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p></div>
+      <div class="inv-kpi-row"><p class="inv-kpi-v">${esc(String(fmt(k.n, 'qty')))}<small> ${k.unit}</small></p>${cipSpark(null, face.fg, k.label)}</div></article>`;
+  }).join('');
+  document.getElementById('content').innerHTML = `<div class="inv-page">
+    <div class="inv-head">${sectionTabs('reports')}<div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
+      <button class="btn" id="toBuilder">${svg('sliders', 14)} Build a custom report</button>
+      <button class="btn primary" id="toSched">${svg('calendar', 14)} Schedules & history</button></div></div>
+    <div class="inv-kpis cols-4">${kpis}</div>
+    <div class="filters inv-filters"><label class="inv-search">${svg('search', 15)}<input id="repQ" placeholder="Search reports…"></label></div>
+    <div id="repGroups">${cats.map(cat => `<section class="card inv-card rgroup" data-cat="${esc(cat)}"><div class="inv-ch-head"><div><h3>${esc(cat)}</h3><p>${d.catalogue.filter(c => c.category === cat).length} reports</p></div></div>
+      <div class="inv-pad rcards">${d.catalogue.filter(c => c.category === cat).map(c => `<button class="rcard" data-r="${esc(c.id)}" data-find="${esc((c.name + ' ' + c.description).toLowerCase())}"><div class="rc-ic">${svg(CAT_ICON[cat] || 'doc', 18)}</div><div><b>${esc(c.name)}</b><div class="muted">${esc(c.description)}</div></div>${svg('arrow', 14)}</button>`).join('')}</div></section>`).join('')}</div></div>`;
   document.querySelectorAll('.rcard').forEach(b => b.onclick = () => go('report:' + b.dataset.r));
+  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Which standard reports should I open for stock, cover, overdue purchase orders, and exceptions?'), 50); };
   document.getElementById('toBuilder').onclick = () => go('builder');
   document.getElementById('toSched').onclick = () => go('schedules');
+  document.getElementById('repQ').oninput = e => {
+    const q = e.target.value.trim().toLowerCase();
+    document.querySelectorAll('#repGroups .rgroup').forEach(group => {
+      let shown = 0;
+      group.querySelectorAll('.rcard').forEach(card => {
+        const on = !q || card.dataset.find.includes(q);
+        card.hidden = !on;
+        if (on) shown += 1;
+      });
+      group.hidden = shown === 0;
+    });
+  };
 }
 
 async function renderReport(rid) {
