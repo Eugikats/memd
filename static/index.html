@@ -1063,7 +1063,7 @@ function go(v, force) {
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
   S.view = v;
-  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview', reports: 'Report library' };
+  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview', reports: 'Report library', builder: 'Report builder' };
   const invShell = Object.prototype.hasOwnProperty.call(INV_SHELL, v);
   document.body.classList.toggle('page-inv', invShell);
   renderWhen();
@@ -2888,8 +2888,29 @@ async function renderBuilder() {
   const b = S.builder || (S.builder = { dataset: 'items', mode: 'list', columns: [], group_by: '', metrics: [{ col: '', agg: 'sum' }], conditions: [], filters: {}, sort: { col: '', dir: 'desc' }, limit: '' });
   const cols = D[b.dataset].columns, num = cols.filter(c => ['qty', 'money', 'days'].includes(c.kind));
   if (!b.columns.length) b.columns = cols.slice(0, 7).map(c => c.field);
+  const dsShort = { items: 'Items', stock_by_location: 'By location', purchase_lines: 'PO lines', exceptions: 'Exceptions', readiness: 'Readiness', location_risk: 'Shortages', weekly_flow: 'Weekly flow' };
+  const selected = b.mode === 'list' ? b.columns.length : b.metrics.filter(m => m.col).length;
+  const faces = {
+    'Dataset': { icon: 'doc', bg: '#e8f1ff', fg: '#2563EB' },
+    'Fields': { icon: 'sliders', bg: '#eef2ff', fg: '#4f46e5' },
+    'Selected': { icon: 'check', bg: '#e8f8ef', fg: '#16a34a' },
+    'Conditions': { icon: 'filter', bg: '#fff4e8', fg: '#e07a12' },
+  };
+  const cards = [
+    { label: 'Dataset', value: esc(dsShort[b.dataset] || D[b.dataset].label) },
+    { label: 'Fields', value: `${esc(String(fmt(cols.length, 'qty')))}<small> fields</small>` },
+    { label: 'Selected', value: `${esc(String(fmt(selected, 'qty')))}<small> ${b.mode === 'list' ? 'columns' : 'measures'}</small>` },
+    { label: 'Conditions', value: `${esc(String(fmt(b.conditions.length, 'qty')))}<small> conditions</small>` },
+  ];
+  const kpis = cards.map(k => {
+    const face = faces[k.label];
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p></div>
+      <div class="inv-kpi-row"><p class="inv-kpi-v">${k.value}</p>${cipSpark(null, face.fg, k.label)}</div></article>`;
+  }).join('');
   const opt = (list, sel, blank) => (blank ? `<option value="">${blank}</option>` : '') + list.map(c => `<option value="${c.field}" ${c.field === sel ? 'selected' : ''}>${esc(c.label)}</option>`).join('');
-  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Report builder</h1><p>Pick a dataset, choose columns or group and summarise, add conditions — then export, save or schedule.</p></div>${sectionTabs('builder')}</div>
+  document.getElementById('content').innerHTML = `<div class="inv-page">
+    <div class="inv-head">${sectionTabs('builder')}<div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button></div></div>
+    <div class="inv-kpis cols-4">${kpis}</div>
     <div class="builder"><div class="card bform">
       <label>Dataset<select id="b_ds">${Object.entries(D).map(([k, v]) => `<option value="${k}" ${k === b.dataset ? 'selected' : ''}>${esc(v.label)}</option>`).join('')}</select></label>
       <div class="seg"><button class="${b.mode === 'list' ? 'on' : ''}" data-mode="list">List rows</button><button class="${b.mode === 'group' ? 'on' : ''}" data-mode="group">Group & summarise</button></div>
@@ -2907,7 +2928,7 @@ async function renderBuilder() {
       <label>Max rows<input id="b_lim" type="number" min="1" value="${esc(b.limit)}" placeholder="All"></label>
       <div class="bbtns"><button class="btn primary" id="b_run">${svg('play', 14)} Run</button><button class="btn" id="b_xl">${svg('download', 14)} Excel</button><button class="btn" id="b_save">${svg('star', 14)} Save as report</button></div>
       <div id="b_msg" class="muted"></div>
-    </div><div id="b_out"><div class="empty">${svg('sliders', 28)}<div>Configure the report and press Run.</div></div></div></div>`;
+    </div><div id="b_out"><div class="empty">${svg('sliders', 28)}<div>Configure the report and press Run.</div></div></div></div></div>`;
   const read = () => {
     b.dataset = b_ds.value;
     if (b.mode === 'list') b.columns = [...document.querySelectorAll('.colpick input:checked')].map(x => x.value);
@@ -2932,6 +2953,7 @@ async function renderBuilder() {
     if (r.error) { b_msg.textContent = r.error; return; }
     drawReportBody(document.getElementById('b_out'), { ...r, name: D[b.dataset].label });
   };
+  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Help me build a report: which dataset, columns and conditions should I use for the question I have?'), 50); };
   b_run.onclick = run;
   b_xl.onclick = async () => { read(); const res = await fetch('/api/reports/custom/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ spec: spec(), name: D[b.dataset].label }) });
     const a = document.createElement('a'); a.href = URL.createObjectURL(await res.blob()); a.download = D[b.dataset].label.replace(/\W+/g, '_') + '.xlsx'; a.click(); };
