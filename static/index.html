@@ -1062,7 +1062,7 @@ function go(v, force) {
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
   S.view = v;
-  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh' };
+  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log' };
   const invShell = Object.prototype.hasOwnProperty.call(INV_SHELL, v);
   document.body.classList.toggle('page-inv', invShell);
   renderWhen();
@@ -2937,17 +2937,63 @@ async function renderDataRefresh() {
 /* ----- audit ----- */
 async function renderAudit() {
   const rows = await api('/api/audit');
-  const types = [...new Set(rows.map(r => r.type).filter(Boolean))];
-  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Audit log</h1><p>Every question, agent run, decision, report and data refresh — with who and when.</p></div>${sectionTabs('audit')}</div>
-    <div class="filters"><select id="a_t"><option value="">All events</option>${types.map(t => `<option>${esc(t)}</option>`).join('')}</select><input id="a_q" placeholder="Search user, question, report…"></div><div class="card tablecard" id="alog"></div>`;
-  const draw = () => {
-    const q = a_q.value.toLowerCase(), t = a_t.value;
-    const f = rows.filter(r => (!t || r.type === t) && (!q || JSON.stringify(r).toLowerCase().includes(q)));
-    renderTable(document.getElementById('alog'), { title: 'Events', total_rows: f.length, drill: null,
-      columns: [{ field: 'at', label: 'When', kind: 'text' }, { field: 'user', label: 'User', kind: 'text' }, { field: 'type', label: 'Type', kind: 'text' }, { field: 'event', label: 'Event', kind: 'text' }, { field: 'detail', label: 'Detail', kind: 'text' }],
-      rows: f.map(r => ({ ...r, at: String(r.at || '').replace('T', ' ').slice(0, 19) })) }, { size: 30 });
+  if (S.view !== 'audit') return;
+  const types = [...new Set(rows.map(r => r.type).filter(Boolean))].sort();
+  const count = pred => rows.filter(pred).length;
+  const questions = count(r => r.type === 'azure' || r.type === 'claude' || r.type === 'offline');
+  const agents = count(r => r.type === 'agent');
+  const decisions = count(r => r.type === 'decision');
+  const reports = count(r => r.type === 'report');
+  const refreshes = count(r => r.type === 'refresh');
+  const total = rows.length;
+  const share = n => total ? Math.round(100 * n / total) : 0;
+  const faces = {
+    'Events': { icon: 'book', bg: '#eef2ff', fg: '#4f46e5' },
+    'Questions': { icon: 'sparkle', bg: '#e8f1ff', fg: '#2563EB' },
+    'Agent runs': { icon: 'play', bg: '#f3eefe', fg: '#7c5cf0' },
+    'Decisions': { icon: 'check', bg: '#e8f8ef', fg: '#16a34a' },
+    'Reports': { icon: 'doc', bg: '#e8f1ff', fg: '#2563EB' },
+    'Refreshes': { icon: 'refresh', bg: '#fff4e8', fg: '#e07a12' },
   };
-  a_t.onchange = draw; let tm; a_q.oninput = () => { clearTimeout(tm); tm = setTimeout(draw, 300); }; draw();
+  const cards = [
+    { label: 'Events', n: total },
+    { label: 'Questions', n: questions, pct: share(questions) },
+    { label: 'Agent runs', n: agents, pct: share(agents) },
+    { label: 'Decisions', n: decisions, pct: share(decisions) },
+    { label: 'Reports', n: reports, pct: share(reports) },
+    { label: 'Refreshes', n: refreshes, pct: share(refreshes) },
+  ];
+  const kpis = cards.map(k => {
+    const face = faces[k.label];
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
+      <div class="inv-kpi-row"><p class="inv-kpi-v">${esc(String(fmt(k.n, 'qty')))}<small> events</small></p>${cipSpark(null, face.fg, k.label)}</div></article>`;
+  }).join('');
+  const typeLabel = t => { const s = String(t || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; };
+  const shown = () => {
+    const t = document.getElementById('a_t').value;
+    return rows.filter(r => !t || r.type === t).map(r => ({ ...r, at: String(r.at || '').replace('T', ' ').slice(0, 19) }));
+  };
+  const tableOf = list => ({ title: 'Events', total_rows: list.length, drill: null,
+    columns: [{ field: 'at', label: 'When', kind: 'text' }, { field: 'user', label: 'User', kind: 'text' }, { field: 'type', label: 'Type', kind: 'text' }, { field: 'event', label: 'Event', kind: 'text' }, { field: 'detail', label: 'Detail', kind: 'text' }],
+    rows: list });
+  document.getElementById('content').innerHTML = `<div class="inv-page">
+    <div class="inv-head">${sectionTabs('audit')}<div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
+      <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
+      <button class="btn primary" id="exportInv">${svg('download', 14)} Export</button></div></div>
+    <div class="inv-kpis cols-6">${kpis}</div>
+    <div class="filters inv-filters"><select id="a_t"><option value="">All events</option>${types.map(t => `<option value="${esc(t)}">${esc(typeLabel(t))}</option>`).join('')}</select>
+      <button class="btn ghost" id="a_clear">Clear</button></div>
+    <div class="card tablecard inv-table" id="alog"></div></div>`;
+  const draw = () => {
+    const spec = tableOf(shown());
+    renderTable(document.getElementById('alog'), spec, { variant: 'inventory', size: 30, search: 'Search user, event, detail…' });
+    document.getElementById('exportInv').onclick = () => exportCsv(spec);
+  };
+  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Summarise the audit log: who did what, and which questions, decisions, reports and refreshes need attention?'), 50); };
+  document.getElementById('pdfThis').onclick = () => window.print();
+  document.getElementById('a_t').onchange = draw;
+  document.getElementById('a_clear').onclick = () => { document.getElementById('a_t').value = ''; draw(); };
+  draw();
 }
 
 /* ---------------- Definitions ---------------- */
