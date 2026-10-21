@@ -94,20 +94,37 @@ button { font: inherit; }
 main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 
 /* ---------- command center home ---------- */
-.hero { background: linear-gradient(180deg, #fbfcfe 0%, #f5f7fc 70%, #eef0fb 100%); border-radius: 14px; padding: 64px 24px 48px; min-height: calc(100vh - 110px); display: flex; flex-direction: column; align-items: center; }
-.hero h1 { font-family: var(--serif); font-weight: 700; font-size: 40px; letter-spacing: -.5px; margin: 0; text-align: center; }
-.hero h1 span { color: var(--accent); }
-.hero .sub { font-family: var(--serif); color: var(--text-secondary); font-size: 17.5px; max-width: 520px; text-align: center; margin: 14px 0 0; }
+.hero { background: #fff; border-radius: 0; padding: 56px 24px 48px; min-height: calc(100vh - 88px); display: flex; flex-direction: column; align-items: center; }
+.cockpit-kicker { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: #94a3b8; }
+.hero h1 { font-family: "Times New Roman", "Source Serif 4", Times, serif; font-weight: 700; font-size: 46px; letter-spacing: -.6px; margin: 12px 0 0; text-align: center; color: #0B1640; }
+.hero h1 span { color: #0B1640; }
+.hero-rule { width: 42px; height: 3px; border-radius: 3px; background: #2563EB; margin: 14px auto 0; }
 .hero.chatting { padding-top: 24px; }
 .hero.chatting h1 { font-size: 26px; }
-.hero.chatting .sub { display: none; }
-.askbox { width: min(768px, 100%); margin-top: 52px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 28px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 16px; }
+.hero.chatting .cockpit-kicker, .hero.chatting .hero-rule, .hero.chatting .cockpit { display: none; }
+.askbox { width: min(720px, 100%); margin-top: 28px; background: #fff; border: 1px solid #e6edf5; border-radius: 999px; box-shadow: 0 10px 30px rgba(15, 23, 42, .06); display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 18px; }
 .hero.chatting .askbox { margin-top: 16px; position: sticky; bottom: 16px; }
 .askbox svg.spark { width: 22px; height: 22px; color: var(--accent); flex: none; }
 .askbox input { flex: 1; border: 0; outline: 0; background: none; font: inherit; font-size: 15px; color: var(--text-primary); padding: 12px 0; min-width: 0; }
 .askbox input::placeholder { color: var(--text-muted); }
-.askbox .send { width: 38px; height: 38px; border-radius: 50%; border: 0; background: var(--surface-3); color: var(--text-muted); cursor: pointer; display: grid; place-items: center; flex: none; transition: background .15s, color .15s; }
-.askbox .send.ready { background: var(--accent); color: #fff; }
+.askbox .send { width: 42px; height: 42px; border-radius: 50%; border: 0; background: #2563EB; color: #fff; cursor: pointer; display: grid; place-items: center; flex: none; }
+.askbox .send.ready { background: #1d4ed8; color: #fff; }
+.cockpit { width: min(980px, 100%); margin-top: 42px; }
+.cockpit-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 16px; text-align: center; }
+.cockpit-metrics .lab { margin: 0; font-size: 13px; color: #64748b; font-weight: 500; }
+.cockpit-metrics .val { margin: 6px 0 0; font-family: "Times New Roman", "Source Serif 4", Times, serif; font-size: 32px; font-weight: 700; letter-spacing: -.04em; color: #0B1640; line-height: 1.05; }
+.cockpit-metrics .val small { font-size: .62em; }
+.cockpit-metrics .val .u { font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 600; color: #94a3b8; letter-spacing: 0; margin-left: 4px; }
+.cockpit-metrics .share { margin: 6px 0 0; font-size: 12.5px; color: #64748b; }
+.cockpit-wave { height: 150px; margin-top: 8px; }
+.cockpit-wave svg { width: 100%; height: 100%; display: block; }
+.flow-toggle { display: inline-flex; align-items: center; gap: 8px; margin: 4px auto 0; border: 0; background: transparent; color: #94a3b8; font-size: 11px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; cursor: pointer; }
+.flow-toggle svg { transition: transform .15s; }
+.flow-toggle.open svg { transform: rotate(180deg); }
+.cockpit-more { width: 100%; margin-top: 16px; }
+.cockpit-more .flow-note { text-align: center; font-size: 12.5px; color: #64748b; margin: 0 0 12px; }
+.flow-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; margin-bottom: 16px; font-size: 12.5px; color: #334155; }
+.flow-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
 .divider { width: min(768px, 100%); display: flex; align-items: center; gap: 14px; margin: 56px 0 18px; color: var(--text-muted); font-size: 11.5px; letter-spacing: 1.4px; text-transform: uppercase; font-weight: 500; }
 .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border-strong); }
 .insights { width: min(768px, 100%); display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
@@ -133,7 +150,7 @@ main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 .rail.collapsed .badge { position: absolute; top: 2px; left: 26px; }
 .rail a .no.lbl { margin-left: auto; width: auto; }
 .chips { width: min(768px, 100%); display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
-.chips button { display: inline-flex; align-items: center; gap: 6px; background: var(--surface-1); border: 1px solid var(--border); color: var(--text-secondary); border-radius: 16px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; }
+.chips button { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #e6edf5; color: #475569; border-radius: 999px; padding: 8px 14px; font-size: 13px; cursor: pointer; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
 .chips button:hover { border-color: var(--accent); color: var(--accent); }
 .chips svg { color: var(--accent); }
 .hero.chatting .chips { margin-top: 10px; }
@@ -319,7 +336,7 @@ dl dt { font-weight: 600; margin-top: 12px; } dl dd { margin: 2px 0 0; color: va
   .charts { grid-template-columns: 1fr; } .span-2, .span-3 { grid-column: auto; }
   .chartbox { height: 260px !important; }
   .insights { grid-template-columns: 1fr; }
-  .hero { padding: 32px 14px 28px; min-height: auto; border-radius: 12px; }
+  .hero { padding: 32px 14px 28px; min-height: auto; } .cockpit-metrics { grid-template-columns: 1fr 1fr; row-gap: 18px; } .cockpit-metrics .val { font-size: 26px; }
   .hero h1 { font-size: 30px; } .hero .sub { font-size: 15.5px; }
   .askbox { margin-top: 28px; } .divider { margin: 32px 0 14px; }
   .filters { gap: 6px; } .filters select { flex: 1 1 calc(50% - 6px); min-width: 0; }
@@ -362,6 +379,7 @@ dl dt { font-weight: 600; margin-top: 12px; } dl dd { margin: 2px 0 0; color: va
 body.page-inv { background: #f5f7fb; color: #14213D; --accent: #2563EB; --accent-hover: #1D4ED8; --text-primary: #14213D; --text-secondary: #64748B; --border: #E2E8F0; --border-strong: #E2E8F0; }
 body.page-inv .shell, body.page-inv main { background: #f5f7fb; }
 body.page-inv main { padding-top: 8px; }
+body.page-inv .hero { margin: -8px -24px -48px; }
 body.page-inv .topbar { background: #fff; border-bottom-color: #E2E8F0; }
 body.page-inv .topbar .page { display: block; font-size: 14px; font-weight: 500; color: #0f172a; }
 body.page-inv .topbar .right { align-items: center; margin-left: auto; }
@@ -1064,7 +1082,7 @@ function go(v, force) {
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
   S.view = v;
-  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview', reports: 'Report library', builder: 'Report builder', schedules: 'Schedules & history', trends: 'Trends', actions: 'Agent actions' };
+  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview', reports: 'Report library', builder: 'Report builder', schedules: 'Schedules & history', trends: 'Trends', actions: 'Agent actions', command: 'Command Center' };
   const invShell = Object.prototype.hasOwnProperty.call(INV_SHELL, v);
   document.body.classList.toggle('page-inv', invShell);
   renderWhen();
@@ -1093,19 +1111,45 @@ function go(v, force) {
 /* ---------------- Command Center ---------------- */
 function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; }
 
+function cockpitWave(series) {
+  const w = 1000, h = 150, pad = 12;
+  const all = series.flatMap(s => s.data.map(Number));
+  const mx = Math.max(...all, 1);
+  const n = Math.max(2, series[0] ? series[0].data.length : 2);
+  const x = i => pad + (n < 2 ? 0 : i / (n - 1)) * (w - pad * 2);
+  const y = v => h - 22 - (Number(v) / mx) * (h - 40);
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Weekly inventory flow">${series.map((s, si) => {
+    const pts = s.data.map((v, i) => [x(i), y(v)]);
+    if (pts.length < 2) return '';
+    let d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+    for (let i = 1; i < pts.length; i++) {
+      const prev = pts[i - 1], p = pts[i], cx = (prev[0] + p[0]) / 2;
+      d += ` C ${cx.toFixed(1)} ${prev[1].toFixed(1)}, ${cx.toFixed(1)} ${p[1].toFixed(1)}, ${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
+    }
+    const area = `${d} L ${pts[pts.length - 1][0].toFixed(1)} ${h} L ${pts[0][0].toFixed(1)} ${h} Z`;
+    return `<defs><linearGradient id="fw${si}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${s.color}" stop-opacity=".28"/><stop offset="100%" stop-color="${s.color}" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#fw${si})"/><path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.6" stroke-linecap="round"/>`;
+  }).join('')}</svg>`;
+}
 function renderCommand() {
   const name = displayName();
   const chatting = S.thread.length > 0;
   document.getElementById('content').innerHTML = `<section class="hero ${chatting ? 'chatting' : ''}" id="hero">
-    <h1>${greeting()}${name ? `, <span>${esc(name)}</span>` : ''}</h1>
-    <p class="sub">Ask for any stock, cover, purchase or production figure — or tell the agent what to do across raw materials, WIP, finished goods and locations.</p>
+    <p class="cockpit-kicker">Your inventory cockpit</p>
+    <h1>${greeting()}${name ? `, <span>${esc(name)}</span>.` : ''}</h1>
+    <div class="hero-rule"></div>
     <div class="thread" id="thread"></div>
-    <div class="askbox">${I.spark}<input id="q" placeholder="Ask anything or tell me what to do..." autocomplete="off"><button class="send" id="send" title="Ask">${I.up}</button></div>
+    <div class="askbox">${I.spark}<input id="q" placeholder="Ask Pulse anything..." autocomplete="off"><button class="send" id="send" title="Ask">${I.up}</button></div>
     <div class="chips" id="chips">${S.meta.playbooks.map(p => `<button data-p="${p.id}">${svg(p.icon, 15)}${esc(p.label)}</button>`).join('')}</div>
     ${S.meta.command_mode === 'offline' ? `<div class="note-banner">Offline mode — questions map to the matching view and agent playbook. Configure Azure OpenAI for free-form planning.</div>` : ''}
-    <div id="insightsWrap" style="width:100%;display:${chatting ? 'none' : 'flex'};flex-direction:column;align-items:center">
-      <div class="divider">AI insights from your data</div>
-      <div class="insights" id="insights">${'<div class="insight skeleton"></div>'.repeat(3)}</div>
+    <div class="cockpit" id="cockpit">
+      <div class="cockpit-metrics" id="cockpitMetrics"></div>
+      <div class="cockpit-wave" id="cockpitWave"></div>
+      <button type="button" class="flow-toggle" id="flowToggle" aria-expanded="false">Inventory flow <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+      <div class="cockpit-more" id="cockpitMore" hidden>
+        <p class="flow-note">Weekly consumption, output, sales and receipts at cost. The figures above are on-hand value at the latest Business Central load.</p>
+        <div class="flow-legend" id="flowLegend"></div>
+        <div class="insights" id="insights">${'<div class="insight skeleton"></div>'.repeat(3)}</div>
+      </div>
     </div></section>`;
   const thread = document.getElementById('thread');
   S.thread.forEach(el => thread.appendChild(el));
@@ -1114,7 +1158,54 @@ function renderCommand() {
   send.onclick = () => ask(q.value.trim());
   q.onkeydown = e => { if (e.key === 'Enter') ask(q.value.trim()); };
   document.getElementById('chips').onclick = e => { const b = e.target.closest('button'); if (b) ask(b.textContent.trim(), b.dataset.p); };
-  if (!chatting) loadInsights(); else q.focus();
+  document.getElementById('flowToggle').onclick = () => {
+    const more = document.getElementById('cockpitMore');
+    const open = more.hidden;
+    more.hidden = !open;
+    document.getElementById('flowToggle').classList.toggle('open', open);
+    document.getElementById('flowToggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+  if (!chatting) { loadCockpit(); loadInsights(); } else q.focus();
+}
+async function loadCockpit() {
+  let d = { kpi: [], weekly: [] };
+  try { d = await api('/api/trends'); } catch (e) { d = { kpi: [], weekly: [] }; }
+  const host = document.getElementById('cockpitMetrics');
+  if (S.view !== 'command' || !host) return;
+  const loads = (d.kpi || []).slice().sort((a, b) => String(a.extracted_at).localeCompare(String(b.extracted_at)));
+  const last = loads[loads.length - 1] || {};
+  const rm = Number(last.rm_value) || 0, wip = Number(last.wip_value) || 0, fg = Number(last.fg_value) || 0, tot = rm + wip + fg;
+  const share = v => tot ? `${Math.round(100 * v / tot)}% of total` : '';
+  const cards = [
+    { label: 'Total inventory value', value: moneyRich(tot), share: 'On-hand RM, WIP and FG' },
+    { label: 'Raw material', value: moneyRich(rm), share: share(rm) },
+    { label: 'Work in progress', value: moneyRich(wip), share: share(wip) },
+    { label: 'Finished goods', value: moneyRich(fg), share: share(fg) },
+  ];
+  host.innerHTML = cards.map(c => `<div><p class="lab">${esc(c.label)}</p><p class="val">${c.value}</p><p class="share">${esc(c.share)}</p></div>`).join('');
+  const by = {};
+  (d.weekly || []).forEach(r => {
+    const w = by[r.week] || (by[r.week] = { c: 0, o: 0, s: 0, r: 0 });
+    w.c += r.consumed_value || 0; w.o += r.output_value || 0; w.s += r.sold_value || 0; w.r += r.received_value || 0;
+  });
+  const weeks = Object.keys(by).sort();
+  const series = [
+    { name: 'Consumption', color: '#3b82f6', data: weeks.map(w => by[w].c) },
+    { name: 'Output', color: '#14b8a6', data: weeks.map(w => by[w].o) },
+    { name: 'Sales', color: '#7c5cf0', data: weeks.map(w => by[w].s) },
+    { name: 'Receipts', color: '#2faf78', data: weeks.map(w => by[w].r) },
+  ];
+  const wave = document.getElementById('cockpitWave');
+  const legend = document.getElementById('flowLegend');
+  if (!weeks.length) {
+    if (wave) wave.innerHTML = '<p class="flow-note">No weekly movement in this window.</p>';
+    return;
+  }
+  if (wave) wave.innerHTML = cockpitWave(series);
+  const lastWeek = weeks[weeks.length - 1];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const weekLabel = `Week of ${months[+lastWeek.slice(5, 7) - 1]} ${+lastWeek.slice(8)}`;
+  if (legend) legend.innerHTML = series.map(s => `<span><i style="background:${s.color}"></i>${esc(s.name)} ${fmt(s.data[s.data.length - 1], 'money')} · ${esc(weekLabel)}</span>`).join('');
 }
 
 async function loadInsights() {
@@ -1128,7 +1219,8 @@ async function loadInsights() {
 async function ask(text, playbook) {
   if (!text) return;
   const hero = document.getElementById('hero'), thread = document.getElementById('thread'), q = document.getElementById('q');
-  hero.classList.add('chatting'); document.getElementById('insightsWrap').style.display = 'none';
+  hero.classList.add('chatting');
+  const wrap = document.getElementById('insightsWrap'); if (wrap) wrap.style.display = 'none';
   q.value = ''; document.getElementById('send').classList.remove('ready');
   const u = document.createElement('div'); u.className = 'msg user'; u.textContent = text;
   const a = document.createElement('div'); a.className = 'msg';
