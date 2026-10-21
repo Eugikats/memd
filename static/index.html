@@ -1053,7 +1053,8 @@ function go(v, force) {
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
   S.view = v;
-  const invShell = v === 'inventory_position' || v === 'inventory_by_location';
+  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover' };
+  const invShell = Object.prototype.hasOwnProperty.call(INV_SHELL, v);
   document.body.classList.toggle('page-inv', invShell);
   renderWhen();
   if (location.hash.slice(1) !== v) location.hash = v;
@@ -1063,7 +1064,7 @@ function go(v, force) {
   document.getElementById('mobileNav').value = sec ? sec.views[0] : navKey;
   const meta = S.meta.views.find(x => x.id === v);
   const grp = (GROUPS.find(([, ids]) => ids.includes(v)) || [''])[0];
-  document.getElementById('pageTitle').textContent = invShell ? (meta ? meta.title : (v === 'inventory_by_location' ? 'Inventory by Location' : 'Inventory Position')) : ({ command: 'Command Center', definitions: 'Definitions & data notes', actions: 'Agent actions', overview: 'Overview', reports: 'Reporting / Report library', builder: 'Reporting / Report builder', schedules: 'Reporting / Schedules & history', trends: 'Reporting / Trends', datarefresh: 'Governance / Data refresh', audit: 'Governance / Audit log' }[v] || `${grp} / ${meta ? meta.title : ''}`);
+  document.getElementById('pageTitle').textContent = invShell ? (meta ? meta.title : INV_SHELL[v]) : ({ command: 'Command Center', definitions: 'Definitions & data notes', actions: 'Agent actions', overview: 'Overview', reports: 'Reporting / Report library', builder: 'Reporting / Report builder', schedules: 'Reporting / Schedules & history', trends: 'Reporting / Trends', datarefresh: 'Governance / Data refresh', audit: 'Governance / Audit log' }[v] || `${grp} / ${meta ? meta.title : ''}`);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
   if (v === 'command') return renderCommand();
   if (v === 'actions') return renderActions();
@@ -1268,6 +1269,7 @@ const INV_PALETTE = {
   seq: '#3b82f6', good: '#2faf78', warning: '#5b8def', violet: '#f08a3e', crit: '#d08080', serious: '#e0a15a', muted: '#94a3b8',
 };
 let invPostMode = 'bar';
+let invLocMode = 'bar';
 function postingRows(items) {
   const ranked = (items || []).filter(x => x && x.value > 0).slice().sort((a, b) => b.value - a.value);
   if (ranked.length <= 8) return { rows: ranked, hidden: 0, totalGroups: ranked.length };
@@ -1276,16 +1278,17 @@ function postingRows(items) {
   return { rows: ranked.slice(0, 8).concat([{ label: 'Others', value: others, group: 'Others' }]), hidden: rest.length, totalGroups: ranked.length };
 }
 function postColor(row, i) { return row.label === 'Others' ? '#94a3b8' : POST_PALETTE[i % POST_PALETTE.length]; }
-function drawPosting(host, items, mode) {
+function drawPosting(host, items, mode, subject) {
   const pack = postingRows(items);
   const rows = pack.rows;
   const total = rows.reduce((s, x) => s + (Number(x.value) || 0), 0) || 1;
+  const ofWhat = subject || 'posting-group value';
   if (mode === 'bubble') {
     host.innerHTML = `<div class="post-bubbles">${rows.map((r, i) => {
       const size = Math.round(54 + Math.sqrt((Number(r.value) || 0) / total) * 150);
       const stroke = postColor(r, i);
       const label = size >= 78 ? `<b>${esc(r.label)}</b><span>${fmt(r.value, 'money')}</span>` : `<b>${esc(fmt(r.value, 'money'))}</b>`;
-      return `<div class="post-bub" style="width:${size}px;height:${size}px;background:radial-gradient(circle at 32% 28%, ${mixWhite(stroke, .62)}, ${stroke} 58%, ${shadeHex(stroke, .8)});color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.45)" title="${esc(r.label)}: ${fmt(r.value, 'money')} UGX (${(100 * r.value / total).toFixed(1)}%)">${label}</div>`;
+      return `<div class="post-bub" style="width:${size}px;height:${size}px;background:radial-gradient(circle at 32% 28%, ${mixWhite(stroke, .62)}, ${stroke} 58%, ${shadeHex(stroke, .8)});color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.45)" title="${esc(r.label)}: ${fmt(r.value, 'money')} UGX (${(100 * r.value / total).toFixed(1)}% of ${esc(ofWhat)})">${label}</div>`;
     }).join('')}</div>`;
     return null;
   }
@@ -1302,7 +1305,7 @@ function drawPosting(host, items, mode) {
   host.innerHTML = `<div class="post-bars">${rows.map((r, i) => {
     const share = (100 * (Number(r.value) || 0) / total).toFixed(1);
     const stroke = postColor(r, i);
-    return `<div class="post-row" title="${esc(r.label)}: ${fmt(r.value, 'money')} UGX (${share}% of posting-group value)"><span class="post-name">${esc(r.label)}</span><span class="post-track"><span style="width:${Math.max(2, 100 * r.value / axisTop)}%;background:${glassCss(stroke)}"></span></span><span class="post-val">${fmt(r.value, 'money')} <em>(${share}%)</em></span></div>`;
+    return `<div class="post-row" title="${esc(r.label)}: ${fmt(r.value, 'money')} UGX (${share}% of ${esc(ofWhat)})"><span class="post-name">${esc(r.label)}</span><span class="post-track"><span style="width:${Math.max(2, 100 * r.value / axisTop)}%;background:${glassCss(stroke)}"></span></span><span class="post-val">${fmt(r.value, 'money')} <em>(${share}%)</em></span></div>`;
   }).join('')}<div class="post-axis"><span></span><span class="post-ticks">${ticks.map(t => `<span>${t}</span>`).join('')}</span><span></span></div></div>`;
   return null;
 }
@@ -1454,6 +1457,11 @@ function renderLocation(c, d) {
   const top = find('Top 15 locations by stock value');
   const held = find('Distinct items held per site');
   const card = (ch, inner) => ch ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(ch.title)}</h3>${ch.subtitle ? `<p>${esc(ch.subtitle)}</p>` : ''}</div></div>${inner}</section>` : '';
+  const locItems = (tree && tree.extra && tree.extra.items) || [];
+  const locPack = tree ? postingRows(locItems) : null;
+  const locNote = locPack && locPack.hidden ? `. Top 8 of ${locPack.totalGroups}. Others is the sum of the remaining ${locPack.hidden}.` : '';
+  const locH = locPack ? Math.max(260, locPack.rows.length * 34 + 28) : 280;
+  const locCard = tree ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(tree.title)}</h3><p>${esc((tree.subtitle || 'Grouped by site') + locNote)}</p></div><div class="seg inv-seg" id="locMode"><button type="button" data-mode="bar">Bar</button><button type="button" data-mode="bubble">Bubble</button><button type="button" data-mode="treemap">Treemap</button></div></div><div class="chartbox" id="locHost" style="height:${invLocMode === 'bar' ? 'auto' : locH + 'px'};min-height:240px"></div></section>` : '';
   c.innerHTML = `<div class="inv-page">
     <div class="inv-head">${sectionTabs('inventory_by_location')}<div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
       <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
@@ -1465,7 +1473,7 @@ function renderLocation(c, d) {
       ${card(heat, `<div class="heat inv-heat" id="chHeat"></div>`)}
     </div>
     <div class="inv-lower">
-      ${card(tree, `<div class="chartbox" style="height:280px"><canvas id="chTree"></canvas></div>`)}
+      ${locCard}
       ${card(top, `<div class="chartbox" style="height:${top && top.height || 320}px"><canvas id="chTopLoc"></canvas></div>`)}
       ${card(held, `<div class="chartbox" style="height:280px"><canvas id="chHeld"></canvas></div>`)}
     </div>
@@ -1482,11 +1490,95 @@ function renderLocation(c, d) {
     catch (e) { el.parentElement.innerHTML = `<div class="muted">Chart unavailable (${esc(e.message)})</div>`; }
   };
   put('chSite', site);
-  put('chTree', tree);
   put('chTopLoc', top);
   put('chHeld', held);
+  if (tree) {
+    const host = document.getElementById('locHost');
+    const showLoc = mode => {
+      invLocMode = mode;
+      document.querySelectorAll('#locMode button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+      host.style.height = mode === 'bar' ? 'auto' : locH + 'px';
+      S.charts = S.charts.filter(ch => { if (ch && ch.canvas && host.contains(ch.canvas)) { ch.destroy(); return false; } return true; });
+      try { const chart = drawPosting(host, locItems, mode, 'location value'); if (chart) S.charts.push(chart); }
+      catch (e) { host.innerHTML = `<div class="muted">Chart unavailable (${esc(e.message)})</div>`; }
+    };
+    document.querySelectorAll('#locMode button').forEach(b => b.onclick = () => showLoc(b.dataset.mode));
+    showLoc(invLocMode);
+  }
   if (heat) drawHeatmap(document.getElementById('chHeat'), Object.assign({}, heat, { classCols: true }));
   d.tables.forEach((t, i) => renderTable(document.getElementById('tb' + i), t, { variant: 'inventory', size: 10, search: i === 0 ? 'Search location…' : 'Search items…' }));
+}
+
+function renderRm(c, d) {
+  const faces = {
+    'RM consumption / production day': { icon: 'gauge', bg: '#e8f1ff', fg: '#2563EB' },
+    'Value-weighted RM cover': { icon: 'clock', bg: '#f3eefe', fg: '#7c5cf0' },
+    'Under 7 production days': { icon: 'alert', bg: '#fdecec', fg: '#d03b3b' },
+    'Under 14 production days': { icon: 'alert', bg: '#fff4e8', fg: '#e07a12' },
+    'RM stock value': { icon: 'box', bg: '#e8f8ef', fg: '#16a34a' },
+  };
+  const kpiValue = k => {
+    if (k.kind === 'money') return moneyRich(k.value);
+    if (k.kind === 'days') return `${esc(String(fmt(k.value, 'days')))}<small> days</small>`;
+    return esc(String(fmt(k.value, k.kind)));
+  };
+  const kpis = (d.kpis || []).map(k => {
+    const face = faces[k.label] || { icon: 'gauge', bg: '#eef2f7', fg: '#475569' };
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
+      <div class="inv-kpi-row"><p class="inv-kpi-v">${kpiValue(k)}</p>${cipSpark(k.spark, face.fg, k.label)}</div></article>`;
+  }).join('');
+  const find = re => (d.charts || []).find(ch => re.test(ch.title));
+  const weekly = find(/weekly rm consumption/i);
+  const cover = find(/production days of cover/i);
+  const risk = find(/risk map/i);
+  const donut = find(/consumption value by posting group/i);
+  const top = find(/top 15 raw materials/i);
+  const card = (ch, inner, extra) => ch ? `<section class="card inv-card"${extra || ''}><div class="inv-ch-head"><div><h3>${esc(ch.title)}</h3>${ch.subtitle ? `<p>${esc(ch.subtitle)}</p>` : ''}</div></div>${inner}</section>` : '';
+  c.innerHTML = `<div class="inv-page">
+    <div class="inv-head">${sectionTabs('rm_consumption_cover')}<div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
+      <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
+      <button class="btn primary" id="exportInv">${svg('download', 14)} Export</button></div></div>
+    ${invFilters()}
+    <div class="inv-kpis">${kpis}</div>
+    <div class="inv-topcharts">
+      ${card(weekly, `<div class="chartbox" style="height:280px"><canvas id="chWeekly"></canvas></div>`)}
+      ${donut ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(donut.title)}</h3>${donut.subtitle ? `<p>${esc(donut.subtitle)}</p>` : ''}</div></div><div class="inv-donut"><div class="chartbox" style="height:250px"><canvas id="chRmDonut"></canvas></div><ul class="inv-legend" id="rmLegend"></ul></div></section>` : ''}
+    </div>
+    <div class="inv-lower">
+      ${card(cover, `<div class="chartbox" style="height:280px"><canvas id="chCover"></canvas></div>`)}
+      ${card(risk, `<div class="chartbox" style="height:320px"><canvas id="chRisk"></canvas></div>`, ' style="grid-column:span 2"')}
+    </div>
+    ${top ? `<div class="inv-wide">${card(top, `<div class="chartbox" style="height:${top.height || 400}px"><canvas id="chRmTop"></canvas></div>`)}</div>` : ''}
+    ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
+  bindFilters();
+  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('pdfThis').onclick = () => window.print();
+  if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
+  S.charts.forEach(ch => ch.destroy()); S.charts = [];
+  const glass = { quiet: true, glassy: true };
+  const put = (id, ch, extra) => {
+    const el = document.getElementById(id); if (!el || !ch) return;
+    try { const chart = drawChart(el, Object.assign({}, ch, glass, extra || {})); if (chart) S.charts.push(chart); }
+    catch (e) { el.parentElement.innerHTML = `<div class="muted">Chart unavailable (${esc(e.message)})</div>`; }
+  };
+  put('chWeekly', weekly, { palette: INV_PALETTE });
+  put('chCover', cover);
+  put('chRisk', risk, { palette: INV_PALETTE });
+  put('chRmTop', top, { palette: INV_PALETTE });
+  if (donut) {
+    const labels = donut.labels || [];
+    const data = (donut.series[0] && donut.series[0].data) || [];
+    const chart = drawChart(document.getElementById('chRmDonut'), Object.assign({}, donut, glass, { hideLegend: true, cutout: '68%', colors: POST_PALETTE }));
+    if (chart) S.charts.push(chart);
+    const total = data.reduce((a, b) => a + (Number(b) || 0), 0);
+    const leg = document.getElementById('rmLegend');
+    const colors = labels.map((_, i) => POST_PALETTE[i % POST_PALETTE.length]);
+    if (leg) leg.innerHTML = labels.map((lb, i) => {
+      const v = Number(data[i]) || 0, share = total ? Math.round(100 * v / total) : 0;
+      return `<li><i style="background:${colors[i]}"></i><span class="nm"><b>${esc(lb)}</b><span class="sh">${share}%</span></span><em>${fmt(v, 'money')}</em></li>`;
+    }).join('');
+  }
+  d.tables.forEach((t, i) => renderTable(document.getElementById('tb' + i), t, { variant: 'inventory', size: 10 }));
 }
 
 async function mountInventoryTrend() {
@@ -1529,6 +1621,7 @@ async function loadView() {
   if (S.view !== view) return;
   if (view === 'inventory_position') { renderInventory(c, d); return; }
   if (view === 'inventory_by_location') { renderLocation(c, d); return; }
+  if (view === 'rm_consumption_cover') { renderRm(c, d); return; }
   c.innerHTML = `<div class="vhead"><div><h1>${d.no ? `<span class="no">${d.no}</span> · ` : ''}${esc(d.title)}</h1><p>${esc(d.question)}</p></div>
       <div class="page-tools">${sectionTabs(view)}<div class="rbtns"><button class="btn" id="askThis">${I.spark.replace('class="spark"', 'width="14" height="14" style="vertical-align:-2px"')} Ask about this view</button>
       <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button></div></div></div>
@@ -1767,7 +1860,7 @@ function drawChart(el, ch) {
 
   if (ch.type === 'scatter') {
     const e = ch.extra || {};
-    const datasets = ch.series.map((s, i) => { const col = seriesColor(s, i, [], ch); return { label: s.name, data: s.data, backgroundColor: hexA(col, .55), borderColor: col, borderWidth: 1, hoverBorderWidth: 2 }; });
+    const datasets = ch.series.map((s, i) => { const col = seriesColor(s, i, [], ch); return { label: s.name, data: s.data, backgroundColor: ch.glassy ? hexA(col, .78) : hexA(col, .55), borderColor: ch.glassy ? mixWhite(col, .45) : col, borderWidth: ch.glassy ? 1.5 : 1, hoverBorderWidth: 2 }; });
     return new Chart(el, { type: 'bubble', data: { datasets }, plugins: [refLines],
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend, refLines: { y: e.yRef || [] },
         tooltip: { ...tooltip, callbacks: { title: i => i[0].raw.label, label: c => [`Usage: ${Math.round(c.raw.x).toLocaleString()} UGX/day`, `Cover: ${c.raw.y} days`, `Status: ${c.dataset.label}`] } } },
