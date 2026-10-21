@@ -1064,7 +1064,7 @@ function go(v, force) {
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
   S.view = v;
-  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview', reports: 'Report library', builder: 'Report builder', schedules: 'Schedules & history', trends: 'Trends' };
+  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview', reports: 'Report library', builder: 'Report builder', schedules: 'Schedules & history', trends: 'Trends', actions: 'Agent actions' };
   const invShell = Object.prototype.hasOwnProperty.call(INV_SHELL, v);
   document.body.classList.toggle('page-inv', invShell);
   renderWhen();
@@ -1193,12 +1193,46 @@ function actionCard(a, compact) {
 
 async function renderActions() {
   const [acts, alerts, watch] = await Promise.all([api('/api/actions'), api('/api/alerts'), api('/api/watchlist')]);
+  if (S.view !== 'actions') return;
   const c = document.getElementById('content');
-  c.innerHTML = `<div class="vhead"><div><h1>Agent actions</h1><p>Everything the agent has proposed. Nothing is sent or posted to Business Central until a person acts on it.</p></div>
-      <div class="page-tools"><button class="btn primary" id="newRun">${I.spark.replace('class="spark"', 'width="14" height="14" style="vertical-align:-2px"')} Run the agent</button></div></div>
-    <div class="filters" id="af">${['proposed', 'approved', 'dismissed', 'all'].map(s => `<button class="btn ${s === (S.actFilter || 'proposed') ? 'primary' : ''}" data-f="${s}">${s[0].toUpperCase() + s.slice(1)} (${s === 'all' ? acts.length : acts.filter(a => a.status === s).length})</button>`).join('')}</div>
+  const count = status => acts.filter(a => a.status === status).length;
+  const proposed = count('proposed'), approved = count('approved'), dismissed = count('dismissed');
+  const share = n => acts.length ? Math.round(100 * n / acts.length) : null;
+  const faces = {
+    'Actions': { icon: 'inbox', bg: '#e8f1ff', fg: '#2563EB' },
+    'Proposed': { icon: 'clock', bg: '#fff4e8', fg: '#e07a12' },
+    'Approved': { icon: 'check', bg: '#e8f8ef', fg: '#16a34a' },
+    'Dismissed': { icon: 'x', bg: '#f1f5f9', fg: '#64748b' },
+    'Alerts': { icon: 'bell', bg: '#fdecec', fg: '#d03b3b' },
+    'Watching': { icon: 'star', bg: '#f3eefe', fg: '#7c5cf0' },
+  };
+  const cards = [
+    { label: 'Actions', value: `${esc(String(fmt(acts.length, 'qty')))}<small> actions</small>` },
+    { label: 'Proposed', value: `${esc(String(fmt(proposed, 'qty')))}<small> actions</small>`, pct: share(proposed) },
+    { label: 'Approved', value: `${esc(String(fmt(approved, 'qty')))}<small> actions</small>`, pct: share(approved) },
+    { label: 'Dismissed', value: `${esc(String(fmt(dismissed, 'qty')))}<small> actions</small>`, pct: share(dismissed) },
+    { label: 'Alerts', value: `${esc(String(fmt(alerts.length, 'qty')))}<small> rules</small>` },
+    { label: 'Watching', value: `${esc(String(fmt(watch.length, 'qty')))}<small> items</small>` },
+  ];
+  const kpis = cards.map(k => {
+    const face = faces[k.label];
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
+      <div class="inv-kpi-row"><p class="inv-kpi-v">${k.value}</p>${cipSpark(null, face.fg, k.label)}</div></article>`;
+  }).join('');
+  const active = S.actFilter || 'proposed';
+  const filters = ['proposed', 'approved', 'dismissed', 'all'].map(s => {
+    const n = s === 'all' ? acts.length : count(s);
+    const label = s[0].toUpperCase() + s.slice(1);
+    return `<button type="button" class="${s === active ? 'on' : ''}" data-f="${s}">${label} (${n.toLocaleString()})</button>`;
+  }).join('');
+  c.innerHTML = `<div class="inv-page">
+    <div class="inv-head"><div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
+      <button class="btn primary" id="newRun">${svg('play', 14)} Run the agent</button></div></div>
+    <div class="inv-kpis cols-6">${kpis}</div>
+    <div class="filters inv-filters"><div class="seg inv-seg" id="af">${filters}</div></div>
     <div id="alist" class="alist"></div>
-    <div class="charts"><div class="card"><h3>${svg('bell', 15)} Alert rules</h3><div id="alerts"></div></div><div class="card"><h3>${svg('star', 15)} Watchlist</h3><div id="watch"></div></div></div>`;
+    <div class="inv-charts2"><section class="card inv-card"><div class="inv-ch-head"><div><h3>Alert rules</h3><p>Checked after each refresh once a person approves the rule</p></div></div><div class="inv-pad" id="alerts"></div></section>
+      <section class="card inv-card"><div class="inv-ch-head"><div><h3>Watchlist</h3><p>Items the agent is watching</p></div></div><div class="inv-pad" id="watch"></div></section></div></div>`;
   const draw = () => {
     const f = S.actFilter || 'proposed', box = document.getElementById('alist');
     const list = acts.filter(a => f === 'all' || a.status === f);
@@ -1206,6 +1240,7 @@ async function renderActions() {
     list.forEach(a => box.appendChild(actionCard(a)));
   };
   document.getElementById('af').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { S.actFilter = b.dataset.f; renderActions(); } };
+  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Which proposed agent actions, alerts and watched items need a decision?'), 50); };
   document.getElementById('newRun').onclick = () => go('command');
   draw();
   const al = document.getElementById('alerts');
