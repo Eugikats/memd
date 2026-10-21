@@ -116,7 +116,7 @@ main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 .cockpit-metrics .val small { font-size: .62em; }
 .cockpit-metrics .val .u { font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 600; color: #94a3b8; letter-spacing: 0; margin-left: 4px; }
 .cockpit-metrics .share { margin: 4px 0 0; min-height: 16px; font-size: 12px; color: #94a3b8; }
-.cockpit-wave { height: 320px; width: calc(100% + 48px); margin: 18px -24px 0; }
+.cockpit-wave { height: 240px; width: calc(100% + 48px); margin: 8px -24px 0; }
 .cockpit-wave svg { width: 100%; height: 100%; display: block; }
 .flow-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; width: calc(100% + 48px); margin: 0 -24px 0; border: 0; background: transparent; color: #b6c0cc; font-size: 11px; font-weight: 600; letter-spacing: .28em; text-transform: uppercase; cursor: pointer; }
 .flow-toggle svg { transition: transform .15s; }
@@ -338,7 +338,7 @@ dl dt { font-weight: 600; margin-top: 12px; } dl dd { margin: 2px 0 0; color: va
   .insights { grid-template-columns: 1fr; }
   .hero { padding: 32px 14px 28px; min-height: auto; } .cockpit-metrics { grid-template-columns: 1fr 1fr; row-gap: 18px; } .cockpit-metrics .val { font-size: 26px; }
   .cockpit-wave, .flow-toggle { width: calc(100% + 28px); margin-left: -14px; margin-right: -14px; }
-  .cockpit-wave { height: 240px; }
+  .cockpit-wave { height: 180px; }
   .hero h1 { font-size: 30px; } .hero .sub { font-size: 15.5px; }
   .askbox { margin-top: 28px; } .divider { margin: 32px 0 14px; }
   .filters { gap: 6px; } .filters select { flex: 1 1 calc(50% - 6px); min-width: 0; }
@@ -1114,16 +1114,14 @@ function go(v, force) {
 function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; }
 
 function cockpitWave(series) {
-  const w = 1200, h = 340, bleed = 90;
+  const w = 1200, h = 280, bleed = 110;
   const n = Math.max(2, series[0] ? series[0].data.length : 2);
   const xAt = i => -bleed + (n < 2 ? 0 : i / (n - 1)) * (w + bleed * 2);
-  const lanes = [72, 148, 224, 300];
-  const drawn = series.map((s, si) => {
-    const vals = s.data.map(Number);
-    const mn = Math.min(...vals), mx = Math.max(...vals), rg = (mx - mn) || 1;
-    const mid = lanes[si] || 180;
-    const yAt = v => mid - ((Number(v) - mn) / rg - 0.5) * 52;
-    const pts = vals.map((v, i) => [xAt(i), yAt(v)]);
+  const all = series.flatMap(s => s.data.map(Number));
+  const mn = Math.min(...all), mx = Math.max(...all), rg = (mx - mn) || 1;
+  const yAt = v => 28 + (1 - (Number(v) - mn) / rg) * 168;
+  const drawn = series.map(s => {
+    const pts = s.data.map((v, i) => [xAt(i), yAt(v)]);
     let d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
     for (let i = 1; i < pts.length; i++) {
       const prev = pts[i - 1], p = pts[i], cx = (prev[0] + p[0]) / 2;
@@ -1131,16 +1129,19 @@ function cockpitWave(series) {
     }
     return { d, pts };
   });
+  const fills = drawn.map((s, si) => {
+    const last = s.pts[s.pts.length - 1], first = s.pts[0];
+    const area = `${s.d} L ${last[0].toFixed(1)} ${(h + 40).toFixed(1)} L ${first[0].toFixed(1)} ${(h + 40).toFixed(1)} Z`;
+    const color = series[si].color;
+    return `<defs><linearGradient id="fw${si}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity=".22"/><stop offset="42%" stop-color="${color}" stop-opacity=".07"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#fw${si})"/>`;
+  }).join('');
+  const strokes = drawn.map((s, si) => `<path d="${s.d}" fill="none" stroke="${series[si].color}" stroke-opacity=".82" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`).join('');
   const marks = drawn.map((s, i) => {
     const idx = Math.round(((i + 0.5) / series.length) * (n - 1));
     const pt = s.pts[Math.max(0, Math.min(s.pts.length - 1, idx))];
-    return `<circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="6" fill="#fff" stroke="${series[i].color}" stroke-width="2.6"/>`;
+    return `<circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="5.5" fill="#fff" stroke="${series[i].color}" stroke-opacity=".8" stroke-width="2"/>`;
   }).join('');
-  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Weekly inventory flow">${drawn.map((s, si) => {
-    const last = s.pts[s.pts.length - 1], first = s.pts[0];
-    const area = `${s.d} L ${last[0].toFixed(1)} ${(h + 40).toFixed(1)} L ${first[0].toFixed(1)} ${(h + 40).toFixed(1)} Z`;
-    return `<defs><linearGradient id="fw${si}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${series[si].color}" stop-opacity=".28"/><stop offset="70%" stop-color="${series[si].color}" stop-opacity=".05"/><stop offset="100%" stop-color="${series[si].color}" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#fw${si})"/><path d="${s.d}" fill="none" stroke="${series[si].color}" stroke-width="2.6" stroke-linejoin="round"/>`;
-  }).join('')}${marks}</svg>`;
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Weekly inventory flow">${fills}${strokes}${marks}</svg>`;
 }
 function renderCommand() {
   const name = displayName();
@@ -1200,10 +1201,10 @@ async function loadCockpit() {
   });
   const weeks = Object.keys(by).sort();
   const series = [
-    { name: 'Consumption', color: '#2563EB', data: weeks.map(w => by[w].c) },
-    { name: 'Output', color: '#0d9488', data: weeks.map(w => by[w].o) },
-    { name: 'Sales', color: '#7c3aed', data: weeks.map(w => by[w].s) },
-    { name: 'Receipts', color: '#16a34a', data: weeks.map(w => by[w].r) },
+    { name: 'Consumption', color: '#7aa6e4', data: weeks.map(w => by[w].c) },
+    { name: 'Output', color: '#67c0bc', data: weeks.map(w => by[w].o) },
+    { name: 'Sales', color: '#b39ae4', data: weeks.map(w => by[w].s) },
+    { name: 'Receipts', color: '#8ec9a6', data: weeks.map(w => by[w].r) },
   ];
   const wave = document.getElementById('cockpitWave');
   if (!wave) return;
