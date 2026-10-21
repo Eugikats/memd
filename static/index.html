@@ -176,7 +176,7 @@ main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 .note-banner { width: min(768px, 100%); margin-top: 14px; font-size: 12.5px; color: var(--text-secondary); text-align: center; }
 
 /* ---------- dashboards ---------- */
-.vhead { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin: 4px 0 14px; }
+.vhead { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin: 4px 0 14px; }
 .vhead h1 { font-family: var(--serif); font-size: 28px; margin: 0; letter-spacing: -.3px; }
 .vhead h1 .no { color: var(--accent); }
 .vhead p { color: var(--text-secondary); margin: 4px 0 0; font-family: var(--serif); font-size: 15.5px; }
@@ -348,7 +348,13 @@ body.page-inv #topAvatar { display: none; }
 .inv-page { min-width: 0; }
 .inv-crumb { color: #94a3b8; font-size: 12.5px; margin: 2px 0 8px; }
 .inv-crumb span { margin: 0 4px; }
-.inv-head { display: flex; justify-content: flex-end; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.inv-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: nowrap; margin-bottom: 14px; }
+.page-tools { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; flex: 1 1 auto; }
+.sec-tabs { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; overflow-x: auto; flex-wrap: nowrap; border: 1px solid rgba(226, 232, 240, .95); background: rgba(255, 255, 255, .92); border-radius: 8px; padding: 2px; }
+.sec-tabs button { border: 0; background: transparent; color: #64748b; font: inherit; font-size: 12px; font-weight: 500; line-height: 1.2; padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+.sec-tabs button.on { background: rgba(23, 105, 255, .12); color: #1769FF; box-shadow: 0 0 0 1px rgba(23, 105, 255, .35), 0 0 12px rgba(23, 105, 255, .25); }
+.sec-tabs button:hover:not(.on) { background: #f8fafc; color: #334155; }
+.inv-head .sec-tabs { flex: 1; }
 .inv-head h1 { margin: 0; font-family: Inter, system-ui, sans-serif; font-size: 30px; font-weight: 700; letter-spacing: -.45px; color: #14213D; }
 .inv-head p { margin: 4px 0 0; color: #64748B; font-family: Inter, system-ui, sans-serif; font-size: 14.5px; }
 .inv-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -553,6 +559,29 @@ const GROUPS = [
   ['Supply & projection', ['in_transit_overdue', 'projection_stockout']],
   ['Risk & production', ['inventory_risk', 'location_risk', 'bom_readiness', 'exceptions']],
 ];
+const SECTIONS = [
+  { key: 'command', label: 'Command Center', icon: 'monitor', views: ['command'] },
+  { key: 'actions', label: 'Agent actions', icon: 'inbox', views: ['actions'], badge: true },
+  { key: 'overview', label: 'Overview', icon: 'grid', views: ['overview'] },
+  ...GROUPS.map(([label, views]) => ({ key: views[0], label, icon: VIEW_ICON[views[0]] || 'grid', views })),
+  { key: 'reporting', label: 'Reporting', icon: 'doc', views: ['reports', 'builder', 'schedules', 'trends'] },
+  { key: 'governance', label: 'Governance', icon: 'shield', views: ['datarefresh', 'audit', 'definitions'] },
+];
+const PAGE_LABEL = { command: 'Command Center', actions: 'Agent actions', overview: 'Overview', reports: 'Report library', builder: 'Report builder', schedules: 'Schedules & history', trends: 'Trends', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes' };
+function sectionOf(v) {
+  const id = String(v || '').startsWith('report:') ? 'reports' : v;
+  return SECTIONS.find(s => s.views.includes(id)) || null;
+}
+function viewLabel(id) {
+  const v = ((S.meta && S.meta.views) || []).find(x => x.id === id);
+  return v ? v.title : (PAGE_LABEL[id] || id);
+}
+function sectionTabs(viewId) {
+  const id = String(viewId || '').startsWith('report:') ? 'reports' : viewId;
+  const sec = sectionOf(id);
+  if (!sec || sec.views.length < 2) return '';
+  return `<div class="sec-tabs" role="tablist" aria-label="${esc(sec.label)}">${sec.views.map(vid => `<button type="button" role="tab" data-go="${vid}" class="${vid === id ? 'on' : ''}" aria-selected="${vid === id}">${esc(viewLabel(vid))}</button>`).join('')}</div>`;
+}
 const KIND_ICON = { expedite: 'mail', transfer: 'swap', alert: 'bell', briefing: 'doc', report: 'doc' };
 
 function fmt(v, kind) {
@@ -568,24 +597,11 @@ const initials = n => (n || '').split(/\s+/).filter(Boolean).map(w => w[0]).join
 
 async function init() {
   S.meta = await api('/api/meta');
-  const rail = document.getElementById('rail'), views = S.meta.views;
-  rail.innerHTML = `<div class="logo"><img class="logo-img" src="/static/pulse-logo.png" alt="Pulse"><div class="logo-text">Pulse<small>${esc(S.meta.notes.company)}</small></div></div>
+  const rail = document.getElementById('rail');
+  rail.innerHTML = `<div class="logo"><img class="logo-img" src="/static/pulse-logo.png" alt="Pulse"><div class="logo-text">Pulse</div></div>
     <button class="toggle" id="railToggle" title="Collapse sidebar">${I.side}</button>
     <div class="scroll">
-      <a data-v="command" title="Command Center">${svg('monitor')}<span class="lbl">Command Center</span></a>
-      <a data-v="actions" title="Agent actions">${svg('inbox')}<span class="lbl">Agent actions</span><span class="badge" id="badge" hidden></span></a>
-      <a data-v="overview" title="Overview">${svg('grid')}<span class="lbl">Overview</span></a>
-      ${GROUPS.map(([g, ids]) => `<div class="sep"></div><div class="group">${g}</div>` + ids.map(id => { const v = views.find(x => x.id === id);
-        return `<a data-v="${id}" title="${v.no} · ${esc(v.title)}">${svg(VIEW_ICON[id])}<span class="lbl">${esc(v.title)}</span></a>`; }).join('')).join('')}
-      <div class="sep"></div><div class="group">Reporting</div>
-      <a data-v="reports" title="Report library">${svg('doc')}<span class="lbl">Report library</span></a>
-      <a data-v="builder" title="Report builder">${svg('sliders')}<span class="lbl">Report builder</span></a>
-      <a data-v="schedules" title="Schedules & history">${svg('calendar')}<span class="lbl">Schedules & history</span></a>
-      <a data-v="trends" title="Trends">${svg('trendUp')}<span class="lbl">Trends</span></a>
-      <div class="sep"></div><div class="group">Governance</div>
-      <a data-v="datarefresh" title="Data refresh">${svg('refresh')}<span class="lbl">Data refresh</span></a>
-      <a data-v="audit" title="Audit log">${svg('shield')}<span class="lbl">Audit log</span></a>
-      <a data-v="definitions" title="Definitions & data notes">${svg('book')}<span class="lbl">Definitions & data notes</span></a>
+      ${SECTIONS.map(s => `<a data-v="${s.views[0]}" data-sec="${s.key}" title="${esc(s.label)}">${svg(s.icon)}<span class="lbl">${esc(s.label)}</span>${s.badge ? '<span class="badge" id="badge" hidden></span>' : ''}</a>`).join('')}
     </div>
     <div class="foot"><div class="avatar">${esc(initials(S.meta.user_name) || 'P')}</div><div class="lbl" style="font-size:12px;color:var(--text-secondary);white-space:nowrap">${esc(S.meta.user_name || 'Supply Chain')}<br><span class="muted">${esc(S.meta.notes.environment)}</span></div></div>`;
   rail.onclick = e => { const a = e.target.closest('a'); if (a) go(a.dataset.v); };
@@ -594,8 +610,9 @@ async function init() {
   document.getElementById('scrim').onclick = closeMenu;
   document.getElementById('topAvatar').textContent = initials(S.meta.user_name) || 'P';
   const mn = document.getElementById('mobileNav');
-  mn.innerHTML = '<option value="command">Command Center</option><option value="actions">Agent actions</option><option value="overview">Overview</option>' + views.map(v => `<option value="${v.id}">${v.no} ${esc(v.title)}</option>`).join('') + '<option value="reports">Report library</option><option value="builder">Report builder</option><option value="schedules">Schedules & history</option><option value="trends">Trends</option><option value="datarefresh">Data refresh</option><option value="audit">Audit log</option><option value="definitions">Definitions & data notes</option>';
+  mn.innerHTML = SECTIONS.map(s => `<option value="${s.views[0]}">${esc(s.label)}</option>`).join('');
   mn.onchange = () => go(mn.value);
+  document.getElementById('content').addEventListener('click', e => { const b = e.target.closest('.sec-tabs [data-go]'); if (b) go(b.dataset.go); });
   renderWhen();
   updateBadge();
   go(location.hash.slice(1) || 'command');
@@ -640,8 +657,9 @@ function go(v, force) {
   renderWhen();
   if (location.hash.slice(1) !== v) location.hash = v;
   const navKey = v.startsWith('report:') ? 'reports' : v;
-  document.querySelectorAll('.rail a').forEach(a => a.classList.toggle('active', a.dataset.v === navKey));
-  document.getElementById('mobileNav').value = navKey;
+  const sec = sectionOf(navKey);
+  document.querySelectorAll('.rail a').forEach(a => a.classList.toggle('active', !!(sec && a.dataset.sec === sec.key)));
+  document.getElementById('mobileNav').value = sec ? sec.views[0] : navKey;
   const meta = S.meta.views.find(x => x.id === v);
   const grp = (GROUPS.find(([, ids]) => ids.includes(v)) || [''])[0];
   document.getElementById('pageTitle').textContent = v === 'inventory_position' ? (meta ? meta.title : 'Inventory Position') : ({ command: 'Command Center', definitions: 'Definitions & data notes', actions: 'Agent actions', overview: 'Overview', reports: 'Reporting / Report library', builder: 'Reporting / Report builder', schedules: 'Reporting / Schedules & history', trends: 'Reporting / Trends', datarefresh: 'Governance / Data refresh', audit: 'Governance / Audit log' }[v] || `${grp} / ${meta ? meta.title : ''}`);
@@ -763,7 +781,7 @@ async function renderActions() {
   const [acts, alerts, watch] = await Promise.all([api('/api/actions'), api('/api/alerts'), api('/api/watchlist')]);
   const c = document.getElementById('content');
   c.innerHTML = `<div class="vhead"><div><h1>Agent actions</h1><p>Everything the agent has proposed. Nothing is sent or posted to Business Central until a person acts on it.</p></div>
-      <button class="btn primary" id="newRun">${I.spark.replace('class="spark"', 'width="14" height="14" style="vertical-align:-2px"')} Run the agent</button></div>
+      <div class="page-tools"><button class="btn primary" id="newRun">${I.spark.replace('class="spark"', 'width="14" height="14" style="vertical-align:-2px"')} Run the agent</button></div></div>
     <div class="filters" id="af">${['proposed', 'approved', 'dismissed', 'all'].map(s => `<button class="btn ${s === (S.actFilter || 'proposed') ? 'primary' : ''}" data-f="${s}">${s[0].toUpperCase() + s.slice(1)} (${s === 'all' ? acts.length : acts.filter(a => a.status === s).length})</button>`).join('')}</div>
     <div id="alist" class="alist"></div>
     <div class="charts"><div class="card"><h3>${svg('bell', 15)} Alert rules</h3><div id="alerts"></div></div><div class="card"><h3>${svg('star', 15)} Watchlist</h3><div id="watch"></div></div></div>`;
@@ -928,7 +946,7 @@ function renderInventory(c, d) {
   const trendCard = `<section class="card inv-card"><div class="inv-ch-head"><div><h3>Inventory Value Trend</h3><p>On-hand value at each Business Central load</p></div><div class="inv-trend-tools"><select id="trendMetric"><option value="total">Total value</option><option value="rm">Raw Material</option><option value="wip">Work in Progress</option><option value="fg">Finished Goods</option></select><div class="seg inv-seg" id="trendRange"><button type="button" data-m="3">3M</button><button type="button" data-m="6">6M</button><button type="button" data-m="12">12M</button></div></div></div><div class="chartbox" style="height:280px"><canvas id="chTrend"></canvas></div></section>`;
   const donutCard = donut ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(donut.title)}</h3>${donut.subtitle ? `<p>${esc(donut.subtitle)}</p>` : ''}</div><div class="seg inv-seg" id="donutMode"><button type="button" data-mode="value">Value</button><button type="button" data-mode="qty">Quantity</button></div></div><div class="inv-donut"><div class="chartbox" style="height:250px"><canvas id="chDonut"></canvas></div><ul class="inv-legend" id="donutLegend"></ul></div></section>` : '';
   c.innerHTML = `<div class="inv-page">
-    <div class="inv-head"><div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
+    <div class="inv-head">${sectionTabs('inventory_position')}<div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
       <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
       <button class="btn primary" id="exportInv">${svg('download', 14)} Export</button></div></div>
     ${invFilters()}
@@ -1049,8 +1067,8 @@ async function loadView() {
   if (S.view !== view) return;
   if (view === 'inventory_position') { renderInventory(c, d); return; }
   c.innerHTML = `<div class="vhead"><div><h1>${d.no ? `<span class="no">${d.no}</span> · ` : ''}${esc(d.title)}</h1><p>${esc(d.question)}</p></div>
-      <div class="rbtns"><button class="btn" id="askThis">${I.spark.replace('class="spark"', 'width="14" height="14" style="vertical-align:-2px"')} Ask about this view</button>
-      <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button></div></div>
+      <div class="page-tools">${sectionTabs(view)}<div class="rbtns"><button class="btn" id="askThis">${I.spark.replace('class="spark"', 'width="14" height="14" style="vertical-align:-2px"')} Ask about this view</button>
+      <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button></div></div></div>
     ${filterBar()}
     ${kpisHTML(d.kpis)}
     ${insightsHTML(d.insights)}
@@ -1463,7 +1481,7 @@ async function renderReports() {
   const d = await api('/api/reports'); S.reportCat = d;
   const cats = [...new Set(d.catalogue.map(c => c.category))];
   document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Report library</h1><p>Standard supply chain reports from the governed model — preview, export to Excel / CSV / PDF, or schedule.</p></div>
-      <div style="display:flex;gap:8px"><button class="btn" id="toBuilder">${svg('sliders', 14)} Build a custom report</button><button class="btn" id="toSched">${svg('calendar', 14)} Schedules & history</button></div></div>
+      <div class="page-tools">${sectionTabs('reports')}<div class="rbtns"><button class="btn" id="toBuilder">${svg('sliders', 14)} Build a custom report</button><button class="btn" id="toSched">${svg('calendar', 14)} Schedules & history</button></div></div></div>
     ${cats.map(cat => `<div class="rgroup"><h3>${svg(CAT_ICON[cat] || 'doc', 16)} ${esc(cat)}</h3><div class="rcards">${d.catalogue.filter(c => c.category === cat).map(c => `
       <button class="rcard" data-r="${esc(c.id)}"><div class="rc-ic">${svg(CAT_ICON[cat] || 'doc', 18)}</div><div><b>${esc(c.name)}</b><div class="muted">${esc(c.description)}</div></div>${svg('arrow', 14)}</button>`).join('')}</div></div>`).join('')}`;
   document.querySelectorAll('.rcard').forEach(b => b.onclick = () => go('report:' + b.dataset.r));
@@ -1478,9 +1496,9 @@ async function renderReport(rid) {
   const f = S.rFilters || (S.rFilters = { item_class: '', site: '', q: '' });
   const c = document.getElementById('content');
   c.innerHTML = `<div class="vhead"><div><h1>${esc(meta.name)}</h1><p>${esc(meta.description)}</p></div>
-      <div class="rbtns"><a class="btn primary" id="xl">${svg('download', 14)} Excel</a><a class="btn" id="csv">${svg('download', 14)} CSV</a>
+      <div class="page-tools">${sectionTabs('reports')}<div class="rbtns"><a class="btn primary" id="xl">${svg('download', 14)} Excel</a><a class="btn" id="csv">${svg('download', 14)} CSV</a>
       <button class="btn" id="pdf">${svg('printer', 14)} Print / PDF</button><button class="btn" id="sch">${svg('calendar', 14)} Schedule</button>
-      <button class="btn" id="save">${svg('star', 14)} Save to history</button><button class="btn" id="askR">${I.spark.replace('class="spark"', 'width="14" height="14"')} Ask agent</button></div></div>
+      <button class="btn" id="save">${svg('star', 14)} Save to history</button><button class="btn" id="askR">${I.spark.replace('class="spark"', 'width="14" height="14"')} Ask agent</button></div></div></div>
     <div class="filters"><select id="f_class"><option value="">All classes</option>${['RM', 'WIP', 'FG'].map(x => `<option ${f.item_class === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
       <select id="f_site"><option value="">All sites</option>${S.meta.sites.map(s => `<option ${f.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
       <input id="f_q" placeholder="Search item, description, vendor, PO…" value="${esc(f.q)}"><button class="btn" id="f_clear">Clear</button></div>
@@ -1545,7 +1563,7 @@ async function renderBuilder() {
   const cols = D[b.dataset].columns, num = cols.filter(c => ['qty', 'money', 'days'].includes(c.kind));
   if (!b.columns.length) b.columns = cols.slice(0, 7).map(c => c.field);
   const opt = (list, sel, blank) => (blank ? `<option value="">${blank}</option>` : '') + list.map(c => `<option value="${c.field}" ${c.field === sel ? 'selected' : ''}>${esc(c.label)}</option>`).join('');
-  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Report builder</h1><p>Pick a dataset, choose columns or group and summarise, add conditions — then export, save or schedule.</p></div></div>
+  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Report builder</h1><p>Pick a dataset, choose columns or group and summarise, add conditions — then export, save or schedule.</p></div>${sectionTabs('builder')}</div>
     <div class="builder"><div class="card bform">
       <label>Dataset<select id="b_ds">${Object.entries(D).map(([k, v]) => `<option value="${k}" ${k === b.dataset ? 'selected' : ''}>${esc(v.label)}</option>`).join('')}</select></label>
       <div class="seg"><button class="${b.mode === 'list' ? 'on' : ''}" data-mode="list">List rows</button><button class="${b.mode === 'group' ? 'on' : ''}" data-mode="group">Group & summarise</button></div>
@@ -1604,7 +1622,7 @@ async function renderSchedules() {
   S.reportCat = cat;
   const when = x => x.frequency === 'weekly' ? `Weekly on ${DAYS[x.weekday]}` : x.frequency === 'monthly' ? `Monthly on day ${x.monthday}` : FREQ[x.frequency];
   document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Schedules & history</h1><p>Reports that run automatically, and every report generated by people, schedules or the agent.</p></div>
-      <button class="btn primary" id="newSch">${svg('plus', 14)} New schedule</button></div>
+      <div class="page-tools">${sectionTabs('schedules')}<button class="btn primary" id="newSch">${svg('plus', 14)} New schedule</button></div></div>
     <div id="newBox"></div>
     <div class="card"><h3>${svg('calendar', 15)} Scheduled reports</h3>${s.reports.length ? `<div class="tablewrap"><table><thead><tr><th>Report</th><th>Filters</th><th>When</th><th>Next run (EAT)</th><th>Last run</th><th>Status</th><th>Owner</th><th></th></tr></thead><tbody>
       ${s.reports.map(x => `<tr><td>${esc(x.name)}</td><td>${esc(Object.entries(x.params || {}).map(([k, v]) => k + '=' + v).join(', ') || '–')}</td><td>${esc(when(x))} ${esc(x.time)}</td>
@@ -1639,7 +1657,7 @@ async function renderTrends() {
   const weeks = Object.keys(byWeek).sort();
   const cls = c => weeks.map(w => (d.weekly.find(r => r.week === w && r.item_class === c) || {}).consumed_value || 0);
   const lab = k.map(x => x.extracted_at.replace('T', ' ').slice(0, 16));
-  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Trends</h1><p>How the supply chain is moving week by week, and how the headline measures change with each data load.</p></div></div>
+  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Trends</h1><p>How the supply chain is moving week by week, and how the headline measures change with each data load.</p></div>${sectionTabs('trends')}</div>
     <div class="charts"><div class="card"><h3>Weekly flow at cost (UGX)</h3><div class="chartbox"><canvas id="t1"></canvas></div></div>
       <div class="card"><h3>Weekly consumption by class (UGX)</h3><div class="chartbox"><canvas id="t2"></canvas></div></div>
       <div class="card"><h3>Stock value by class per data load</h3><div class="chartbox"><canvas id="t3"></canvas></div>${n < 3 ? `<div class="muted">${n} load${n === 1 ? '' : 's'} so far — this line builds up with every scheduled refresh during the proof period.</div>` : ''}</div>
@@ -1658,7 +1676,7 @@ async function renderDataRefresh() {
   S.meta = await api('/api/meta');
   const n = S.meta.notes, r = n.reconciliation, rf = s.refresh, last = log[0];
   document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Data refresh</h1><p>Read-only loads from Business Central ${esc(n.environment)}, the run log and reconciliation after each load.</p></div>
-      <button class="btn primary" id="rnow">${svg('refresh', 14)} ${S.meta.refreshing ? 'Refreshing…' : 'Refresh now'}</button></div>
+      <div class="page-tools">${sectionTabs('datarefresh')}<button class="btn primary" id="rnow">${svg('refresh', 14)} ${S.meta.refreshing ? 'Refreshing…' : 'Refresh now'}</button></div></div>
     ${S.meta.last_error ? `<div class="banner" style="border-left-color:var(--critical)">Last refresh failed: ${esc(S.meta.last_error)}</div>` : ''}
     <div class="kpis"><div class="kpi"><div class="label">Data loaded</div><div class="value" style="font-size:20px">${esc(n.extracted_at.replace('T', ' '))}</div><div class="note">${esc(n.company)}</div></div>
       <div class="kpi"><div class="label"><span class="dot" style="background:${css(last && last.status === 'failed' ? '--critical' : '--good')}"></span>Last run</div><div class="value" style="font-size:20px">${last ? esc(last.status) : 'Initial load'}</div><div class="note">${last ? esc((last.started || '').replace('T', ' ').slice(0, 16)) + ' · ' + esc(last.trigger || 'manual') : ''}</div></div>
@@ -1686,7 +1704,7 @@ async function renderDataRefresh() {
 async function renderAudit() {
   const rows = await api('/api/audit');
   const types = [...new Set(rows.map(r => r.type).filter(Boolean))];
-  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Audit log</h1><p>Every question, agent run, decision, report and data refresh — with who and when.</p></div></div>
+  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Audit log</h1><p>Every question, agent run, decision, report and data refresh — with who and when.</p></div>${sectionTabs('audit')}</div>
     <div class="filters"><select id="a_t"><option value="">All events</option>${types.map(t => `<option>${esc(t)}</option>`).join('')}</select><input id="a_q" placeholder="Search user, question, report…"></div><div class="card tablecard" id="alog"></div>`;
   const draw = () => {
     const q = a_q.value.toLowerCase(), t = a_t.value;
@@ -1701,7 +1719,7 @@ async function renderAudit() {
 /* ---------------- Definitions ---------------- */
 function renderDefinitions() {
   const n = S.meta.notes, r = n.reconciliation;
-  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Definitions & data notes</h1><p>How every measure is calculated, and what the data profiling found.</p></div></div>
+  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Definitions & data notes</h1><p>How every measure is calculated, and what the data profiling found.</p></div>${sectionTabs('definitions')}</div>
     <div class="charts">
     <div class="card"><h3>Measure definitions</h3><dl>${Object.entries(S.meta.definitions).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>
     <div class="card"><h3>Data notes (this load)</h3><dl>
