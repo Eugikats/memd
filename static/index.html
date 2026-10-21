@@ -1062,7 +1062,7 @@ function go(v, force) {
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
   S.view = v;
-  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log' };
+  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes' };
   const invShell = Object.prototype.hasOwnProperty.call(INV_SHELL, v);
   document.body.classList.toggle('page-inv', invShell);
   renderWhen();
@@ -2999,20 +2999,52 @@ async function renderAudit() {
 /* ---------------- Definitions ---------------- */
 function renderDefinitions() {
   const n = S.meta.notes, r = n.reconciliation;
-  document.getElementById('content').innerHTML = `<div class="vhead"><div><h1>Definitions & data notes</h1><p>How every measure is calculated, and what the data profiling found.</p></div>${sectionTabs('definitions')}</div>
-    <div class="charts">
-    <div class="card"><h3>Measure definitions</h3><dl>${Object.entries(S.meta.definitions).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>
-    <div class="card"><h3>Data notes (this load)</h3><dl>
-      <dt>Source</dt><dd>${esc(n.company)} · ${esc(n.environment)} · extracted ${esc(n.extracted_at)}</dd>
-      <dt>Reporting window</dt><dd>${n.window_days} days (${n.production_days} days with production output)</dd>
-      <dt>Ledger</dt><dd>${n.open_ledger_entries.toLocaleString()} open entries (stock); ${n.movement_entries.toLocaleString()} movements in window</dd>
-      <dt>Reconciliation to BC item inventory</dt><dd>${r ? `${r.items_matching.toLocaleString()} of ${r.items_compared.toLocaleString()} items match exactly (${(100 * r.items_matching / r.items_compared).toFixed(1)}%).` : 'Run a refresh to compute.'}</dd>
-      <dt>Purchase lines</dt><dd>${n.purchase_lines_outstanding} outstanding lines; <b>${n.purchase_lines_overdue}</b> past expected receipt date, of which ${n.purchase_lines_stale} are more than ${n.stale_after_days} days overdue (stale, excluded from projections).</dd>
-      <dt>Bills of Materials</dt><dd>${n.bom_lines_certified.toLocaleString()} certified BOM item lines; <b>${n.bom_lines_zero_qty.toLocaleString()}</b> have Quantity per = 0 and are excluded.</dd>
-      <dt>Unclassified items with stock</dt><dd>${n.items_unclassified_with_stock.toLocaleString()} items (spares, consumables, stationery etc.) are outside RM/WIP/FG.</dd>
-    </dl>${r && r.mismatches.length ? '<div id="recon" style="margin-top:12px"></div>' : ''}</div></div>`;
+  const match = r && r.items_compared ? 100 * r.items_matching / r.items_compared : null;
+  const faces = {
+    'Window': { icon: 'clock', bg: '#e8f1ff', fg: '#2563EB' },
+    'Open entries': { icon: 'doc', bg: '#eef2ff', fg: '#4f46e5' },
+    'Movements': { icon: 'trend', bg: '#f3eefe', fg: '#7c5cf0' },
+    'Match to BC': { icon: 'shield', bg: '#e8f8ef', fg: '#16a34a' },
+  };
+  const cards = [
+    { label: 'Window', value: `${esc(String(fmt(n.window_days, 'days')))}<small> days</small>`, note: `${n.production_days} days with production output` },
+    { label: 'Open entries', value: `${(n.open_ledger_entries || 0).toLocaleString()}<small> entries</small>`, note: 'Stock on hand' },
+    { label: 'Movements', value: `${(n.movement_entries || 0).toLocaleString()}<small> entries</small>`, note: 'In the reporting window' },
+    { label: 'Match to BC', value: match == null ? '–' : `${match.toFixed(1)}<small> %</small>`, note: r ? `${r.items_matching.toLocaleString()} of ${r.items_compared.toLocaleString()} items` : 'Run a refresh to compute' },
+  ];
+  const kpis = cards.map(k => {
+    const face = faces[k.label];
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p></div>
+      <div class="inv-kpi-row"><p class="inv-kpi-v">${k.value}</p>${cipSpark(null, face.fg, k.label)}</div><p class="inv-kpi-note">${esc(k.note)}</p></article>`;
+  }).join('');
+  const defs = { title: 'Measure definitions', total_rows: Object.keys(S.meta.definitions || {}).length, drill: null,
+    columns: [{ field: 'term', label: 'Term', kind: 'text' }, { field: 'text', label: 'Definition', kind: 'text' }],
+    rows: Object.entries(S.meta.definitions || {}).map(([term, text]) => ({ term, text })) };
+  document.getElementById('content').innerHTML = `<div class="inv-page">
+    <div class="inv-head">${sectionTabs('definitions')}<div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
+      <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
+      <button class="btn primary" id="exportInv">${svg('download', 14)} Export</button></div></div>
+    <div class="inv-kpis cols-4">${kpis}</div>
+    <div class="inv-topcharts">
+      <section class="card inv-card"><div class="inv-ch-head"><div><h3>Measure definitions</h3><p>How each supply-chain measure is calculated</p></div></div>
+        <div class="inv-pad"><dl>${Object.entries(S.meta.definitions || {}).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div></section>
+      <section class="card inv-card"><div class="inv-ch-head"><div><h3>Data notes</h3><p>This Business Central load</p></div></div>
+        <div class="inv-pad"><dl>
+          <dt>Source</dt><dd>${esc(n.company)} · ${esc(n.environment)} · extracted ${esc(n.extracted_at)}</dd>
+          <dt>Reporting window</dt><dd>${n.window_days} days (${n.production_days} days with production output)</dd>
+          <dt>Ledger</dt><dd>${n.open_ledger_entries.toLocaleString()} open entries (stock); ${n.movement_entries.toLocaleString()} movements in window</dd>
+          <dt>Reconciliation to BC item inventory</dt><dd>${r ? `${r.items_matching.toLocaleString()} of ${r.items_compared.toLocaleString()} items match exactly (${(100 * r.items_matching / r.items_compared).toFixed(1)}%).` : 'Run a refresh to compute.'}</dd>
+          <dt>Purchase lines</dt><dd>${n.purchase_lines_outstanding} outstanding lines; <b>${n.purchase_lines_overdue}</b> past expected receipt date, of which ${n.purchase_lines_stale} are more than ${n.stale_after_days} days overdue (stale, excluded from projections).</dd>
+          <dt>Bills of Materials</dt><dd>${n.bom_lines_certified.toLocaleString()} certified BOM item lines; <b>${n.bom_lines_zero_qty.toLocaleString()}</b> have Quantity per = 0 and are excluded.</dd>
+          <dt>Unclassified items with stock</dt><dd>${n.items_unclassified_with_stock.toLocaleString()} items (spares, consumables, stationery etc.) are outside RM/WIP/FG.</dd>
+        </dl></div></section>
+    </div>
+    ${r && r.mismatches.length ? '<div class="card tablecard inv-table" id="recon"></div>' : ''}</div>`;
+  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Summarise the definitions and data notes: how are the measures calculated, and what did this Business Central load find?'), 50); };
+  document.getElementById('pdfThis').onclick = () => window.print();
+  document.getElementById('exportInv').onclick = () => exportCsv(defs);
   if (r && r.mismatches.length) renderTable(document.getElementById('recon'), { title: 'Reconciliation mismatches', total_rows: r.mismatches.length, drill: 'item_no',
-    columns: [{ field: 'item_no', label: 'Item', kind: 'text' }, { field: 'bc', label: 'BC inventory', kind: 'qty' }, { field: 'pulse', label: 'Pulse stock', kind: 'qty' }], rows: r.mismatches }, { size: 10 });
+    columns: [{ field: 'item_no', label: 'Item', kind: 'text' }, { field: 'bc', label: 'BC inventory', kind: 'qty' }, { field: 'pulse', label: 'Pulse stock', kind: 'qty' }], rows: r.mismatches }, { variant: 'inventory', size: 10, search: 'Search item…' });
 }
 
 init();
