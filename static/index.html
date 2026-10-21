@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pulse Command Center</title>
-<link rel="icon" type="image/jpeg" href="/static/logo.jpg">
+<link rel="icon" type="image/png" href="/static/pulse-logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -32,7 +32,7 @@ button { font: inherit; }
 .rail { width: 260px; background: var(--surface-1); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; transition: width .18s; overflow: hidden; }
 .rail.collapsed { width: 64px; }
 .rail .logo { display: flex; align-items: center; gap: 10px; padding: 14px 14px 6px; }
-.logo-img { width: 44px; height: 44px; flex: none; border-radius: 10px; object-fit: contain; background: #fff; border: 1px solid var(--border); padding: 2px; }
+.logo-img { width: 40px; height: 40px; flex: none; object-fit: contain; background: transparent; border: 0; padding: 0; }
 .rail.collapsed .logo { padding-left: 10px; }
 .logo-mark { width: 36px; height: 36px; flex: none; border-radius: 11px; display: grid; place-items: center; color: #fff; font-weight: 700; font-family: var(--serif); font-size: 20px;
   background: linear-gradient(135deg, #1f6bff, #4aa3ff); box-shadow: 0 4px 10px -3px rgba(31,107,255,.5); }
@@ -165,7 +165,7 @@ main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 .banner { background: var(--surface-1); border: 1px solid var(--border); border-left: 4px solid var(--warning); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 13px; }
 @media (max-width: 900px) { .builder { grid-template-columns: 1fr; } .bform { position: static; max-height: none; } }
 @media print {
-  .rail, .topbar, .filters, .vhead .rbtns, .vhead button, #schedBox, .pager, [data-csv], .drawer { display: none !important; }
+  .rail, .topbar, .filters, .vhead .rbtns, .vhead button, .inv-actions, #schedBox, .pager, [data-csv], .drawer { display: none !important; }
   body, html { background: #fff; } main { padding: 0; } .app { display: block; }
   .print-head { display: block; font-size: 12px; color: #333; margin-bottom: 10px; }
   .tablewrap { max-height: none !important; overflow: visible !important; border: 0; }
@@ -326,6 +326,99 @@ dl dt { font-weight: 600; margin-top: 12px; } dl dd { margin: 2px 0 0; color: va
   main { padding: 16px 18px 48px; }
   .rail { width: 232px; }
 }
+
+/* Inventory Position — visual redesign, scoped to that page */
+body.page-inv { background: #fff; color: #14213D; --accent: #2563EB; --accent-hover: #1D4ED8; --text-primary: #14213D; --text-secondary: #64748B; --border: #E2E8F0; --border-strong: #E2E8F0; }
+body.page-inv .shell, body.page-inv main { background: #fff; }
+body.page-inv main { padding-top: 8px; }
+body.page-inv .topbar { background: #fff; border-bottom-color: #E2E8F0; }
+body.page-inv .topbar .page { display: none; }
+body.page-inv .topbar .when { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+body.page-inv .topbar .when a { text-decoration: underline; text-decoration-color: #2563EB; color: #64748B; }
+body.page-inv .topbar .when a:hover { color: #2563EB; }
+.inv-date { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #14213D; }
+.inv-updated { font-size: 12px; color: #64748B; }
+.inv-page { min-width: 0; }
+.inv-crumb { color: #94a3b8; font-size: 12.5px; margin: 2px 0 8px; }
+.inv-crumb span { margin: 0 4px; }
+.inv-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.inv-head h1 { margin: 0; font-family: Inter, system-ui, sans-serif; font-size: 30px; font-weight: 700; letter-spacing: -.45px; color: #14213D; }
+.inv-head p { margin: 4px 0 0; color: #64748B; font-family: Inter, system-ui, sans-serif; font-size: 14.5px; }
+.inv-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.inv-actions .btn { display: inline-flex; align-items: center; gap: 6px; border-radius: 10px; padding: 8px 12px; background: #fff; }
+.inv-actions .btn.primary { background: #2563EB; border-color: #2563EB; color: #fff; }
+.inv-actions .btn.primary:hover { color: #fff; background: #1D4ED8; }
+.inv-filters { margin-bottom: 14px; }
+.inv-filters select { appearance: none; background-color: #fff; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.2' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; border-radius: 10px; height: 38px; min-width: 132px; }
+.inv-search { display: flex; align-items: center; gap: 6px; background: #fff; border: 1px solid var(--border-strong); border-radius: 10px; padding: 0 10px; color: #94a3b8; min-width: 0; }
+.inv-filters .inv-search { flex: 1; max-width: 460px; }
+.inv-search input { border: 0 !important; outline: 0; background: transparent; min-width: 0 !important; width: 100%; padding: 8px 0; box-shadow: none; }
+.inv-filters .btn.ghost { border-color: transparent; background: transparent; color: #475569; }
+.inv-filters .btn.ghost:hover { color: var(--accent); border-color: transparent; }
+.inv-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.inv-kpi { background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 14px 14px 12px; box-shadow: none; min-width: 0; }
+.inv-kpi-top { display: flex; align-items: center; gap: 8px; }
+.inv-ico { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none; }
+.inv-kpi-l { flex: 1; min-width: 0; color: #64748B; font-size: 12.5px; font-weight: 500; line-height: 1.25; }
+.inv-kpi-v { margin-top: 10px; font-size: 26px; font-weight: 700; letter-spacing: -.4px; font-variant-numeric: tabular-nums; line-height: 1.1; color: #14213D; }
+.inv-kpi-v small { font-size: 18px; font-weight: 700; margin-left: 1px; }
+.inv-kpi-v .u { font-size: 12px; font-weight: 600; color: #94a3b8; margin-left: 4px; }
+.inv-kpi-foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: 8px; min-height: 28px; color: #64748B; font-size: 12px; line-height: 1.35; }
+.inv-kpi-foot .spark-svg { width: 88px; height: 28px; }
+.inv-topcharts { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(260px, .95fr); gap: 14px; margin-top: 14px; }
+.inv-lower { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+.inv-card, .inv-table { border-color: #E2E8F0; border-radius: 16px; box-shadow: none; }
+.inv-ch-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
+.inv-ch-head h3 { margin: 0; font-size: 14.5px; }
+.inv-ch-head p { margin: 3px 0 0; color: var(--text-muted); font-size: 12px; }
+.inv-ch-head .seg { flex: none; }
+.inv-pill { background: #eef4ff; color: #2457d6; font-size: 12px; font-weight: 600; border-radius: 8px; padding: 4px 8px; flex: none; }
+.inv-donut { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(150px, .95fr); align-items: center; gap: 6px; }
+.inv-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.inv-legend li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 12.5px; }
+.inv-legend i { width: 8px; height: 8px; border-radius: 50%; }
+.inv-legend .nm { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.inv-legend .nm b { font-weight: 600; }
+.inv-legend .sh { color: #64748b; font-variant-numeric: tabular-nums; font-weight: 500; }
+.inv-legend em { font-style: normal; font-weight: 600; font-variant-numeric: tabular-nums; }
+.inv-pager button:disabled { opacity: .45; cursor: default; }
+.page-inv .insights-card, body.page-inv .insights-card { border-radius: 16px; }
+.inv-table { border-radius: 16px; }
+.inv-tablehead h3 { font-size: 15px; }
+.inv-table .tablewrap { border: 0; border-radius: 0; }
+.inv-table th { background: #f8fafc; font-size: 12px; }
+.inv-table tbody tr:hover td { background: #f8fbff; }
+.inv-sku { color: #2457d6; font-weight: 600; }
+.inv-table .cls { color: var(--c); background: color-mix(in srgb, var(--c) 14%, white); }
+.inv-days { font-weight: 700; font-variant-numeric: tabular-nums; }
+.inv-table .pill.tone-good { background: #e9f8ef; color: #128a3e; border-color: transparent; }
+.inv-table .pill.tone-warn { background: #fff4e6; color: #c26a00; border-color: transparent; }
+.inv-table .pill.tone-bad { background: #fdecec; color: #c43535; border-color: transparent; }
+.inv-table .pill.tone-good .dot, .inv-table .pill.tone-warn .dot, .inv-table .pill.tone-bad .dot { display: none; }
+.inv-table .inv-search { flex: 0 1 220px; min-width: 140px; }
+.inv-table .inv-search input { padding: 6px 0; font-size: 12.5px; }
+.colmenu-wrap { position: relative; }
+.colmenu { display: none; position: absolute; right: 0; top: calc(100% + 6px); background: #fff; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); padding: 8px 10px; z-index: 6; min-width: 190px; max-height: 280px; overflow: auto; }
+.colmenu.open { display: flex; flex-direction: column; gap: 2px; }
+.colmenu label { display: flex; gap: 8px; align-items: center; font-size: 12.5px; padding: 4px 2px; cursor: pointer; font-weight: 400; color: var(--text-primary); }
+.inv-pager { width: 100%; }
+.inv-pager .pg { min-width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: #fff; cursor: pointer; color: var(--text-secondary); }
+.inv-pager .pg.on { background: #2563EB; color: #fff; border-color: #2563EB; }
+.inv-pager .ellipsis { color: var(--text-muted); padding: 0 2px; }
+.inv-pager .rpp { margin-left: auto; color: #64748b; font-size: 12.5px; display: inline-flex; align-items: center; gap: 8px; }
+.inv-pager select { border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font: inherit; background: #fff; }
+@media (max-width: 1200px) {
+  .inv-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .inv-lower { grid-template-columns: 1fr; }
+  .inv-topcharts { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+  .inv-kpis { grid-template-columns: 1fr 1fr; }
+  .inv-head h1 { font-size: 24px; }
+  .inv-kpi-v { font-size: 22px; }
+  .inv-donut { grid-template-columns: 1fr; }
+  .inv-actions .btn { flex: 1; justify-content: center; }
+}
 </style>
 </head>
 <body>
@@ -334,7 +427,7 @@ dl dt { font-weight: 600; margin-top: 12px; } dl dd { margin: 2px 0 0; color: va
   <div class="shell">
     <header class="topbar">
       <button class="menu-btn" id="menuBtn" aria-label="Open menu"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-      <img class="top-logo" src="/static/logo.jpg" alt="Nice House of Plastics">
+      <img class="top-logo" src="/static/pulse-logo.png" alt="Pulse">
       <select class="mobile-nav btn" id="mobileNav" hidden></select>
       <div class="page" id="pageTitle">Command Center</div>
       <div class="right"><div class="when" id="when"></div><div class="avatar ghost" id="topAvatar"></div></div>
@@ -401,6 +494,8 @@ const P = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   trash: '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.2-3.2"/>',
+  sparkle: '<path d="M12 3l1.1 3.4L16.5 7.5 13.1 8.6 12 12l-1.1-3.4L7.5 7.5l3.4-1.1z"/><path d="M18 13l.6 1.8L20.5 15.4 18.6 16 18 17.8 17.4 16 15.5 15.4l1.9-.6z"/>',
 };
 const svg = (n, s = 18) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${P[n] || ''}</svg>`;
 const VIEW_ICON = { overview: 'grid', inventory_position: 'box', inventory_by_location: 'pin', rm_consumption_cover: 'gauge', wip_cover: 'layers', fg_cover: 'package',
@@ -426,7 +521,7 @@ const initials = n => (n || '').split(/\s+/).filter(Boolean).map(w => w[0]).join
 async function init() {
   S.meta = await api('/api/meta');
   const rail = document.getElementById('rail'), views = S.meta.views;
-  rail.innerHTML = `<div class="logo"><img class="logo-img" src="/static/logo.jpg" alt="Nice House of Plastics"><div class="logo-text">Pulse<small>${esc(S.meta.notes.company)}</small></div></div>
+  rail.innerHTML = `<div class="logo"><img class="logo-img" src="/static/pulse-logo.png" alt="Pulse"><div class="logo-text">Pulse<small>${esc(S.meta.notes.company)}</small></div></div>
     <button class="toggle" id="railToggle" title="Collapse sidebar">${I.side}</button>
     <div class="scroll">
       <a data-v="command" title="Command Center">${svg('monitor')}<span class="lbl">Command Center</span></a>
@@ -467,8 +562,17 @@ async function updateBadge() {
 function renderWhen() {
   const n = S.meta.notes;
   const d = new Date(n.reporting_date + 'T12:00:00');
-  const label = `<span class="d-long">${d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</span><span class="d-short">${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>`;
-  document.getElementById('when').innerHTML = `<b>${label}</b><a id="refresh" title="Data loaded ${esc(n.extracted_at.replace('T', ' '))}"><span class="r-long">${S.meta.refreshing ? 'Refreshing from Business Central…' : S.meta.last_error ? 'Last refresh failed – retry' : 'Refresh from Business Central'}</span><span class="r-short">${S.meta.refreshing ? 'Refreshing…' : '↻ Refresh'}</span></a>`;
+  const long = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+  const short = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const inv = document.body.classList.contains('page-inv');
+  const loaded = new Date(n.extracted_at);
+  const time = Number.isNaN(loaded.getTime()) ? n.extracted_at.replace('T', ' ').slice(0, 16) : loaded.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const label = inv
+    ? `<span class="inv-date">${svg('calendar', 16)}<span class="d-long">${long}</span><span class="d-short">${short}</span></span>`
+    : `<span class="d-long">${long}</span><span class="d-short">${short}</span>`;
+  const refreshLong = S.meta.refreshing ? 'Refreshing from Business Central…' : S.meta.last_error ? 'Last refresh failed – retry' : 'Refresh from Business Central';
+  const updated = inv ? `<span class="inv-updated">Last updated: ${esc(time)}</span>` : '';
+  document.getElementById('when').innerHTML = `<b>${label}</b>${updated}<a id="refresh" title="Data loaded ${esc(n.extracted_at.replace('T', ' '))}. Click to refresh from Business Central."><span class="r-long">${refreshLong}</span><span class="r-short">${S.meta.refreshing ? 'Refreshing…' : '↻ Refresh'}</span></a>`;
   document.getElementById('refresh').onclick = async () => {
     if (S.meta.refreshing) return;
     await api('/api/refresh', { method: 'POST' }); S.meta.refreshing = true; renderWhen();
@@ -482,7 +586,10 @@ function closeMenu() { document.getElementById('rail').classList.remove('open');
 function go(v, force) {
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
-  S.view = v; if (location.hash.slice(1) !== v) location.hash = v;
+  S.view = v;
+  document.body.classList.toggle('page-inv', v === 'inventory_position');
+  renderWhen();
+  if (location.hash.slice(1) !== v) location.hash = v;
   const navKey = v.startsWith('report:') ? 'reports' : v;
   document.querySelectorAll('.rail a').forEach(a => a.classList.toggle('active', a.dataset.v === navKey));
   document.getElementById('mobileNav').value = navKey;
@@ -648,13 +755,131 @@ function filterBar() {
     <button class="btn" id="f_clear">Clear</button></div>`;
 }
 
+const INV_CLASS = {
+  RM: '#3b82f6', WIP: '#7c5cf0', FG: '#16a34a',
+  'Raw Material': '#3b82f6', 'Work in Progress': '#7c5cf0', 'Finished Goods': '#16a34a',
+};
+const KPI_FACE = [
+  { test: /total/i, icon: 'box', bg: '#e8f1ff', fg: '#2f6bff' },
+  { test: /raw material/i, icon: 'box', bg: '#e8f1ff', fg: '#2f6bff' },
+  { test: /work in progress|^wip$/i, icon: 'layers', bg: '#f1ebff', fg: '#7c5cf0' },
+  { test: /finished/i, icon: 'package', bg: '#e7f8ef', fg: '#16a34a' },
+  { test: /excess|not moving/i, icon: 'alert', bg: '#fff4e8', fg: '#e07a12' },
+];
+function moneyRich(v) {
+  if (v == null || v === '') return '–';
+  const a = Math.abs(v);
+  if (a >= 1e9) return `${(v / 1e9).toFixed(2)}<small>B</small> <span class="u">UGX</span>`;
+  if (a >= 1e6) return `${(v / 1e6).toFixed(1)}<small>M</small> <span class="u">UGX</span>`;
+  return `${Math.round(v).toLocaleString()} <span class="u">UGX</span>`;
+}
+function postingRows(items) {
+  const ranked = (items || []).filter(x => x && x.value > 0).slice().sort((a, b) => b.value - a.value);
+  if (ranked.length <= 8) return { rows: ranked, hidden: 0, totalGroups: ranked.length };
+  const rest = ranked.slice(8);
+  const others = rest.reduce((s, x) => s + (Number(x.value) || 0), 0);
+  return { rows: ranked.slice(0, 8).concat([{ label: 'Others', value: others }]), hidden: rest.length, totalGroups: ranked.length };
+}
+function drawPostingBars(el, items) {
+  const { rows } = postingRows(items);
+  const total = rows.reduce((s, x) => s + (Number(x.value) || 0), 0);
+  const blue = '#2563EB', lead = '#1D4ED8', ink = '#64748B';
+  return new Chart(el, {
+    type: 'bar',
+    data: { labels: rows.map(r => r.label), datasets: [{ label: 'Inventory value', data: rows.map(r => r.value), backgroundColor: rows.map((_, i) => i === 0 ? lead : blue), borderRadius: 4, maxBarThickness: 18, categoryPercentage: .72 }] },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: '#14213D', padding: 10, cornerRadius: 8, callbacks: { label: c => { const v = c.raw || 0; const share = total ? (100 * v / total).toFixed(1) : '0'; return `${fmt(v, 'money')} UGX (${share}% of posting-group value)`; } } },
+      },
+      scales: {
+        x: { beginAtZero: true, border: { display: false }, grid: { color: '#E2E8F0' }, ticks: { color: ink, callback: v => fmt(v, 'money') } },
+        y: { border: { display: false }, grid: { display: false }, ticks: { color: '#14213D', font: { size: 11 }, autoSkip: false, callback: function (v) { const l = String(this.getLabelForValue(v)); return l.length > 28 ? l.slice(0, 27) + '…' : l; } } },
+      },
+    },
+  });
+}
+function invFilters() {
+  const f = S.filters, m = S.meta;
+  return `<div class="filters inv-filters">
+    <select id="f_class"><option value="">All classes</option>${['RM', 'WIP', 'FG'].map(c => `<option ${f.item_class === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
+    <select id="f_site"><option value="">All sites</option>${m.sites.map(s => `<option ${f.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
+    <label class="inv-search">${svg('search', 15)}<input id="f_q" placeholder="Search item, description, vendor, PO…" value="${esc(f.q)}"></label>
+    <button class="btn ghost" id="f_clear">Clear</button></div>`;
+}
+function renderInventory(c, d) {
+  const faceOf = label => KPI_FACE.find(f => f.test.test(label)) || { icon: 'chart', bg: '#eef2f7', fg: '#475569' };
+  const kpis = (d.kpis || []).map(k => {
+    const f = faceOf(k.label);
+    const title = { 'Total RM / WIP / FG value': 'Total Inventory Value', 'Excess / not moving': 'Excess / Not Moving' }[k.label] || k.label;
+    const spark = k.spark ? `<span title="Weekly receipts">${sparkSVG(k.spark, '#2563EB')}</span>` : '';
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-ico" style="background:${f.bg};color:${f.fg}">${svg(f.icon, 16)}</span><span class="inv-kpi-l">${esc(title)}</span></div>
+      <div class="inv-kpi-v">${k.kind === 'money' ? moneyRich(k.value) : esc(String(fmt(k.value, k.kind)))}</div>
+      <div class="inv-kpi-foot">${k.note ? `<span>${esc(k.note)}</span>` : '<span></span>'}${spark}</div></article>`;
+  }).join('');
+  const donut = (d.charts || []).find(ch => ch.type === 'doughnut');
+  const posting = (d.charts || []).find(ch => ch.type === 'treemap');
+  const health = (d.charts || []).find(ch => /health/i.test(ch.title));
+  const top = (d.charts || []).find(ch => /top 15/i.test(ch.title));
+  const abc = (d.charts || []).find(ch => /abc/i.test(ch.title));
+  const card = (ch, id) => ch ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(ch.title)}</h3>${ch.subtitle ? `<p>${esc(ch.subtitle)}</p>` : ''}</div></div><div class="chartbox" style="height:${ch.height || 280}px"><canvas id="${id}"></canvas></div></section>` : '';
+  const postItems = (posting && posting.extra && posting.extra.items) || [];
+  const postPack = posting ? postingRows(postItems) : null;
+  const postSub = !postPack ? '' : postPack.hidden ? `Top 8 of ${postPack.totalGroups} posting groups. Others is the sum of the remaining ${postPack.hidden}.` : 'Inventory value distribution across posting groups';
+  const postH = postPack ? Math.max(240, postPack.rows.length * 36 + 12) : 280;
+  const postCard = posting ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(posting.title)}</h3><p>${esc(postSub)}</p></div></div><div class="chartbox" style="height:${postH}px"><canvas id="chPost"></canvas></div></section>` : '';
+  const donutCard = donut ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(donut.title)}</h3>${donut.subtitle ? `<p>${esc(donut.subtitle)}</p>` : ''}</div><span class="inv-pill">Value</span></div><div class="inv-donut"><div class="chartbox" style="height:250px"><canvas id="chDonut"></canvas></div><ul class="inv-legend" id="donutLegend"></ul></div></section>` : '';
+  c.innerHTML = `<div class="inv-page"><div class="inv-crumb">Inventory <span>›</span> ${esc(d.title)}</div>
+    <div class="inv-head"><div><h1>${esc(d.title)}</h1><p>${esc(d.question)}</p></div>
+      <div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
+      <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
+      <button class="btn primary" id="exportInv">${svg('download', 14)} Export</button></div></div>
+    ${invFilters()}
+    <div class="inv-kpis">${kpis}</div>
+    ${insightsHTML(d.insights)}
+    <div class="inv-topcharts">${card(top, 'chTop')}${donutCard}</div>
+    <div class="inv-lower">${card(abc, 'chAbc')}${postCard}${card(health, 'chHealth')}</div>
+    ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
+  bindFilters();
+  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('pdfThis').onclick = () => window.print();
+  if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
+  S.charts.forEach(ch => ch.destroy()); S.charts = [];
+  const put = (id, ch, extra) => {
+    const el = document.getElementById(id); if (!el || !ch) return;
+    try { const chart = drawChart(el, Object.assign({}, ch, extra || {})); if (chart) S.charts.push(chart); }
+    catch (e) { el.parentElement.innerHTML = `<div class="muted">Chart unavailable (${esc(e.message)})</div>`; }
+  };
+  put('chTop', top, { classColors: INV_CLASS });
+  put('chAbc', abc);
+  put('chHealth', health, { keepLabels: true, labelLen: 18 });
+  if (donut) {
+    put('chDonut', donut, { hideLegend: true, cutout: '72%', classColors: INV_CLASS });
+    const labels = donut.labels || [], data = (donut.series[0] && donut.series[0].data) || [];
+    const total = data.reduce((a, b) => a + (b || 0), 0);
+    const leg = document.getElementById('donutLegend');
+    if (leg) leg.innerHTML = labels.map((lb, i) => {
+      const v = data[i] || 0, share = total ? Math.round(100 * v / total) : 0, col = INV_CLASS[lb] || '#94a3b8';
+      return `<li><i style="background:${col}"></i><span class="nm"><b>${esc(lb)}</b><span class="sh">${share}%</span></span><em>${fmt(v, 'money')}</em></li>`;
+    }).join('');
+  }
+  if (posting) {
+    const el = document.getElementById('chPost');
+    try { const chart = drawPostingBars(el, postItems); if (chart) S.charts.push(chart); }
+    catch (e) { if (el) el.parentElement.innerHTML = `<div class="muted">Chart unavailable (${esc(e.message)})</div>`; }
+  }
+  d.tables.forEach((t, i) => renderTable(document.getElementById('tb' + i), t, { variant: 'inventory', size: 10 }));
+}
+
 async function loadView() {
   const view = S.view;
   const qs = new URLSearchParams(Object.entries(S.filters).filter(([, v]) => v));
   const c = document.getElementById('content');
-  if (!c.querySelector('.vhead')) c.innerHTML = `<div class="loading"><span class="thinking"><i></i><i></i><i></i></span> Loading view…</div>`;
+  if (!c.querySelector('.vhead') && !c.querySelector('.inv-page')) c.innerHTML = `<div class="loading"><span class="thinking"><i></i><i></i><i></i></span> Loading view…</div>`;
   const d = await api(`/api/view/${view}?${qs}`);
   if (S.view !== view) return;
+  if (view === 'inventory_position') { renderInventory(c, d); return; }
   c.innerHTML = `<div class="vhead"><div><h1>${d.no ? `<span class="no">${d.no}</span> · ` : ''}${esc(d.title)}</h1><p>${esc(d.question)}</p></div>
       <div class="rbtns"><button class="btn" id="askThis">${I.spark.replace('class="spark"', 'width="14" height="14" style="vertical-align:-2px"')} Ask about this view</button>
       <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button></div></div>
@@ -742,10 +967,11 @@ const KEYS = { seq: '--series-1', crit: '--critical', serious: '--serious', warn
 const tok = k => CLASS[k] ? css(CLASS[k]) : KEYS[k] ? css(KEYS[k]) : css('--series-1');
 const catCol = i => css('--series-' + ((i % 8) + 1));
 function hexA(hex, a) { const h = hex.replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map(x => x + x).join('') : h, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+const classPaint = (ch, k, fallback) => (ch && ch.classColors && ch.classColors[k]) || fallback;
 function seriesColor(s, i, labels, ch) {
-  if (ch && ch.colors && ch.series.length === 1) return ch.colors.map(tok);
-  if (s.key && s.key.startsWith('class:')) return s.key.slice(6).split(',').map(k => css(CLASS[k] || '--series-4'));
-  if (s.key === 'class') return labels.map(l => css(CLASS[l] || '--series-4'));
+  if (ch && ch.colors && ch.series.length === 1) return ch.colors.map(c => (typeof c === 'string' && c[0] === '#') ? c : tok(c));
+  if (s.key && s.key.startsWith('class:')) return s.key.slice(6).split(',').map(k => classPaint(ch, k, css(CLASS[k] || '--series-4')));
+  if (s.key === 'class') return labels.map(l => classPaint(ch, l, css(CLASS[l] || '--series-4')));
   if (s.key === 'cat' && ch && ch.type === 'doughnut') return labels.map((_, j) => catCol(j));
   if (s.key === 'cat') return catCol(i);
   if (CLASS[s.key] || KEYS[s.key]) return tok(s.key);
@@ -787,7 +1013,7 @@ function drawChart(el, ch) {
 
   if (ch.type === 'treemap') {
     const items = ch.extra.items, groups = [...new Set(items.map(x => x.group))];
-    const gcol = g => CLASS[g] ? css(CLASS[g]) : catCol(groups.indexOf(g));
+    const gcol = g => classPaint(ch, g, CLASS[g] ? css(CLASS[g]) : catCol(groups.indexOf(g)));
     return new Chart(el, { type: 'treemap', data: { datasets: [{ tree: items, key: 'value', borderWidth: 2, borderColor: surf, spacing: 0, borderRadius: 4,
       backgroundColor: c => c.type !== 'data' ? 'transparent' : hexA(gcol(c.raw._data.group), .82),
       labels: { display: true, align: 'left', position: 'top', color: '#fff', font: [{ size: 12, weight: '600' }, { size: 11 }], overflow: 'hidden',
@@ -832,15 +1058,15 @@ function drawChart(el, ch) {
       indexAxis: horizontal ? 'y' : 'x', responsive: true, maintainAspectRatio: false,
       interaction: { mode: type === 'line' ? 'index' : 'nearest', intersect: false },
       plugins: {
-        legend: { ...legend, display: ch.series.length > 1 || type === 'doughnut', position: type === 'doughnut' && el.parentElement.clientWidth > 460 ? 'right' : 'bottom' },
+        legend: { ...legend, display: ch.hideLegend ? false : (ch.series.length > 1 || type === 'doughnut'), position: type === 'doughnut' && el.parentElement.clientWidth > 460 ? 'right' : 'bottom' },
         tooltip: { ...tooltip, callbacks: { label: c => `${type === 'doughnut' ? c.label : c.dataset.label}: ${vfmt(c.raw)}${type === 'doughnut' && total ? ` (${(100 * c.raw / total).toFixed(0)}%)` : ''}` } },
         centerText: type === 'doughnut' ? { mid: true, text: money ? fmt(total, 'money') : Number(total).toLocaleString(), sub: money ? 'UGX total' : 'total' } : undefined,
         refLines: { y: ch.extra && ch.extra.zeroLine ? [0] : [] },
       },
-      cutout: type === 'doughnut' ? '66%' : undefined,
+      cutout: type === 'doughnut' ? (ch.cutout || '66%') : undefined,
       layout: type === 'doughnut' ? { padding: 6 } : undefined,
       scales: type === 'doughnut' ? {} : {
-        x: { stacked: ch.stacked, border: { display: false }, grid: { color: horizontal ? grid : 'transparent' }, ticks: { color: ink, maxRotation: 0, autoSkipPadding: 12, callback: horizontal ? tick : function (v) { const l = this.getLabelForValue(v); return String(l).length > 14 ? String(l).slice(0, 13) + '…' : l; } } },
+        x: { stacked: ch.stacked, border: { display: false }, grid: { color: horizontal ? grid : 'transparent' }, ticks: { color: ink, maxRotation: 0, autoSkip: !ch.keepLabels, autoSkipPadding: 12, font: { size: ch.keepLabels ? 10 : 12 }, callback: horizontal ? tick : function (v) { const l = this.getLabelForValue(v); const lim = ch.labelLen || 14; return String(l).length > lim ? String(l).slice(0, lim - 1) + '…' : l; } } },
         y: { stacked: ch.stacked, beginAtZero: true, border: { display: false }, grid: { color: horizontal ? 'transparent' : grid }, ticks: { color: ink, autoSkip: !horizontal, font: { size: horizontal ? 11 : 12 }, callback: horizontal ? function (v) { const l = String(this.getLabelForValue(v)); return l.length > 30 ? l.slice(0, 29) + '…' : l; } : tick } },
       },
     },
@@ -858,39 +1084,75 @@ function drawHeatmap(el, ch) {
 
 /* ---------- tables with in-cell data bars ---------- */
 function renderTable(el, t, opts = {}) {
-  const st = { sort: null, dir: 1, page: 0, size: opts.size || 50 };
+  const inv = opts.variant === 'inventory';
+  const st = { sort: null, dir: 1, page: 0, size: opts.size || (inv ? 10 : 50), q: '', colsOpen: false };
+  const hidden = new Set();
   const num = k => ['qty', 'money', 'days'].includes(k);
-  const barCols = t.bars === false ? [] : t.columns.filter(c => c.kind === 'money' || (c.kind === 'qty' && !/days|line|parent|component/i.test(c.label))).map(c => c.field);
+  const barCols = (inv || t.bars === false) ? [] : t.columns.filter(c => c.kind === 'money' || (c.kind === 'qty' && !/days|line|parent|component/i.test(c.label))).map(c => c.field);
   const maxOf = {}; barCols.forEach(f => maxOf[f] = Math.max(1e-9, ...t.rows.map(r => Math.abs(r[f] || 0))));
+  const toneOf = v => /healthy|ready|on time|made to order/i.test(v || '') ? 'good' : /excess|no movement|^low$/i.test(v || '') ? 'warn' : /stockout|critical|high/i.test(v || '') ? 'bad' : '';
   const draw = () => {
     let rows = t.rows.slice();
+    const cols = t.columns.filter(c => !inv || !hidden.has(c.field));
     if (st.sort) { const f = st.sort; rows.sort((a, b) => { const x = a[f], y = b[f]; if (x == null) return 1; if (y == null) return -1; return (x > y ? 1 : x < y ? -1 : 0) * st.dir; }); }
+    if (inv && st.q) { const q = st.q.toLowerCase(); rows = rows.filter(r => t.columns.some(c => String(r[c.field] ?? '').toLowerCase().includes(q))); }
     const pages = Math.max(1, Math.ceil(rows.length / st.size)); st.page = Math.min(st.page, pages - 1);
     const slice = rows.slice(st.page * st.size, (st.page + 1) * st.size);
     const cell = (r, c) => {
       const v = r[c.field];
       if (c.kind === 'link') return v ? `<a class="btn" href="${esc(v)}">${svg('download', 12)} Excel</a>` : '';
-      if (c.kind === 'status') return v ? `<span class="pill"><span class="dot" style="background:${statusColor(v)}"></span>${esc(v)}</span>` : '–';
+      if (c.kind === 'status') {
+        const tone = inv ? toneOf(v) : '';
+        return v ? `<span class="pill${tone ? ' tone-' + tone : ''}"><span class="dot" style="background:${statusColor(v)}"></span>${esc(v)}</span>` : '–';
+      }
+      if (c.kind === 'days' && v != null && inv) {
+        const stt = String(r.cover_status || '');
+        const col = /excess|no movement/i.test(stt) ? '#e07a12' : /stockout|critical/i.test(stt) ? '#d03b3b' : /low/i.test(stt) ? '#d97706' : '#128a3e';
+        return `<span class="inv-days" style="color:${col}">${esc(tableFmt(v, c.kind))}</span>`;
+      }
       if (c.kind === 'days' && v != null) { const col = v < 7 ? '--critical' : v < 14 ? '--serious' : v < 30 ? '--warning' : v > 180 ? '--series-7' : '--good';
         return `<span class="dchip" style="--c:${css(col)}">${esc(tableFmt(v, c.kind))}</span>`; }
-      if (c.field === 'item_class' && CLASS[v]) return `<span class="cls" style="--c:${css(CLASS[v])}">${esc(v)}</span>`;
+      if (c.field === 'item_class' && CLASS[v]) return `<span class="cls" style="--c:${inv && INV_CLASS[v] ? INV_CLASS[v] : css(CLASS[v])}">${esc(v)}</span>`;
+      if (inv && c.field === 'item_no') return `<span class="inv-sku">${esc(v)}</span>`;
       if (c.field === 'abc' && v) return `<span class="abc abc-${esc(v)}">${esc(v)}</span>`;
       return esc(tableFmt(v, c.kind));
     };
     const bg = (r, c) => { if (!barCols.includes(c.field) || r[c.field] == null) return ''; const p = Math.min(100, 100 * Math.abs(r[c.field]) / maxOf[c.field]);
       return ` style="background:linear-gradient(to left, ${hexA(c.kind === 'money' ? css('--accent') : css('--series-3'), .13)} ${p}%, transparent ${p}%)"`; };
-    el.innerHTML = `<div class="tablehead"><h3 style="margin:0">${esc(t.title)} <span class="muted" style="font-weight:400">· ${t.total_rows.toLocaleString()} rows${t.total_rows > t.rows.length ? `, top ${t.rows.length} shown` : ''}</span></h3>
-      <div class="rbtns"><input class="tfilter" placeholder="Filter rows…"><button class="btn" data-csv>${svg('download', 12)} CSV</button></div></div>
-      <div class="tablewrap"><table><thead><tr>${t.columns.map(c => `<th class="${num(c.kind) ? 'num' : ''}" data-f="${c.field}">${esc(c.label)}${st.sort === c.field ? (st.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead>
-      <tbody>${slice.map(r => `<tr class="${t.drill === 'item_no' && r.item_no ? 'click' : ''}" data-i="${esc(r.item_no || '')}">${t.columns.map(c => `<td class="${num(c.kind) ? 'num' : ''}"${bg(r, c)} title="${esc(r[c.field])}">${cell(r, c)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${t.columns.length}" class="muted">No rows match.</td></tr>`}</tbody></table></div>
-      ${pages > 1 ? `<div class="pager"><button class="btn" data-p="-1">‹ Prev</button> Page ${st.page + 1} of ${pages} · ${rows.length.toLocaleString()} rows <button class="btn" data-p="1">Next ›</button></div>` : ''}`;
+    const seq = [];
+    const pushN = n => { if (n >= 0 && n < pages && !seq.includes(n)) seq.push(n); };
+    pushN(0); for (let i = st.page - 2; i <= st.page + 2; i++) pushN(i); pushN(pages - 1);
+    let prevN = -1; const pgBtns = [];
+    seq.forEach(n => { if (prevN >= 0 && n - prevN > 1) pgBtns.push('<span class="ellipsis">…</span>'); pgBtns.push(`<button type="button" class="pg${n === st.page ? ' on' : ''}" data-go="${n}">${n + 1}</button>`); prevN = n; });
+    const head = inv
+      ? `<div class="tablehead inv-tablehead"><h3 style="margin:0">${esc(t.title)} <span class="muted" style="font-weight:400">${t.total_rows.toLocaleString()} rows${t.total_rows > t.rows.length ? `, top ${t.rows.length} shown` : ''}</span></h3>
+        <div class="rbtns"><label class="inv-search">${svg('search', 14)}<input class="tfilter" placeholder="Search items…"></label>
+        <div class="colmenu-wrap"><button type="button" class="btn" data-cols>${svg('sliders', 12)} Columns</button><div class="colmenu${st.colsOpen ? ' open' : ''}">${t.columns.map(c => `<label><input type="checkbox" data-col="${c.field}" ${hidden.has(c.field) ? '' : 'checked'}> ${esc(c.label)}</label>`).join('')}</div></div>
+        <button type="button" class="btn" data-csv>${svg('download', 12)} CSV</button></div></div>`
+      : `<div class="tablehead"><h3 style="margin:0">${esc(t.title)} <span class="muted" style="font-weight:400">· ${t.total_rows.toLocaleString()} rows${t.total_rows > t.rows.length ? `, top ${t.rows.length} shown` : ''}</span></h3>
+      <div class="rbtns"><input class="tfilter" placeholder="Filter rows…"><button class="btn" data-csv>${svg('download', 12)} CSV</button></div></div>`;
+    const pager = inv
+      ? `<div class="pager inv-pager"><button type="button" class="btn" data-p="-1" ${st.page === 0 ? 'disabled' : ''}>‹ Prev</button>${pgBtns.join('')}<button type="button" class="btn" data-p="1" ${st.page >= pages - 1 ? 'disabled' : ''}>Next ›</button><label class="rpp">Rows per page <select data-size>${[10, 25, 50].map(n => `<option value="${n}" ${st.size === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>`
+      : (pages > 1 ? `<div class="pager"><button class="btn" data-p="-1">‹ Prev</button> Page ${st.page + 1} of ${pages} · ${rows.length.toLocaleString()} rows <button class="btn" data-p="1">Next ›</button></div>` : '');
+    el.innerHTML = `${head}<div class="tablewrap"><table><thead><tr>${cols.map(c => `<th class="${num(c.kind) ? 'num' : ''}" data-f="${c.field}">${esc(c.label)}${st.sort === c.field ? (st.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead>
+      <tbody>${slice.map(r => `<tr class="${t.drill === 'item_no' && r.item_no ? 'click' : ''}" data-i="${esc(r.item_no || '')}">${cols.map(c => `<td class="${num(c.kind) ? 'num' : ''}"${bg(r, c)} title="${esc(r[c.field])}">${cell(r, c)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length}" class="muted">No rows match.</td></tr>`}</tbody></table></div>${pager}`;
     el.querySelectorAll('th').forEach(th => th.onclick = () => { const f = th.dataset.f; st.dir = st.sort === f ? -st.dir : (num(t.columns.find(c => c.field === f).kind) ? -1 : 1); st.sort = f; draw(); });
-    el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { st.page = Math.max(0, st.page + +b.dataset.p); draw(); });
+    el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { if (b.disabled) return; st.page = Math.max(0, Math.min(pages - 1, st.page + +b.dataset.p)); draw(); });
+    el.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { st.page = +b.dataset.go; draw(); });
     el.querySelectorAll('tr.click').forEach(tr => tr.onclick = () => openItem(tr.dataset.i));
     el.querySelector('[data-csv]').onclick = () => exportCsv(t);
+    const size = el.querySelector('[data-size]'); if (size) size.onchange = () => { st.size = +size.value; st.page = 0; draw(); };
+    const colsBtn = el.querySelector('[data-cols]');
+    if (colsBtn) colsBtn.onclick = () => { st.colsOpen = !st.colsOpen; draw(); };
+    el.querySelectorAll('[data-col]').forEach(cb => cb.onchange = () => {
+      if (cb.checked) hidden.delete(cb.dataset.col);
+      else if (hidden.size < t.columns.length - 1) hidden.add(cb.dataset.col);
+      st.colsOpen = true; draw();
+    });
     const tf = el.querySelector('.tfilter'); tf.value = st.q || '';
-    tf.oninput = () => { st.q = tf.value; const q = st.q.toLowerCase(); el.querySelectorAll('tbody tr').forEach(tr => tr.style.display = !q || tr.textContent.toLowerCase().includes(q) ? '' : 'none'); };
-    if (st.q) tf.oninput();
+    if (inv) tf.oninput = () => { const pos = tf.selectionStart; st.q = tf.value; st.page = 0; draw(); const n = el.querySelector('.tfilter'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } };
+    else tf.oninput = () => { st.q = tf.value; const q = st.q.toLowerCase(); el.querySelectorAll('tbody tr').forEach(tr => tr.style.display = !q || tr.textContent.toLowerCase().includes(q) ? '' : 'none'); };
+    if (!inv && st.q) tf.oninput();
   };
   draw();
 }
