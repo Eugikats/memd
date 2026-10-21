@@ -101,7 +101,7 @@ main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 .hero-rule { width: 42px; height: 3px; border-radius: 3px; background: #2563EB; margin: 14px auto 0; }
 .hero.chatting { padding-top: 24px; }
 .hero.chatting h1 { font-size: 26px; }
-.hero.chatting .cockpit-kicker, .hero.chatting .hero-rule, .hero.chatting .cockpit { display: none; }
+.hero.chatting .cockpit-kicker, .hero.chatting .hero-rule, .hero.chatting .cockpit, .hero.chatting .cockpit-wave, .hero.chatting .flow-toggle { display: none; }
 .askbox { width: min(720px, 100%); margin-top: 28px; background: #fff; border: 1px solid #e6edf5; border-radius: 999px; box-shadow: 0 10px 30px rgba(15, 23, 42, .06); display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 18px; }
 .hero.chatting .askbox { margin-top: 16px; position: sticky; bottom: 16px; }
 .askbox svg.spark { width: 22px; height: 22px; color: var(--accent); flex: none; }
@@ -116,9 +116,9 @@ main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 .cockpit-metrics .val small { font-size: .62em; }
 .cockpit-metrics .val .u { font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 600; color: #94a3b8; letter-spacing: 0; margin-left: 4px; }
 .cockpit-metrics .share { margin: 4px 0 0; min-height: 16px; font-size: 12px; color: #94a3b8; }
-.cockpit-wave { height: 176px; margin-top: -6px; }
+.cockpit-wave { height: 320px; width: calc(100% + 48px); margin: 18px -24px 0; }
 .cockpit-wave svg { width: 100%; height: 100%; display: block; }
-.flow-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin: -6px auto 0; border: 0; background: transparent; color: #b6c0cc; font-size: 11px; font-weight: 600; letter-spacing: .28em; text-transform: uppercase; cursor: pointer; }
+.flow-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; width: calc(100% + 48px); margin: 0 -24px 0; border: 0; background: transparent; color: #b6c0cc; font-size: 11px; font-weight: 600; letter-spacing: .28em; text-transform: uppercase; cursor: pointer; }
 .flow-toggle svg { transition: transform .15s; }
 .flow-toggle.open svg { transform: rotate(180deg); }
 .cockpit-more { width: 100%; margin-top: 16px; }
@@ -337,6 +337,8 @@ dl dt { font-weight: 600; margin-top: 12px; } dl dd { margin: 2px 0 0; color: va
   .chartbox { height: 260px !important; }
   .insights { grid-template-columns: 1fr; }
   .hero { padding: 32px 14px 28px; min-height: auto; } .cockpit-metrics { grid-template-columns: 1fr 1fr; row-gap: 18px; } .cockpit-metrics .val { font-size: 26px; }
+  .cockpit-wave, .flow-toggle { width: calc(100% + 28px); margin-left: -14px; margin-right: -14px; }
+  .cockpit-wave { height: 240px; }
   .hero h1 { font-size: 30px; } .hero .sub { font-size: 15.5px; }
   .askbox { margin-top: 28px; } .divider { margin: 32px 0 14px; }
   .filters { gap: 6px; } .filters select { flex: 1 1 calc(50% - 6px); min-width: 0; }
@@ -1112,30 +1114,32 @@ function go(v, force) {
 function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; }
 
 function cockpitWave(series) {
-  const w = 1000, h = 190, pad = 16;
+  const w = 1200, h = 340, bleed = 90;
   const n = Math.max(2, series[0] ? series[0].data.length : 2);
-  const xAt = i => pad + (n < 2 ? 0 : i / (n - 1)) * (w - pad * 2);
-  const drawn = series.map(s => {
+  const xAt = i => -bleed + (n < 2 ? 0 : i / (n - 1)) * (w + bleed * 2);
+  const lanes = [72, 148, 224, 300];
+  const drawn = series.map((s, si) => {
     const vals = s.data.map(Number);
     const mn = Math.min(...vals), mx = Math.max(...vals), rg = (mx - mn) || 1;
-    const yAt = v => 36 + (1 - (Number(v) - mn) / rg) * 78;
+    const mid = lanes[si] || 180;
+    const yAt = v => mid - ((Number(v) - mn) / rg - 0.5) * 52;
     const pts = vals.map((v, i) => [xAt(i), yAt(v)]);
     let d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
     for (let i = 1; i < pts.length; i++) {
       const prev = pts[i - 1], p = pts[i], cx = (prev[0] + p[0]) / 2;
       d += ` C ${cx.toFixed(1)} ${prev[1].toFixed(1)}, ${cx.toFixed(1)} ${p[1].toFixed(1)}, ${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
     }
-    return { d, pts, yAt };
+    return { d, pts };
   });
   const marks = drawn.map((s, i) => {
-    const t = (i + 0.5) / series.length;
-    const idx = Math.round(t * (n - 1));
-    const pt = s.pts[Math.max(0, Math.min(n - 1, idx))];
-    return `<circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="5.5" fill="#fff" stroke="${series[i].color}" stroke-width="2.4"/>`;
+    const idx = Math.round(((i + 0.5) / series.length) * (n - 1));
+    const pt = s.pts[Math.max(0, Math.min(s.pts.length - 1, idx))];
+    return `<circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="6" fill="#fff" stroke="${series[i].color}" stroke-width="2.6"/>`;
   }).join('');
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Weekly inventory flow">${drawn.map((s, si) => {
-    const area = `${s.d} L ${s.pts[s.pts.length - 1][0].toFixed(1)} ${h} L ${s.pts[0][0].toFixed(1)} ${h} Z`;
-    return `<defs><linearGradient id="fw${si}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${series[si].color}" stop-opacity=".22"/><stop offset="55%" stop-color="${series[si].color}" stop-opacity=".06"/><stop offset="100%" stop-color="${series[si].color}" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#fw${si})"/><path d="${s.d}" fill="none" stroke="${series[si].color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`;
+    const last = s.pts[s.pts.length - 1], first = s.pts[0];
+    const area = `${s.d} L ${last[0].toFixed(1)} ${(h + 40).toFixed(1)} L ${first[0].toFixed(1)} ${(h + 40).toFixed(1)} Z`;
+    return `<defs><linearGradient id="fw${si}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${series[si].color}" stop-opacity=".28"/><stop offset="70%" stop-color="${series[si].color}" stop-opacity=".05"/><stop offset="100%" stop-color="${series[si].color}" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#fw${si})"/><path d="${s.d}" fill="none" stroke="${series[si].color}" stroke-width="2.6" stroke-linejoin="round"/>`;
   }).join('')}${marks}</svg>`;
 }
 function renderCommand() {
@@ -1154,11 +1158,10 @@ function renderCommand() {
       { icon: 'layers', label: 'Analyze WIP cover', go: 'wip_cover' },
       { icon: 'doc', label: 'Create a purchase request', q: 'Which items need a purchase because cover is short and incoming supply will not cover them?' },
     ].map(c => `<button type="button"${c.go ? ` data-go="${c.go}"` : ''}${c.p ? ` data-p="${c.p}"` : ''}${c.q ? ` data-q="${esc(c.q)}"` : ''}>${svg(c.icon, 15)}${esc(c.label)}</button>`).join('')}</div>
-    <div class="cockpit" id="cockpit">
-      <div class="cockpit-metrics" id="cockpitMetrics"></div>
-      <div class="cockpit-wave" id="cockpitWave"></div>
-      <button type="button" class="flow-toggle" id="flowToggle">Inventory flow <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
-    </div></section>`;
+    <div class="cockpit" id="cockpit"><div class="cockpit-metrics" id="cockpitMetrics"></div></div>
+    <div class="cockpit-wave" id="cockpitWave"></div>
+    <button type="button" class="flow-toggle" id="flowToggle">Inventory flow <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+    </section>`;
   const thread = document.getElementById('thread');
   S.thread.forEach(el => thread.appendChild(el));
   const q = document.getElementById('q'), send = document.getElementById('send');
@@ -1197,10 +1200,10 @@ async function loadCockpit() {
   });
   const weeks = Object.keys(by).sort();
   const series = [
-    { name: 'Consumption', color: '#7eb6ff', data: weeks.map(w => by[w].c) },
-    { name: 'Output', color: '#5eead4', data: weeks.map(w => by[w].o) },
-    { name: 'Sales', color: '#c4b5fd', data: weeks.map(w => by[w].s) },
-    { name: 'Receipts', color: '#6ee7b7', data: weeks.map(w => by[w].r) },
+    { name: 'Consumption', color: '#2563EB', data: weeks.map(w => by[w].c) },
+    { name: 'Output', color: '#0d9488', data: weeks.map(w => by[w].o) },
+    { name: 'Sales', color: '#7c3aed', data: weeks.map(w => by[w].s) },
+    { name: 'Receipts', color: '#16a34a', data: weeks.map(w => by[w].r) },
   ];
   const wave = document.getElementById('cockpitWave');
   if (!wave) return;
