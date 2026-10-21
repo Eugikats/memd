@@ -2321,38 +2321,6 @@ async function loadView() {
 }
 
 function renderOverview(c, d) {
-  const short = {
-    'Stock value (RM/WIP/FG)': 'Stock value',
-    'Out of stock (in use)': 'Out of stock',
-    'Run out within 7 days': 'Within 7 days',
-    'High-risk items': 'High risk',
-    'Overdue PO value (≤ 90d)': 'Overdue POs',
-    'Constrained products': 'Constrained',
-    'Site shortages': 'Shortages',
-    'High exceptions': 'Exceptions',
-  };
-  const faces = {
-    'Stock value': { icon: 'box', bg: '#e8f1ff', fg: '#2563EB' },
-    'Out of stock': { icon: 'alert', bg: '#fdecec', fg: '#d03b3b' },
-    'Within 7 days': { icon: 'clock', bg: '#fff4e8', fg: '#e07a12' },
-    'High risk': { icon: 'alert', bg: '#fdecec', fg: '#b42318' },
-    'Overdue POs': { icon: 'truck', bg: '#fff1ea', fg: '#e07a12' },
-    'Constrained': { icon: 'factory', bg: '#f3eefe', fg: '#7c5cf0' },
-    'Shortages': { icon: 'pin', bg: '#fff8e8', fg: '#c26a00' },
-    'Exceptions': { icon: 'flag', bg: '#fdecec', fg: '#d03b3b' },
-  };
-  const unit = label => label === 'Constrained' ? 'products' : label === 'Exceptions' ? 'exceptions' : 'items';
-  const kpiValue = (k, label) => {
-    if (k.kind === 'money') return moneyRich(k.value);
-    if (k.kind === 'qty') return `${esc(String(fmt(k.value, 'qty')))}<small> ${unit(label)}</small>`;
-    return esc(String(k.value ?? '–'));
-  };
-  const kpis = (d.kpis || []).map(k => {
-    const label = short[k.label] || k.label;
-    const face = faces[label] || { icon: 'grid', bg: '#eef2f7', fg: '#475569' };
-    return `<article class="inv-kpi${k.view ? ' link' : ''}" ${k.view ? `data-view="${esc(k.view)}"` : ''}><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
-      <div class="inv-kpi-row"><p class="inv-kpi-v">${kpiValue(k, label)}</p>${cipSpark(k.spark, face.fg, label)}</div>${k.note ? `<p class="inv-kpi-note">${esc(k.note)}</p>` : ''}</article>`;
-  }).join('');
   const find = re => (d.charts || []).find(ch => re.test(ch.title));
   const gauges = (d.charts || []).filter(ch => ch.type === 'gauge');
   const flow = find(/weekly flow/i);
@@ -2364,19 +2332,16 @@ function renderOverview(c, d) {
       <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
       <button class="btn primary" id="exportInv">${svg('download', 14)} Export</button></div></div>
     ${invFilters()}
-    <div class="inv-kpis cols-4">${kpis}</div>
-    ${insightsHTML(d.insights)}
     <div class="inv-lower">${gauges.map((ch, i) => card(ch, `<div class="chartbox" style="height:200px"><canvas id="chOvG${i}"></canvas></div>`)).join('')}</div>
     <div class="inv-topcharts">
       ${card(flow, `<div class="chartbox" style="height:280px"><canvas id="chOvFlow"></canvas></div>`)}
       ${donut ? `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(donut.title)}</h3>${donut.subtitle ? `<p>${esc(donut.subtitle)}</p>` : '<p>On-hand value by class</p>'}</div></div><div class="inv-donut"><div class="chartbox" style="height:250px"><canvas id="chOvDonut"></canvas></div><ul class="inv-legend" id="ovLegend"></ul></div></section>` : ''}
     </div>
     ${bars ? `<div class="inv-wide">${card(bars, `<div class="chartbox" style="height:${Math.max(bars.height || 320, (bars.labels || []).length * 32 + 40)}px"><canvas id="chOvEx"></canvas></div>`)}</div>` : ''}
-    ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}
-    <div id="ovx"></div></div>`;
+    <div id="ovx"></div>
+    ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
-  c.querySelectorAll('.inv-kpi.link').forEach(el => el.onclick = () => go(el.dataset.view));
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Summarise the overview: what needs attention across inventory, supply, production and exceptions?'), 50); };
+  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Summarise overview health, weekly flow, stock by class, and the top exceptions.'), 50); };
   document.getElementById('pdfThis').onclick = () => window.print();
   if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
@@ -2408,16 +2373,10 @@ function renderOverview(c, d) {
 async function renderOverviewExtras() {
   const box = document.getElementById('ovx');
   if (!box || S.view !== 'overview') return;
-  box.innerHTML = `<div class="inv-lower">${GROUPS.map(([g, ids]) => `<section class="card inv-card"><div class="inv-ch-head"><div><h3>${esc(g)}</h3></div></div><div class="inv-pad tiles">${ids.map(id => `<a class="tile" data-v="${id}">${svg(VIEW_ICON[id], 16)}<span>${esc(viewTitle(id))}</span>${svg('arrow', 14)}</a>`).join('')}</div></section>`).join('')}</div>
-    <div class="inv-topcharts"><section class="card inv-card"><div class="inv-ch-head"><div><h3>Watchlist</h3></div></div><div class="inv-pad" id="ov_watch"></div></section>
-      <section class="card inv-card"><div class="inv-ch-head"><div><h3>Alerts</h3></div></div><div class="inv-pad" id="ov_alerts"></div></section></div>`;
-  box.querySelectorAll('.tile').forEach(t => t.onclick = () => go(t.dataset.v));
-  const [watch, alerts] = await Promise.all([api('/api/watchlist'), api('/api/alerts')]);
+  box.innerHTML = `<section class="card inv-card" style="margin-top:14px"><div class="inv-ch-head"><div><h3>Watchlist</h3><p>Items the agent is watching</p></div></div><div class="inv-pad" id="ov_watch"></div></section>`;
+  const watch = await api('/api/watchlist');
   if (S.view !== 'overview' || !document.getElementById('ov_watch')) return;
   renderWatch(document.getElementById('ov_watch'), watch, () => go('overview', true));
-  const act = alerts.filter(r => r.active);
-  document.getElementById('ov_alerts').innerHTML = act.length ? act.map(r => `<div class="alert-row"><span class="dot" style="background:${css(r.triggered ? '--critical' : '--good')}"></span><b>${r.triggered ? 'Triggered' : 'OK'}</b> · ${esc(r.name)} <span class="muted">(now ${r.last_value ?? '–'})</span></div>`).join('')
-    : `<div class="muted">No active alerts. ${alerts.length ? `${alerts.length} awaiting approval in <a href="#actions">Agent actions</a>.` : 'Ask the agent to "watch items about to run out".'}</div>`;
 }
 
 function bindFilters() {
