@@ -95,6 +95,9 @@ main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 
 /* ---------- command center home ---------- */
 .hero { background: #fff; border-radius: 0; padding: 56px 24px 48px; min-height: calc(100vh - 88px); display: flex; flex-direction: column; align-items: center; }
+.hero:not(.chatting) { height: calc(100vh - 62px); max-height: calc(100vh - 62px); min-height: 0; padding: 20px 24px 8px; box-sizing: border-box; overflow: hidden; }
+.hero:not(.chatting) .askbox { margin-top: 16px; }
+.hero:not(.chatting) .chips { margin-top: 12px; }
 .cockpit-kicker { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: #94a3b8; }
 .hero h1 { font-family: "Times New Roman", "Source Serif 4", Times, serif; font-weight: 700; font-size: 46px; letter-spacing: -.6px; margin: 12px 0 0; text-align: center; color: #0B1640; }
 .hero h1 span { color: #0B1640; }
@@ -116,10 +119,10 @@ main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 .cockpit-metrics .val small { font-size: .62em; }
 .cockpit-metrics .val .u { font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 600; color: #94a3b8; letter-spacing: 0; margin-left: 4px; }
 .cockpit-metrics .share { margin: 4px 0 0; min-height: 16px; font-size: 12px; color: #94a3b8; }
-.cockpit-wave { position: relative; width: calc(100% + 48px); margin: 28px -24px 0; background: #fff; }
-.cockpit-wave img { width: 100%; height: auto; display: block; background: #fff; }
-.wave-metric { position: absolute; width: 20%; text-align: center; transform: translate(-50%, calc(-100% - 6px)); }
-.wave-metric.edge-end { transform: translate(calc(-100% + 10px), calc(-100% - 6px)); text-align: right; }
+.cockpit-wave { position: relative; flex: 1 1 auto; min-height: 0; width: calc(100% + 48px); margin: 6px -24px 0; background: #fff; overflow: hidden; }
+.wave-clip { position: absolute; left: 0; right: 0; bottom: 0; height: 46%; overflow: hidden; background: #fff; }
+.wave-clip img { width: 100%; height: auto; display: block; margin-top: -11.6%; background: #fff; }
+.wave-metric { position: absolute; top: 0; bottom: 46%; display: flex; flex-direction: column; justify-content: flex-end; text-align: center; transform: translateX(-50%); padding-bottom: 2px; }
 .wave-metric .lab { margin: 0; font-size: 13px; color: #64748b; font-weight: 500; white-space: nowrap; }
 .wave-metric .val { margin: 4px 0 0; font-family: "Times New Roman", "Source Serif 4", Times, serif; font-size: clamp(18px, 2.1vw, 32px); font-weight: 700; letter-spacing: -.04em; color: #0B1640; line-height: 1.05; }
 .wave-metric .val .u { font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 600; color: #94a3b8; letter-spacing: 0; margin-left: 4px; }
@@ -349,7 +352,7 @@ dl dt { font-weight: 600; margin-top: 12px; } dl dd { margin: 2px 0 0; color: va
   .charts { grid-template-columns: 1fr; } .span-2, .span-3 { grid-column: auto; }
   .chartbox { height: 260px !important; }
   .insights { grid-template-columns: 1fr; }
-  .hero { padding: 32px 14px 28px; min-height: auto; } .cockpit-metrics { grid-template-columns: 1fr 1fr; row-gap: 18px; } .cockpit-metrics .val { font-size: 26px; }
+  .hero { padding: 32px 14px 28px; min-height: auto; } .hero:not(.chatting) { height: calc(100vh - 58px); max-height: calc(100vh - 58px); padding: 16px 14px 6px; } .cockpit-metrics { grid-template-columns: 1fr 1fr; row-gap: 18px; } .cockpit-metrics .val { font-size: 26px; }
   .cockpit-wave, .flow-toggle { width: calc(100% + 28px); margin-left: -14px; margin-right: -14px; }
   .wave-metric .lab { font-size: 10px; }
   .wave-metric .val { font-size: 15px; }
@@ -398,6 +401,9 @@ body.page-inv { background: #f5f7fb; color: #14213D; --accent: #2563EB; --accent
 body.page-inv .shell, body.page-inv main { background: #f5f7fb; }
 body.page-inv main { padding-top: 8px; }
 body.page-inv .hero { margin: -8px -24px -48px; }
+body.page-inv:has(.hero:not(.chatting)) { overflow: hidden; }
+body.page-inv main:has(.hero:not(.chatting)) { overflow: hidden; padding-bottom: 0; }
+body.page-inv .hero:not(.chatting) { margin-bottom: 0; }
 body.page-inv .topbar { background: #fff; border-bottom-color: #E2E8F0; }
 body.page-inv .topbar .page { display: block; font-size: 14px; font-weight: 500; color: #0f172a; }
 body.page-inv .topbar .right { align-items: center; margin-left: auto; }
@@ -1150,7 +1156,6 @@ function renderCommand() {
   const name = displayName();
   const chatting = S.thread.length > 0;
   document.getElementById('content').innerHTML = `<section class="hero ${chatting ? 'chatting' : ''}" id="hero">
-    <p class="cockpit-kicker">Your inventory cockpit</p>
     <h1>${greeting()}${name ? `, <span>${esc(name)}</span>.` : ''}</h1>
     <div class="hero-rule"></div>
     <div class="thread" id="thread"></div>
@@ -1187,15 +1192,15 @@ async function loadCockpit() {
   try { feed = await api('/api/cockpit'); } catch (e) { feed = { metrics: [], frames: [] }; }
   if (S.view !== 'command' || !document.getElementById('cockpitWave')) return;
   const peaks = [
-    { x: 15.2, y: 39.3, w: 17 },
-    { x: 40.7, y: 47.6, w: 16 },
-    { x: 61.3, y: 44.1, w: 16 },
-    { x: 94.5, y: 39.6, w: 16, edge: 'edge-end' },
+    { x: 14, w: 16 },
+    { x: 40, w: 16 },
+    { x: 60.1, w: 16 },
+    { x: 91.1, w: 15 },
   ];
   const metrics = feed.metrics || [];
-  wave.innerHTML = `<img src="/static/cockpit-wave.png" alt="Inventory flow">` + peaks.map((p, i) => {
+  wave.innerHTML = `<div class="wave-clip"><img src="/static/cockpit-wave.png" alt="Inventory flow"></div>` + peaks.map((p, i) => {
     const m = metrics[i] || { label: '', value: 0 };
-    return `<div class="wave-metric ${p.edge || ''}" style="left:${p.x}%;top:${p.y}%;width:${p.w}%"><p class="lab">${esc(m.label)}</p><p class="val">${moneyRich(m.value)}</p><div class="wave-delta" data-slot="${i}"></div></div>`;
+    return `<div class="wave-metric" style="left:${p.x}%;width:${p.w}%"><p class="lab">${esc(m.label)}</p><p class="val">${moneyRich(m.value)}</p><div class="wave-delta" data-slot="${i}"></div></div>`;
   }).join('');
   const decks = [[], [], [], []];
   (feed.frames || []).forEach(f => { if (decks[f.slot]) decks[f.slot].push(f); });
