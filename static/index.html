@@ -110,8 +110,8 @@ main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 .askbox svg.spark { width: 22px; height: 22px; color: var(--accent); flex: none; }
 .askbox input { flex: 1; border: 0; outline: 0; background: none; font: inherit; font-size: 15px; color: var(--text-primary); padding: 12px 0; min-width: 0; }
 .askbox input::placeholder { color: var(--text-muted); }
-.askbox .send { width: 42px; height: 42px; border-radius: 50%; border: 0; background: #2563EB; color: #fff; cursor: pointer; display: grid; place-items: center; flex: none; }
-.askbox .send.ready { background: #1d4ed8; color: #fff; }
+.askbox .send { width: 42px; height: 42px; border-radius: 50%; border: 0; background: #e6edf5; color: #94a3b8; cursor: default; display: grid; place-items: center; flex: none; }
+.askbox .send.ready { background: #2563EB; color: #fff; cursor: pointer; }
 .cockpit { width: min(980px, 100%); margin-top: 42px; }
 .cockpit-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 16px; text-align: center; }
 .cockpit-metrics .lab { margin: 0; font-size: 13px; color: #64748b; font-weight: 500; }
@@ -417,7 +417,26 @@ body.page-inv #topAvatar { display: none; }
 .inv-when-text { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
 .inv-date { font-size: 13.5px; font-weight: 650; color: #0f172a; letter-spacing: -.01em; line-height: 1.25; }
 .inv-updated { cursor: pointer; }
-.inv-avatar { width: 34px; height: 34px; margin-left: 4px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 13px; font-weight: 600; color: #0f172a; background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(15, 23, 42, .05); cursor: pointer; padding: 0; font-family: inherit; }
+.inv-avatar { width: 34px; height: 34px; margin-left: 4px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 13px; font-weight: 600; color: #0f172a; background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(15, 23, 42, .05); cursor: pointer; padding: 0; font-family: inherit; overflow: hidden; }
+.avatar img, .inv-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+.logo-edit { position: relative; width: 96px; height: 96px; flex: none; }
+.logo-edit .avatar { width: 96px; height: 96px; overflow: hidden; border: 1px solid #e2e8f0; background: #f8fafc; color: #94a3b8; box-shadow: 0 1px 2px rgba(15, 23, 42, .04); }
+.logo-pen { position: absolute; right: -2px; bottom: -2px; width: 32px; height: 32px; border-radius: 50%; border: 1px solid #e2e8f0; background: #fff; color: #334155; display: grid; place-items: center; cursor: pointer; box-shadow: 0 1px 2px rgba(15, 23, 42, .08); }
+.logo-pen:hover { background: #f8fafc; color: #0f172a; }
+.set-photo { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.crop-mask { position: fixed; inset: 0; z-index: 80; background: rgba(0, 0, 0, .4); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.crop-dialog { width: min(440px, 100%); background: #fff; border-radius: 16px; box-shadow: 0 24px 80px rgba(15, 23, 42, .22); overflow: hidden; }
+.crop-dialog header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #f1f5f9; }
+.crop-dialog h3 { margin: 0; font-size: 14px; }
+.crop-dialog header p { margin: 2px 0 0; font-size: 12px; color: #64748b; }
+.crop-x { border: 0; background: transparent; color: #94a3b8; cursor: pointer; padding: 4px; }
+.crop-stage { position: relative; height: 288px; background: #0f172a; overflow: hidden; cursor: grab; touch-action: none; }
+.crop-stage img { position: absolute; max-width: none; user-select: none; pointer-events: none; }
+.crop-stage::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at center, transparent 46%, rgba(15, 23, 42, .55) 48%); pointer-events: none; }
+.crop-foot { padding: 16px 20px 18px; }
+.crop-foot label { display: block; font-size: 12px; font-weight: 600; color: #475569; }
+.crop-foot input[type=range] { width: 100%; margin-top: 8px; accent-color: #2563EB; }
+.crop-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 #topAvatar { cursor: pointer; }
 .inv-page { min-width: 0; }
 .inv-crumb { color: #94a3b8; font-size: 12.5px; margin: 2px 0 8px; }
@@ -703,6 +722,7 @@ const P = {
   building: '<path d="M4 21V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16"/><path d="M15 9h3a2 2 0 0 1 2 2v10"/><path d="M8 7h2M8 11h2M8 15h2M4 21h16"/>',
   user: '<path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="8" r="4"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
 };
 const svg = (n, s = 18) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${P[n] || ''}</svg>`;
 const VIEW_ICON = { overview: 'grid', inventory_position: 'box', inventory_by_location: 'pin', rm_consumption_cover: 'gauge', wip_cover: 'layers', fg_cover: 'package',
@@ -714,7 +734,6 @@ const GROUPS = [
 ];
 const SECTIONS = [
   { key: 'command', label: 'Command Center', icon: 'monitor', views: ['command'] },
-  { key: 'actions', label: 'Agent actions', icon: 'inbox', views: ['actions'], badge: true },
   { key: 'overview', label: 'Overview', icon: 'grid', views: ['overview'] },
   ...GROUPS.map(([label, views]) => ({ key: views[0], label, icon: VIEW_ICON[views[0]] || 'grid', views })),
   { key: 'reporting', label: 'Reporting', icon: 'doc', views: ['reports', 'builder', 'schedules', 'trends'] },
@@ -781,6 +800,14 @@ function profile() {
 }
 function displayName() { return profile().fullName || (S.meta && S.meta.user_name) || ''; }
 function saveProfile(p) { localStorage.setItem('pulse-profile', JSON.stringify(p)); applyIdentity(); }
+function storedImage(key) { try { return localStorage.getItem(key) || ''; } catch { return ''; } }
+function saveImage(key, dataUrl) {
+  if (dataUrl) localStorage.setItem(key, dataUrl);
+  else localStorage.removeItem(key);
+  applyIdentity();
+  if (document.body.classList.contains('page-inv')) renderWhen();
+}
+function markInner(src, letters) { return src ? `<img src="${src}" alt="">` : esc(letters || ''); }
 function notesPref() {
   return Object.assign({ refresh: true, actions: true, stock: true, reports: false, quiet: false, from: '18:00', to: '08:00', pausedUntil: '' }, readStore('pulse-notes', {}));
 }
@@ -789,11 +816,10 @@ function seatList() { const v = readStore('pulse-seats', []); return Array.isArr
 function saveSeats(list) { localStorage.setItem('pulse-seats', JSON.stringify(list)); }
 function applyIdentity() {
   const name = displayName();
-  const mark = initials(name) || 'P';
   const av = document.getElementById('railAvatar'), nm = document.getElementById('railName'), top = document.getElementById('topAvatar');
-  if (av) av.textContent = mark;
+  if (av) av.innerHTML = markInner(storedImage('pulse-user-photo'), initials(name));
   if (nm) nm.textContent = name || 'Supply Chain';
-  if (top) top.textContent = mark;
+  if (top) top.innerHTML = markInner(storedImage('pulse-org-logo'), initials(S.meta && S.meta.notes && S.meta.notes.company));
 }
 function loadChats() { const v = readStore('pulse-chats', []); return Array.isArray(v) ? v : []; }
 function saveChatStore() { localStorage.setItem('pulse-chats', JSON.stringify(S.chats.slice(0, 30))); }
@@ -901,10 +927,65 @@ function paintSettings() {
 function field(label, id, value, extra) {
   return `<label class="set-field"><span>${esc(label)}</span><input id="${id}" value="${esc(value || '')}" ${extra || ''}></label>`;
 }
+function openCropper(file, title) {
+  return new Promise(resolve => {
+    if (!file || !['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'].includes((file.type || '').toLowerCase())) {
+      resolve({ error: 'Use a PNG, JPEG, WebP or GIF image.' }); return;
+    }
+    if (file.size > 8 * 1024 * 1024) { resolve({ error: 'Image is too large to edit. Choose a file under 8 MB.' }); return; }
+    const url = URL.createObjectURL(file);
+    const mask = document.createElement('div');
+    mask.className = 'crop-mask';
+    mask.innerHTML = `<div class="crop-dialog" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header><div><h3>${esc(title)}</h3><p>Drag and zoom to fit the circle.</p></div><button type="button" class="crop-x" data-x title="Close">${svg('x', 16)}</button></header>
+      <div class="crop-stage" id="cropStage"><img id="cropImg" alt=""></div>
+      <div class="crop-foot"><label>Zoom<input type="range" id="cropZoom" min="1" max="3" step="0.05" value="1"></label>
+        <div class="crop-actions"><button type="button" class="set-ghost" data-x>Cancel</button><button type="button" class="set-save" id="cropSave">Save</button></div>
+        <p class="set-note" id="cropErr" hidden></p></div></div>`;
+    document.body.appendChild(mask);
+    const img = mask.querySelector('#cropImg'), stage = mask.querySelector('#cropStage');
+    const frame = 288;
+    let zoom = 1, dx = 0, dy = 0, cover = 1, natW = 1, natH = 1;
+    const layout = () => {
+      const w = natW * cover * zoom, h = natH * cover * zoom;
+      const maxX = Math.max(0, (w - frame) / 2), maxY = Math.max(0, (h - frame) / 2);
+      dx = Math.max(-maxX, Math.min(maxX, dx));
+      dy = Math.max(-maxY, Math.min(maxY, dy));
+      img.style.width = w + 'px'; img.style.height = h + 'px';
+      img.style.left = ((frame - w) / 2 + dx) + 'px';
+      img.style.top = ((frame - h) / 2 + dy) + 'px';
+    };
+    img.onload = () => { natW = img.naturalWidth; natH = img.naturalHeight; cover = Math.max(frame / natW, frame / natH); layout(); };
+    img.src = url;
+    mask.querySelector('#cropZoom').oninput = e => { zoom = Number(e.target.value); layout(); };
+    let drag = null;
+    stage.onpointerdown = e => { drag = { x: e.clientX, y: e.clientY, dx, dy }; stage.setPointerCapture(e.pointerId); };
+    stage.onpointermove = e => { if (!drag) return; dx = drag.dx + (e.clientX - drag.x); dy = drag.dy + (e.clientY - drag.y); layout(); };
+    stage.onpointerup = () => { drag = null; };
+    const close = result => { URL.revokeObjectURL(url); mask.remove(); resolve(result); };
+    mask.querySelectorAll('[data-x]').forEach(b => b.onclick = () => close(null));
+    mask.addEventListener('click', e => { if (e.target === mask) close(null); });
+    mask.querySelector('#cropSave').onclick = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      const w = natW * cover * zoom, h = natH * cover * zoom;
+      const left = (frame - w) / 2 + dx, top = (frame - h) / 2 + dy, k = 512 / frame;
+      ctx.beginPath(); ctx.arc(256, 256, 256, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
+      ctx.drawImage(img, left * k, top * k, w * k, h * k);
+      let data = canvas.toDataURL('image/jpeg', 0.86);
+      if (data.length > 1400000) data = canvas.toDataURL('image/jpeg', 0.7);
+      try { close(data); } catch { const err = mask.querySelector('#cropErr'); err.hidden = false; err.textContent = 'Could not save that image.'; }
+    };
+  });
+}
 function paintProfile(body) {
   const p = profile();
   const name = p.fullName || (S.meta.user_name || '');
-  body.innerHTML = `<div class="set-hero"><div class="avatar">${esc(initials(name) || 'P')}</div><div><b>${esc(name || 'Supply Chain')}</b><div class="set-note">${esc([p.jobTitle, S.meta.notes.company].filter(Boolean).join(' · ') || S.meta.notes.environment || '')}</div><p class="set-note">Your initials stay on the profile icon. Pulse keeps this profile in this browser.</p></div></div>
+  const photo = storedImage('pulse-user-photo');
+  body.innerHTML = `<div class="set-hero"><div class="avatar" id="pfMark">${markInner(photo, initials(name))}</div><div><b>${esc(name || 'Supply Chain')}</b><div class="set-note">${esc([p.jobTitle, S.meta.notes.company].filter(Boolean).join(' · ') || S.meta.notes.environment || '')}</div>
+    <div class="set-photo"><button type="button" class="set-ghost" id="pfPhoto">${photo ? 'Change photo' : 'Upload photo'}</button>${photo ? '<button type="button" class="set-ghost" id="pfClear">Remove</button>' : ''}</div>
+    <p class="set-note">PNG, JPEG, WebP or GIF, up to 5 MB.</p><p class="set-note" id="pfPhotoMsg" hidden></p>
+    <input id="pfFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden></div></div>
     ${field('Full name', 'pfName', name)}
     ${field('Role / job title', 'pfJob', p.jobTitle, 'placeholder="Supply chain planner" maxlength="200"')}
     ${field('Department', 'pfDept', p.department, 'placeholder="Supply chain" maxlength="120"')}
@@ -917,6 +998,22 @@ function paintProfile(body) {
     saveProfile({ fullName: document.getElementById('pfName').value.trim(), jobTitle: document.getElementById('pfJob').value.trim(), department: document.getElementById('pfDept').value.trim(), phone: document.getElementById('pfPhone').value.trim(), timezone: document.getElementById('pfTz').value.trim(), email: document.getElementById('pfEmail').value.trim() });
     const ok = document.getElementById('pfOk'); ok.hidden = false;
     if (S.view === 'command' || S.view === 'inventory_position') go(S.view, true);
+  };
+  const file = document.getElementById('pfFile');
+  document.getElementById('pfPhoto').onclick = () => file.click();
+  const clear = document.getElementById('pfClear');
+  if (clear) clear.onclick = () => { saveImage('pulse-user-photo', ''); paintProfile(body); };
+  file.onchange = async () => {
+    const chosen = file.files && file.files[0];
+    file.value = '';
+    if (!chosen) return;
+    const msg = document.getElementById('pfPhotoMsg');
+    if (chosen.size > 5 * 1024 * 1024) { msg.hidden = false; msg.textContent = 'Profile pictures must be 5 MB or smaller.'; return; }
+    const data = await openCropper(chosen, 'Adjust photo');
+    if (!data) return;
+    if (data.error) { msg.hidden = false; msg.textContent = data.error; return; }
+    try { saveImage('pulse-user-photo', data); paintProfile(body); }
+    catch { msg.hidden = false; msg.textContent = 'Could not store that picture in this browser.'; }
   };
 }
 function paintSecurity(body) {
@@ -999,18 +1096,32 @@ function paintSeats(body) {
 }
 function paintOrg(body) {
   const n = S.meta.notes;
-  body.innerHTML = `<div class="set-hero"><img src="/static/pulse-logo.png" alt="" width="64" height="64" style="border-radius:12px;object-fit:cover"><div><b>Pulse</b><div class="set-note">${esc(n.company || '')}</div><p class="set-note">The company name comes from Business Central. Changing it here would not update the source company.</p></div></div>
+  const logo = storedImage('pulse-org-logo');
+  body.innerHTML = `<div class="set-hero"><div class="logo-edit"><div class="avatar" id="orgMark">${markInner(logo, initials(n.company))}</div><button type="button" class="logo-pen" id="orgPen" title="Edit logo" aria-label="Edit organization logo">${svg('pencil', 14)}</button><input id="orgFile" type="file" accept="image/png,image/jpeg" hidden></div><div><b>${esc(n.company || 'Organization')}</b><div class="set-note">${esc(n.environment || '')}</div><p class="set-note">Shown next to the date. Click the pencil to update.</p><p class="set-note" id="orgMsg" hidden></p></div></div>
     ${field('Company', 'orgCo', n.company || '', 'readonly')}
     ${field('Environment', 'orgEnv', n.environment || '', 'readonly')}
     ${field('Reporting date', 'orgDate', n.reporting_date || '', 'readonly')}
     <label class="set-field"><span>Data access</span><input value="Read only" readonly></label>`;
+  const file = document.getElementById('orgFile');
+  document.getElementById('orgPen').onclick = () => file.click();
+  file.onchange = async () => {
+    const chosen = file.files && file.files[0];
+    file.value = '';
+    if (!chosen) return;
+    const msg = document.getElementById('orgMsg');
+    const data = await openCropper(chosen, 'Adjust logo');
+    if (!data) return;
+    if (data.error) { msg.hidden = false; msg.textContent = data.error; return; }
+    try { saveImage('pulse-org-logo', data); paintOrg(body); }
+    catch { msg.hidden = false; msg.textContent = 'Could not store that logo in this browser.'; }
+  };
 }
 
 async function init() {
   S.meta = await api('/api/meta');
   const rail = document.getElementById('rail');
   const navLink = s => `<a data-v="${s.views[0]}" data-sec="${s.key}" title="${esc(s.label)}">${svg(s.icon)}<span class="lbl">${esc(s.label)}</span>${s.badge ? '<span class="badge" id="badge" hidden></span>' : ''}</a>`;
-  const navGroups = [['command', 'actions', 'overview'], ['inventory_position', 'in_transit_overdue', 'inventory_risk'], ['reporting', 'governance']];
+  const navGroups = [['command', 'overview'], ['inventory_position', 'in_transit_overdue', 'inventory_risk'], ['reporting', 'governance']];
   rail.innerHTML = `<div class="rail-head"><a class="logo" href="#command" data-v="command" title="Pulse"><img class="logo-img" src="/static/pulse-logo.png" alt="Pulse"><div class="logo-text">Pulse</div></a>
     <button class="toggle" id="railToggle" type="button" title="Collapse sidebar" aria-label="Collapse sidebar">${I.side}</button></div>
     <div class="scroll">
@@ -1019,7 +1130,7 @@ async function init() {
       <a id="railSettings" title="Settings">${svg('gear')}<span class="lbl">Settings</span></a>
       <div class="recent" id="recent"></div>
     </div>
-    <div class="foot"><button type="button" class="rail-user" id="railProfile" title="Profile"><div class="avatar" id="railAvatar">${esc(initials(profile().fullName || S.meta.user_name) || 'P')}</div><div class="who lbl" style="font-size:12px;color:var(--text-secondary);white-space:nowrap"><b id="railName" style="color:var(--text-primary);font-weight:600">${esc(profile().fullName || S.meta.user_name || 'Supply Chain')}</b><br><span class="muted">${esc(S.meta.notes.environment)}</span></div></button></div>`;
+    <div class="foot"><button type="button" class="rail-user" id="railProfile" title="Profile"><div class="avatar" id="railAvatar">${markInner(storedImage('pulse-user-photo'), initials(profile().fullName || S.meta.user_name))}</div><div class="who lbl" style="font-size:12px;color:var(--text-secondary);white-space:nowrap"><b id="railName" style="color:var(--text-primary);font-weight:600">${esc(profile().fullName || S.meta.user_name || 'Supply Chain')}</b><br><span class="muted">${esc(S.meta.notes.environment)}</span></div></button></div>`;
   const slot = document.getElementById('railSlot');
   const syncRail = () => {
     const collapsed = rail.classList.contains('collapsed');
@@ -1058,8 +1169,8 @@ async function init() {
   paintChats();
   document.getElementById('menuBtn').onclick = () => { rail.classList.add('open'); document.body.classList.add('menu-open'); };
   document.getElementById('scrim').onclick = closeMenu;
-  document.getElementById('topAvatar').textContent = initials(displayName()) || 'P';
-  document.getElementById('topAvatar').onclick = () => openSettings('profile');
+  document.getElementById('topAvatar').innerHTML = markInner(storedImage('pulse-org-logo'), initials(S.meta.notes.company));
+  document.getElementById('topAvatar').onclick = () => openSettings('organization');
   const mn = document.getElementById('mobileNav');
   mn.innerHTML = SECTIONS.map(s => `<option value="${s.views[0]}">${esc(s.label)}</option>`).join('');
   mn.onchange = () => go(mn.value);
@@ -1070,8 +1181,10 @@ async function init() {
 }
 
 async function updateBadge() {
+  const b = document.getElementById('badge');
+  if (!b) return;
   const acts = await api('/api/actions');
-  const n = acts.filter(a => a.status === 'proposed').length, b = document.getElementById('badge');
+  const n = acts.filter(a => a.status === 'proposed').length;
   b.hidden = !n; b.textContent = n;
 }
 
@@ -1086,12 +1199,12 @@ function renderWhen() {
   const label = `<span class="d-long">${long}</span><span class="d-short">${short}</span>`;
   const refreshLong = S.meta.refreshing ? 'Refreshing from Business Central…' : S.meta.last_error ? 'Last refresh failed – retry' : 'Refresh from Business Central';
   const invStatus = S.meta.refreshing ? 'Refreshing from Business Central…' : S.meta.last_error ? 'Last refresh failed – retry' : `Last updated: ${esc(time)}`;
-  const mark = esc(initials(displayName()) || 'P');
+  const orgMark = markInner(storedImage('pulse-org-logo'), initials(n.company));
   document.getElementById('when').innerHTML = inv
-    ? `<div class="inv-when"><span class="inv-cal">${svg('calendar', 16)}</span><div class="inv-when-text"><span class="inv-date">${label}</span><a id="refresh" class="inv-updated" title="Click to refresh from Business Central">${invStatus}</a></div><button type="button" class="inv-avatar" id="invAvatar" title="Settings">${mark}</button></div>`
+    ? `<div class="inv-when"><span class="inv-cal">${svg('calendar', 16)}</span><div class="inv-when-text"><span class="inv-date">${label}</span><a id="refresh" class="inv-updated" title="Click to refresh from Business Central">${invStatus}</a></div><button type="button" class="inv-avatar" id="invAvatar" title="Organization">${orgMark}</button></div>`
     : `<b>${label}</b><a id="refresh" title="Data loaded ${esc(n.extracted_at.replace('T', ' '))}. Click to refresh from Business Central."><span class="r-long">${refreshLong}</span><span class="r-short">${S.meta.refreshing ? 'Refreshing…' : '↻ Refresh'}</span></a>`;
   const invAvatar = document.getElementById('invAvatar');
-  if (invAvatar) invAvatar.onclick = () => openSettings('profile');
+  if (invAvatar) invAvatar.onclick = () => openSettings('organization');
   document.getElementById('refresh').onclick = async () => {
     if (S.meta.refreshing) return;
     await api('/api/refresh', { method: 'POST' }); S.meta.refreshing = true; renderWhen();
@@ -1103,11 +1216,12 @@ const isMobile = () => matchMedia('(max-width: 900px)').matches;
 function closeMenu() { document.getElementById('rail').classList.remove('open'); document.body.classList.remove('menu-open'); }
 
 function go(v, force) {
+  if (v === 'actions') { v = 'command'; force = true; }
   if (S.cockpitTimer) { clearInterval(S.cockpitTimer); S.cockpitTimer = null; }
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
   S.view = v;
-  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview', reports: 'Report library', builder: 'Report builder', schedules: 'Schedules & history', trends: 'Trends', actions: 'Agent actions', command: 'Command Center' };
+  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview', reports: 'Report library', builder: 'Report builder', schedules: 'Schedules & history', trends: 'Trends', command: 'Command Center' };
   const invShell = Object.prototype.hasOwnProperty.call(INV_SHELL, v);
   document.body.classList.toggle('page-inv', invShell);
   renderWhen();
@@ -1121,7 +1235,6 @@ function go(v, force) {
   document.getElementById('pageTitle').textContent = invShell ? (meta ? meta.title : INV_SHELL[v]) : ({ command: 'Command Center', definitions: 'Definitions & data notes', actions: 'Agent actions', overview: 'Overview', reports: 'Reporting / Report library', builder: 'Reporting / Report builder', schedules: 'Reporting / Schedules & history', trends: 'Reporting / Trends', datarefresh: 'Governance / Data refresh', audit: 'Governance / Audit log' }[v] || `${grp} / ${meta ? meta.title : ''}`);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
   if (v === 'command') return renderCommand();
-  if (v === 'actions') return renderActions();
   if (v === 'reports') return renderReports();
   if (v.startsWith('report:')) return renderReport(v.slice(7));
   if (v === 'builder') return renderBuilder();
@@ -1159,29 +1272,17 @@ function renderCommand() {
     <h1>${greeting()}${name ? `, <span>${esc(name)}</span>.` : ''}</h1>
     <div class="hero-rule"></div>
     <div class="thread" id="thread"></div>
-    <div class="askbox">${I.spark}<input id="q" placeholder="Ask Pulse anything..." autocomplete="off"><button class="send" id="send" title="Ask">${I.up}</button></div>
-    <div class="chips" id="chips">${[
-      { icon: 'box', label: 'Check a stock item', go: 'inventory_position' },
-      { icon: 'alert', label: 'Show items at risk', go: 'inventory_risk' },
-      { icon: 'swap', label: 'Plan a transfer', p: 'rebalance' },
-      { icon: 'layers', label: 'Analyze WIP cover', go: 'wip_cover' },
-      { icon: 'doc', label: 'Create a purchase request', q: 'Which items need a purchase because cover is short and incoming supply will not cover them?' },
-    ].map(c => `<button type="button"${c.go ? ` data-go="${c.go}"` : ''}${c.p ? ` data-p="${c.p}"` : ''}${c.q ? ` data-q="${esc(c.q)}"` : ''}>${svg(c.icon, 15)}${esc(c.label)}</button>`).join('')}</div>
+    <div class="askbox">${I.spark}<input id="q" placeholder="Ask Pulse anything..." autocomplete="off"><button class="send" id="send" title="Ask" disabled>${I.up}</button></div>
     <div class="cockpit-wave" id="cockpitWave"></div>
     <button type="button" class="flow-toggle" id="flowToggle">Inventory flow <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
     </section>`;
   const thread = document.getElementById('thread');
   S.thread.forEach(el => thread.appendChild(el));
   const q = document.getElementById('q'), send = document.getElementById('send');
-  q.oninput = () => send.classList.toggle('ready', !!q.value.trim());
-  send.onclick = () => ask(q.value.trim());
-  q.onkeydown = e => { if (e.key === 'Enter') ask(q.value.trim()); };
-  document.getElementById('chips').onclick = e => {
-    const b = e.target.closest('button'); if (!b) return;
-    if (b.dataset.go) go(b.dataset.go);
-    else if (b.dataset.p) ask(b.textContent.trim(), b.dataset.p);
-    else if (b.dataset.q) ask(b.dataset.q);
-  };
+  const armSend = () => { const on = !!q.value.trim(); send.classList.toggle('ready', on); send.disabled = !on; };
+  q.oninput = armSend;
+  send.onclick = () => { if (!send.disabled) ask(q.value.trim()); };
+  q.onkeydown = e => { if (e.key === 'Enter' && q.value.trim()) ask(q.value.trim()); };
   document.getElementById('flowToggle').onclick = () => go('trends');
   if (!chatting) loadCockpit(); else q.focus();
 }
