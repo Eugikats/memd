@@ -116,8 +116,21 @@ main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 .cockpit-metrics .val small { font-size: .62em; }
 .cockpit-metrics .val .u { font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 600; color: #94a3b8; letter-spacing: 0; margin-left: 4px; }
 .cockpit-metrics .share { margin: 4px 0 0; min-height: 16px; font-size: 12px; color: #94a3b8; }
-.cockpit-wave { height: 240px; width: calc(100% + 48px); margin: 8px -24px 0; }
-.cockpit-wave svg { width: 100%; height: 100%; display: block; }
+.cockpit-wave { position: relative; width: calc(100% + 48px); margin: 28px -24px 0; background: #fff; }
+.cockpit-wave img { width: 100%; height: auto; display: block; background: #fff; }
+.wave-metric { position: absolute; width: 20%; text-align: center; transform: translate(-50%, calc(-100% - 6px)); }
+.wave-metric.edge-end { transform: translate(calc(-100% + 10px), calc(-100% - 6px)); text-align: right; }
+.wave-metric .lab { margin: 0; font-size: 13px; color: #64748b; font-weight: 500; white-space: nowrap; }
+.wave-metric .val { margin: 4px 0 0; font-family: "Times New Roman", "Source Serif 4", Times, serif; font-size: clamp(18px, 2.1vw, 32px); font-weight: 700; letter-spacing: -.04em; color: #0B1640; line-height: 1.05; }
+.wave-metric .val .u { font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 600; color: #94a3b8; letter-spacing: 0; margin-left: 4px; }
+.wave-delta { min-height: 34px; transition: opacity .45s ease; }
+.wave-delta.out { opacity: 0; }
+.wave-delta .chg { margin: 5px 0 0; font-size: 13px; font-weight: 650; line-height: 1.2; }
+.wave-delta .chg.up { color: #15945a; }
+.wave-delta .chg.down { color: #d03b3b; }
+.wave-delta .chg.flat, .wave-delta .chg.info { color: #94a3b8; }
+.wave-delta .chg span { margin-right: 2px; }
+.wave-delta .vs { margin: 1px 0 0; font-size: 11.5px; color: #94a3b8; line-height: 1.25; white-space: normal; }
 .flow-toggle { display: flex; align-items: center; justify-content: center; gap: 8px; width: calc(100% + 48px); margin: 0 -24px 0; border: 0; background: transparent; color: #b6c0cc; font-size: 11px; font-weight: 600; letter-spacing: .28em; text-transform: uppercase; cursor: pointer; }
 .flow-toggle svg { transition: transform .15s; }
 .flow-toggle.open svg { transform: rotate(180deg); }
@@ -338,7 +351,10 @@ dl dt { font-weight: 600; margin-top: 12px; } dl dd { margin: 2px 0 0; color: va
   .insights { grid-template-columns: 1fr; }
   .hero { padding: 32px 14px 28px; min-height: auto; } .cockpit-metrics { grid-template-columns: 1fr 1fr; row-gap: 18px; } .cockpit-metrics .val { font-size: 26px; }
   .cockpit-wave, .flow-toggle { width: calc(100% + 28px); margin-left: -14px; margin-right: -14px; }
-  .cockpit-wave { height: 180px; }
+  .wave-metric .lab { font-size: 10px; }
+  .wave-metric .val { font-size: 15px; }
+  .wave-delta .chg, .wave-delta .vs { font-size: 9px; }
+  .wave-delta { min-height: 26px; }
   .hero h1 { font-size: 30px; } .hero .sub { font-size: 15.5px; }
   .askbox { margin-top: 28px; } .divider { margin: 32px 0 14px; }
   .filters { gap: 6px; } .filters select { flex: 1 1 calc(50% - 6px); min-width: 0; }
@@ -1081,6 +1097,7 @@ const isMobile = () => matchMedia('(max-width: 900px)').matches;
 function closeMenu() { document.getElementById('rail').classList.remove('open'); document.body.classList.remove('menu-open'); }
 
 function go(v, force) {
+  if (S.cockpitTimer) { clearInterval(S.cockpitTimer); S.cockpitTimer = null; }
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
   S.view = v;
@@ -1113,35 +1130,21 @@ function go(v, force) {
 /* ---------------- Command Center ---------------- */
 function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; }
 
-function cockpitWave(series) {
-  const w = 1200, h = 280, bleed = 110;
-  const n = Math.max(2, series[0] ? series[0].data.length : 2);
-  const xAt = i => -bleed + (n < 2 ? 0 : i / (n - 1)) * (w + bleed * 2);
-  const all = series.flatMap(s => s.data.map(Number));
-  const mn = Math.min(...all), mx = Math.max(...all), rg = (mx - mn) || 1;
-  const yAt = v => 28 + (1 - (Number(v) - mn) / rg) * 168;
-  const drawn = series.map(s => {
-    const pts = s.data.map((v, i) => [xAt(i), yAt(v)]);
-    let d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
-    for (let i = 1; i < pts.length; i++) {
-      const prev = pts[i - 1], p = pts[i], cx = (prev[0] + p[0]) / 2;
-      d += ` C ${cx.toFixed(1)} ${prev[1].toFixed(1)}, ${cx.toFixed(1)} ${p[1].toFixed(1)}, ${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
-    }
-    return { d, pts };
+function cockpitDelta(f) {
+  const dir = f.dir === 'up' || f.dir === 'down' ? f.dir : (f.dir === 'flat' ? 'flat' : 'info');
+  const arrow = dir === 'up' ? '↑' : dir === 'down' ? '↓' : '';
+  return `<p class="chg ${dir}">${arrow ? `<span>${arrow}</span>` : ''}${esc(f.value)}</p><p class="vs">${esc(f.vs)}</p>`;
+}
+function paintCockpit(decks, step, animate) {
+  document.querySelectorAll('#cockpitWave .wave-delta').forEach(el => {
+    const list = decks[+el.dataset.slot] || [];
+    if (!list.length) return;
+    const frame = list[step % list.length];
+    const write = () => { el.classList.remove('out'); el.innerHTML = cockpitDelta(frame); };
+    if (!animate) { write(); return; }
+    el.classList.add('out');
+    setTimeout(() => { if (el.isConnected) write(); }, 420);
   });
-  const fills = drawn.map((s, si) => {
-    const last = s.pts[s.pts.length - 1], first = s.pts[0];
-    const area = `${s.d} L ${last[0].toFixed(1)} ${(h + 40).toFixed(1)} L ${first[0].toFixed(1)} ${(h + 40).toFixed(1)} Z`;
-    const color = series[si].color;
-    return `<defs><linearGradient id="fw${si}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity=".22"/><stop offset="42%" stop-color="${color}" stop-opacity=".07"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs><path d="${area}" fill="url(#fw${si})"/>`;
-  }).join('');
-  const strokes = drawn.map((s, si) => `<path d="${s.d}" fill="none" stroke="${series[si].color}" stroke-opacity=".82" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`).join('');
-  const marks = drawn.map((s, i) => {
-    const idx = Math.round(((i + 0.5) / series.length) * (n - 1));
-    const pt = s.pts[Math.max(0, Math.min(s.pts.length - 1, idx))];
-    return `<circle cx="${pt[0].toFixed(1)}" cy="${pt[1].toFixed(1)}" r="5.5" fill="#fff" stroke="${series[i].color}" stroke-opacity=".8" stroke-width="2"/>`;
-  }).join('');
-  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Weekly inventory flow">${fills}${strokes}${marks}</svg>`;
 }
 function renderCommand() {
   const name = displayName();
@@ -1159,7 +1162,6 @@ function renderCommand() {
       { icon: 'layers', label: 'Analyze WIP cover', go: 'wip_cover' },
       { icon: 'doc', label: 'Create a purchase request', q: 'Which items need a purchase because cover is short and incoming supply will not cover them?' },
     ].map(c => `<button type="button"${c.go ? ` data-go="${c.go}"` : ''}${c.p ? ` data-p="${c.p}"` : ''}${c.q ? ` data-q="${esc(c.q)}"` : ''}>${svg(c.icon, 15)}${esc(c.label)}</button>`).join('')}</div>
-    <div class="cockpit" id="cockpit"><div class="cockpit-metrics" id="cockpitMetrics"></div></div>
     <div class="cockpit-wave" id="cockpitWave"></div>
     <button type="button" class="flow-toggle" id="flowToggle">Inventory flow <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
     </section>`;
@@ -1179,36 +1181,36 @@ function renderCommand() {
   if (!chatting) loadCockpit(); else q.focus();
 }
 async function loadCockpit() {
-  let d = { kpi: [], weekly: [] };
-  try { d = await api('/api/trends'); } catch (e) { d = { kpi: [], weekly: [] }; }
-  const host = document.getElementById('cockpitMetrics');
-  if (S.view !== 'command' || !host) return;
-  const loads = (d.kpi || []).slice().sort((a, b) => String(a.extracted_at).localeCompare(String(b.extracted_at)));
-  const last = loads[loads.length - 1] || {};
-  const rm = Number(last.rm_value) || 0, wip = Number(last.wip_value) || 0, fg = Number(last.fg_value) || 0, tot = rm + wip + fg;
-  const share = v => tot ? `${Math.round(100 * v / tot)}% of total` : '';
-  const cards = [
-    { label: 'Total inventory value', value: moneyRich(tot), share: '' },
-    { label: 'Raw material', value: moneyRich(rm), share: share(rm) },
-    { label: 'Work in progress', value: moneyRich(wip), share: share(wip) },
-    { label: 'Finished goods', value: moneyRich(fg), share: share(fg) },
-  ];
-  host.innerHTML = cards.map(c => `<div><p class="lab">${esc(c.label)}</p><p class="val">${c.value}</p><p class="share">${esc(c.share)}</p></div>`).join('');
-  const by = {};
-  (d.weekly || []).forEach(r => {
-    const w = by[r.week] || (by[r.week] = { c: 0, o: 0, s: 0, r: 0 });
-    w.c += r.consumed_value || 0; w.o += r.output_value || 0; w.s += r.sold_value || 0; w.r += r.received_value || 0;
-  });
-  const weeks = Object.keys(by).sort();
-  const series = [
-    { name: 'Consumption', color: '#7aa6e4', data: weeks.map(w => by[w].c) },
-    { name: 'Output', color: '#67c0bc', data: weeks.map(w => by[w].o) },
-    { name: 'Sales', color: '#b39ae4', data: weeks.map(w => by[w].s) },
-    { name: 'Receipts', color: '#8ec9a6', data: weeks.map(w => by[w].r) },
-  ];
   const wave = document.getElementById('cockpitWave');
-  if (!wave) return;
-  wave.innerHTML = weeks.length ? cockpitWave(series) : '';
+  if (S.view !== 'command' || !wave) return;
+  let feed = { metrics: [], frames: [] };
+  try { feed = await api('/api/cockpit'); } catch (e) { feed = { metrics: [], frames: [] }; }
+  if (S.view !== 'command' || !document.getElementById('cockpitWave')) return;
+  const peaks = [
+    { x: 15.2, y: 39.3, w: 17 },
+    { x: 40.7, y: 47.6, w: 16 },
+    { x: 61.3, y: 44.1, w: 16 },
+    { x: 94.5, y: 39.6, w: 16, edge: 'edge-end' },
+  ];
+  const metrics = feed.metrics || [];
+  wave.innerHTML = `<img src="/static/cockpit-wave.png" alt="Inventory flow">` + peaks.map((p, i) => {
+    const m = metrics[i] || { label: '', value: 0 };
+    return `<div class="wave-metric ${p.edge || ''}" style="left:${p.x}%;top:${p.y}%;width:${p.w}%"><p class="lab">${esc(m.label)}</p><p class="val">${moneyRich(m.value)}</p><div class="wave-delta" data-slot="${i}"></div></div>`;
+  }).join('');
+  const decks = [[], [], [], []];
+  (feed.frames || []).forEach(f => { if (decks[f.slot]) decks[f.slot].push(f); });
+  let step = 0;
+  paintCockpit(decks, step, false);
+  if (S.cockpitTimer) clearInterval(S.cockpitTimer);
+  S.cockpitTimer = setInterval(() => { step += 1; paintCockpit(decks, step, true); }, 5000);
+  api('/api/cockpit/narrate').then(extra => {
+    if (S.view !== 'command') return;
+    (extra.frames || []).forEach(f => {
+      const deck = decks[f.slot];
+      if (!deck || deck.some(x => x.value === f.value && x.vs === f.vs)) return;
+      deck.push(f);
+    });
+  }).catch(() => {});
 }
 
 async function loadInsights() {

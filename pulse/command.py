@@ -402,6 +402,221 @@ def _ask_offline(m, question):
             "table": {**t, "rows": t["rows"][:MAX_ROWS]}}
 
 
+# ---------- Command Center feed: measured comparisons, then optional narration ----------
+_NARRATION = {"key": None, "lines": None}
+
+
+def _kpi_history():
+    path = DATA_DIR / "kpi_history.jsonl"
+    if not path.exists():
+        return []
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    rows.sort(key=lambda r: str(r.get("extracted_at") or ""))
+    return rows
+
+
+def _vs_when(iso):
+    try:
+        dt = datetime.fromisoformat(str(iso)[:10])
+    except ValueError:
+        return "vs last load"
+    return f"vs {dt.day} {dt.strftime('%b')}"
+
+
+def _change(slot, new, old, vs):
+    """A signed percent only when both measurements exist. A flat 0.0% is a real unchanged figure."""
+    if new is None or old is None:
+        return None
+    try:
+        new, old = float(new), float(old)
+    except (TypeError, ValueError):
+        return None
+    if old == 0:
+        return None
+    pct = (new - old) / abs(old) * 100
+    if abs(pct) < 0.05:
+        return {"slot": slot, "dir": "flat", "value": "0.0%", "vs": vs}
+    return {"slot": slot, "dir": "up" if pct > 0 else "down", "value": f"{pct:+.1f}%", "vs": vs}
+
+
+def _info(slot, value, vs):
+    return {"slot": slot, "dir": "info", "value": value, "vs": vs}
+
+
+def cockpit_feed(m):
+    """Four cockpit columns and the rotating comparisons under them. Every figure is measured."""
+    hist = _kpi_history()
+    last = hist[-1] if hist else {}
+    prev = hist[-2] if len(hist) > 1 else None
+    rm = float(last.get("rm_value") or 0)
+    wip = float(last.get("wip_value") or 0)
+    fg = float(last.get("fg_value") or 0)
+    tot = rm + wip + fg
+    when = _vs_when(prev.get("reporting_date") or prev.get("extracted_at")) if prev else None
+    frames = []
+    if prev and when:
+        pairs = [
+            (0, tot, float(prev.get("rm_value") or 0) + float(prev.get("wip_value") or 0) + float(prev.get("fg_value") or 0), when),
+            (1, rm, prev.get("rm_value"), when),
+            (2, wip, prev.get("wip_value"), when),
+            (3, fg, prev.get("fg_value"), when),
+            (0, last.get("high_risk"), prev.get("high_risk"), f"high risk {when}"),
+            (0, last.get("overdue_value"), prev.get("overdue_value"), f"overdue POs {when}"),
+            (0, last.get("high_exceptions"), prev.get("high_exceptions"), f"exceptions {when}"),
+            (0, last.get("out_of_stock"), prev.get("out_of_stock"), f"stockouts {when}"),
+            (2, last.get("constrained"), prev.get("constrained"), f"constrained {when}"),
+            (3, last.get("run_out_7d"), prev.get("run_out_7d"), f"due in 7 days {when}"),
+            (3, last.get("overdue_lines"), prev.get("overdue_lines"), f"overdue lines {when}"),
+        ]
+        for slot, new, old, vs in pairs:
+            frame = _change(slot, new, old, vs)
+            if frame:
+                frames.append(frame)
+    if tot:
+        frames.append(_info(1, f"{round(100 * rm / tot)}%", "of total stock"))
+        frames.append(_info(2, f"{round(100 * wip / tot)}%", "of total stock"))
+        frames.append(_info(3, f"{round(100 * fg / tot)}%", "of total stock"))
+    weekly = m.get("weekly")
+    if weekly is not None and len(weekly):
+        cols = [c for c in ("consumed_value", "output_value", "sold_value", "received_value") if c in weekly.columns]
+        if cols:
+            grouped = weekly.groupby(weekly.week.astype(str))[cols].sum().sort_index()
+            if len(grouped) >= 2:
+                a, b = grouped.iloc[-2], grouped.iloc[-1]
+                week_vs = "vs prior week"
+                mapping = [("consumed_value", 1, "consumption"), ("output_value", 2, "output"),
+                           ("sold_value", 3, "sales"), ("received_value", 0, "receipts")]
+                for col, slot, name in mapping:
+                    if col not in grouped.columns:
+                        continue
+                    frame = _change(slot, b[col], a[col], f"{name} {week_vs}")
+                    if frame:
+                        frames.append(frame)
+    # The value's own change leads each column; later lines rotate into the same seat.
+    lead = []
+    rest = []
+    seen = set()
+    for frame in frames:
+        key = (frame["slot"], frame["value"], frame["vs"])
+        if key in seen:
+            continue
+        seen.add(key)
+        (lead if frame["vs"] == when else rest).append(frame)
+    ordered = []
+    for slot in range(4):
+        ordered += [f for f in lead if f["slot"] == slot]
+        ordered += [f for f in rest if f["slot"] == slot]
+    facts = _fact_sheet(last, prev, tot, rm, wip, fg, ordered)
+    return {
+        "key": str(last.get("extracted_at") or ""),
+        "metrics": [
+            {"label": "Total inventory value", "value": tot},
+            {"label": "Raw material", "value": rm},
+            {"label": "Work in progress", "value": wip},
+            {"label": "Finished goods", "value": fg},
+        ],
+        "frames": ordered,
+        "facts": facts,
+    }
+
+
+def _fact_sheet(last, prev, tot, rm, wip, fg, frames):
+    lines = [f"Latest load {last.get('reporting_date') or last.get('extracted_at') or ''}: "
+             f"total {V.money(tot)}, raw material {V.money(rm)}, work in progress {V.money(wip)}, "
+             f"finished goods {V.money(fg)}."]
+    if prev:
+        lines.append(f"Previous load {prev.get('reporting_date') or ''}: "
+                     f"out of stock {prev.get('out_of_stock')}, run out in 7 days {prev.get('run_out_7d')}, "
+                     f"high risk {prev.get('high_risk')}, overdue lines {prev.get('overdue_lines')}, "
+                     f"overdue {V.money(prev.get('overdue_value') or 0)}, constrained {prev.get('constrained')}, "
+                     f"high exceptions {prev.get('high_exceptions')}.")
+    if last:
+        lines.append(f"Latest counts: out of stock {last.get('out_of_stock')}, "
+                     f"run out in 7 days {last.get('run_out_7d')}, high risk {last.get('high_risk')}, "
+                     f"overdue lines {last.get('overdue_lines')}, overdue {V.money(last.get('overdue_value') or 0)}, "
+                     f"constrained {last.get('constrained')}, high exceptions {last.get('high_exceptions')}.")
+    lines += [f"slot {f['slot']}: {f['value']} {f['vs']}" for f in frames]
+    return "\n".join(lines)
+
+
+def _accept_narration(text, facts):
+    match = re.search(r"\[.*\]", text or "", re.S)
+    if not match:
+        return []
+    try:
+        data = json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return []
+    allowed = set(re.findall(r"\d+(?:\.\d+)?", facts.replace(",", "")))
+    out = []
+    for item in data if isinstance(data, list) else []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            slot = int(item.get("slot"))
+        except (TypeError, ValueError):
+            continue
+        if slot not in (0, 1, 2, 3):
+            continue
+        direction = str(item.get("dir") or "info")
+        if direction not in ("up", "down", "flat", "info"):
+            direction = "info"
+        value = re.sub(r"\s+", " ", str(item.get("value") or "")).strip()[:18]
+        vs = re.sub(r"\s+", " ", str(item.get("vs") or "")).strip()[:42]
+        if not value or not vs:
+            continue
+        numbers = re.findall(r"\d+(?:\.\d+)?", f"{value} {vs}".replace(",", ""))
+        if any(n not in allowed for n in numbers):
+            continue
+        out.append({"slot": slot, "dir": direction, "value": value, "vs": vs})
+        if len(out) >= 4:
+            break
+    return out
+
+
+def cockpit_narration(m):
+    """Extra loop lines from the configured model. Drop any line that introduces a number."""
+    feed = cockpit_feed(m)
+    key = feed["key"]
+    if _NARRATION["key"] == key and _NARRATION["lines"] is not None:
+        return _NARRATION["lines"]
+    lines = []
+    if provider() != "offline" and feed["facts"]:
+        prompt = (
+            "Add up to 4 cockpit lines from these measured facts only. Return a JSON array and nothing else. "
+            "Each item is {\"slot\":0|1|2|3,\"dir\":\"up\"|\"down\"|\"flat\"|\"info\",\"value\":\"16 characters or fewer\","
+            "\"vs\":\"42 characters or fewer\"}. Slot 0 is total inventory, 1 raw material, 2 work in progress, "
+            "3 finished goods. Copy numbers exactly from the facts. Do not invent a count, percent, date, or amount. "
+            "Do not repeat a line already listed.\n\n" + feed["facts"]
+        )
+        try:
+            if provider() == "azure":
+                resp = _azure().chat.completions.create(
+                    model=os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-5.4"),
+                    messages=[{"role": "user", "content": prompt}],
+                    max_completion_tokens=1200)
+                text = resp.choices[0].message.content or ""
+            else:
+                resp = anthropic.Anthropic().messages.create(
+                    model=MODEL, max_tokens=800,
+                    messages=[{"role": "user", "content": prompt}])
+                text = "\n".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+            lines = _accept_narration(text, feed["facts"])
+        except Exception:
+            lines = []
+    known = {(f["slot"], f["value"], f["vs"]) for f in feed["frames"]}
+    lines = [ln for ln in lines if (ln["slot"], ln["value"], ln["vs"]) not in known]
+    _NARRATION["key"] = key
+    _NARRATION["lines"] = lines
+    return lines
+
+
 def _fmt(k):
     v = k["value"]
     if v is None:

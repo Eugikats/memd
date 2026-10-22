@@ -64,6 +64,19 @@ def meta():
                     "ai_model": __import__("os").environ.get("AZURE_OPENAI_DEPLOYMENT", "") if command.provider() == "azure" else ""})
 
 
+@app.get("/api/cockpit")
+def cockpit():
+    """Command Center totals and the measured comparisons that rotate under them."""
+    feed = command.cockpit_feed(STATE["model"])
+    return _json({"key": feed["key"], "metrics": feed["metrics"], "frames": feed["frames"]})
+
+
+@app.get("/api/cockpit/narrate")
+def cockpit_narrate():
+    """Extra comparison lines written from the same facts. Empty when no model is configured."""
+    return _json({"frames": command.cockpit_narration(STATE["model"])})
+
+
 @app.get("/api/insights")
 def insights():
     """Headline insight cards for the Command Center home, from the same governed model."""
