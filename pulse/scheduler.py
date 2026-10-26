@@ -8,6 +8,7 @@ import time
 import traceback
 from datetime import datetime
 
+from . import mail
 from . import reports as R
 
 _started = False
@@ -42,8 +43,23 @@ def tick(state, refresh_fn):
                 e = R.generate(state["model"], sch["report_id"], sch.get("params"), user=sch.get("created_by"),
                                trigger="schedule")
                 sch["last_status"], sch["last_file"] = "ok", e["id"]
+                try:
+                    _entry, path = R.history_file(e["id"])
+                    attachment = None
+                    if path:
+                        attachment = (f"{e['name'].replace(' ', '_')}.xlsx", path.read_bytes(),
+                                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    sch["last_email"] = mail.send(
+                        sch.get("recipients"), f"Scheduled report: {e['name']}",
+                        f"<p>The scheduled report <b>{e['name']}</b> is attached. It was built from the Manufacturing Intelligence Platform data.</p>",
+                        attachment)
+                    mail.notice("reports", f"Report ready: {e['name']}",
+                                f"<p>{e['name']} ran on schedule. {e.get('rows', 0)} rows were saved to report history.</p>")
+                except Exception as ex:
+                    sch["last_email"] = str(ex)[:160]
             except Exception as ex:  # keep the schedule alive; surface the error in the UI
                 sch["last_status"] = f"failed: {ex}"[:200]
+                sch["last_email"] = "not sent"
             sch["last_run"] = now.isoformat(timespec="minutes")
             nr = R.next_run(sch, now)
             sch["next_run"] = nr.isoformat(timespec="minutes") if nr else None

@@ -6,7 +6,8 @@ from datetime import datetime
 from flask import Flask, Response, jsonify, request, send_file, send_from_directory
 
 from pulse import agent as A
-from pulse import command, extract, model
+from pulse import command, documents, extract, model
+from pulse import mail
 from pulse import reports as R
 from pulse import scheduler
 from pulse import views as V
@@ -123,7 +124,8 @@ def item(item_no):
 def ask():
     body = request.get_json(force=True)
     res = command.ask(STATE["model"], body.get("question", "")[:1000], user=current_user(),
-                      history=body.get("history"))
+                      history=body.get("history"), documents=body.get("documents") or [],
+                      emails=body.get("emails") or [])
     return app.response_class(json.dumps(res, default=str), mimetype="application/json")
 
 
@@ -224,6 +226,14 @@ def _refresh(days, trigger="manual", user=None):
         with REFRESH_LOG.open("a", encoding="utf-8") as f:
             f.write(json.dumps(rec) + "\n")
         STATE["refreshing"] = False
+        if rec.get("status") == "ok":
+            from pulse import mail
+            mail.notice("refresh", "Data refresh finished",
+                        "<p>The Business Central load finished. Manufacturing Intelligence Platform is using the new data.</p>")
+        elif rec.get("status") == "failed":
+            from pulse import mail
+            mail.notice("refresh", "Data refresh failed",
+                        f"<p>The Business Central load failed. {rec.get('error', '')}</p>")
 
 
 @app.post("/api/refresh")
@@ -342,6 +352,31 @@ def report_history_download(hid):
                      download_name=f"{e['name'].replace(' ', '_').replace('&', 'and')}_{e['generated_at'][:10]}.xlsx")
 
 
+@app.get("/api/mail/status")
+def mail_status():
+    return _json({"configured": mail.configured(), "prefs": mail.load_prefs()})
+
+
+@app.post("/api/notifications/mail")
+def notification_mail():
+    b = request.get_json(force=True) or {}
+    return _json(mail.save_prefs({"email": b.get("email"), "refresh": b.get("refresh"), "reports": b.get("reports")}))
+
+
+@app.post("/api/documents")
+def document_upload():
+    f = request.files.get("file")
+    if not f:
+        return _json({"error": "Choose a file."}, 400)
+    try:
+        saved = documents.save(f.filename or "upload.txt", f.read())
+    except ValueError as e:
+        return _json({"error": str(e)}, 400)
+    except Exception as e:
+        return _json({"error": f"Could not read that file ({type(e).__name__})."}, 400)
+    return _json(saved)
+
+
 @app.get("/api/schedules")
 def schedules_get():
     s = R.schedules()
@@ -354,10 +389,16 @@ def schedules_get():
 @app.post("/api/schedules/report")
 def schedule_add():
     b = request.get_json(force=True)
-    if b.get("frequency") not in ("daily", "weekdays", "weekly", "monthly"):
+    if b.get("frequency") not in ("daily", "weekdays", "weekly", "monthly", "custom"):
         return _json({"error": "bad frequency"}, 400)
-    return _json(R.add_schedule(b["report_id"], b.get("params"), b["frequency"], b.get("time", "07:00"),
-                                b.get("weekday", 0), b.get("monthday", 1), current_user()))
+    if b.get("frequency") == "custom" and b.get("unit") not in ("hours", "days"):
+        return _json({"error": "custom schedules need a period of hours or days"}, 400)
+    sch = R.add_schedule(b["report_id"], b.get("params"), b["frequency"], b.get("time", "07:00"),
+                         b.get("weekday", 0), b.get("monthday", 1), current_user(),
+                         recipients=b.get("recipients"), every=b.get("every"), unit=b.get("unit"))
+    from pulse import mail
+    sch["mail_configured"] = mail.configured()
+    return _json(sch)
 
 
 @app.post("/api/schedules/report/<sid>")

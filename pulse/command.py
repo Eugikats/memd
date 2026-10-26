@@ -91,6 +91,24 @@ def _tools():
          "input_schema": {"type": "object", "additionalProperties": False, "required": ["report_id"], "properties": {
              "report_id": {"type": "string"},
              "item_class": {"type": "string", "enum": ["RM", "WIP", "FG"]}, "site": {"type": "string"}}}},
+        {"name": "schedule_report",
+         "description": "ACTION: schedule a catalogue report and email the Excel when it runs. "
+                        "Ask for a missing recipient or, for a custom period, the number of hours or days, then call this. "
+                        "Reports: " + "; ".join(f"{c[0]} = {c[1]}" for c in __import__("pulse.reports", fromlist=["x"]).CATALOGUE),
+         "input_schema": {"type": "object", "additionalProperties": False, "required": ["report_id", "frequency", "recipients"],
+                          "properties": {
+                              "report_id": {"type": "string"},
+                              "frequency": {"type": "string", "enum": ["daily", "weekdays", "weekly", "monthly", "custom"]},
+                              "time": {"type": "string"}, "weekday": {"type": "integer"}, "monthday": {"type": "integer"},
+                              "every": {"type": "integer"}, "unit": {"type": "string", "enum": ["hours", "days"]},
+                              "recipients": {"type": "array", "items": {"type": "string"}},
+                              "item_class": {"type": "string", "enum": ["RM", "WIP", "FG"]}, "site": {"type": "string"}}}},
+        {"name": "rebuild_from_upload",
+         "description": "Rebuild an Excel that follows an uploaded spreadsheet's header row. "
+                        "Cells are filled only when a header matches a column from a system view. Unmatched columns stay blank. "
+                        "Never copy numbers out of the upload.",
+         "input_schema": {"type": "object", "additionalProperties": False, "required": ["document_id", "view"],
+                          "properties": {"document_id": {"type": "string"}, "view": {"type": "string"}}}},
         {"name": "get_definitions",
          "description": "Return the documented definition of every measure and the data notes for this load.",
          "input_schema": {"type": "object", "additionalProperties": False, "properties": {}}},
@@ -141,6 +159,28 @@ def run_tool(m, name, args):
         return {"created": r["created"], "markdown": r["markdown"][:6000]}
     if name == "generate_report":
         return A.generate_report(m, args["report_id"], {k: args.get(k) for k in ("item_class", "site") if args.get(k)})
+    if name == "schedule_report":
+        return A.schedule_report(m, args.get("report_id"), args.get("frequency") or "daily", args.get("time") or "07:00",
+                                 int(args.get("weekday") or 0), int(args.get("monthday") or 1), args.get("recipients"),
+                                 args.get("every"), args.get("unit"),
+                                 {k: args.get(k) for k in ("item_class", "site") if args.get(k)})
+    if name == "rebuild_from_upload":
+        from . import documents
+        from . import reports as R
+        built = documents.fill_layout(m, args.get("document_id"), args.get("view"))
+        if built.get("error"):
+            return built
+        hid = __import__("uuid").uuid4().hex[:10]
+        R.FILES.mkdir(parents=True, exist_ok=True)
+        (R.FILES / f"{hid}.xlsx").write_bytes(built["bytes"])
+        entry = {"id": hid, "report_id": "upload", "name": "Upload layout", "params": {"view": args.get("view")},
+                 "generated_at": R.now().isoformat(timespec="seconds"), "by": "Pulse agent", "trigger": "upload",
+                 "rows": built["rows"], "data_loaded": ""}
+        hist = R._read(R.HISTORY, [])
+        R._write(R.HISTORY, ([entry] + hist)[:500])
+        return {"history_id": hid, "matched": built["matched"], "unmatched": built["unmatched"],
+                "view": built["view"], "rows": built["rows"],
+                "note": "Blank columns had no matching system field. No upload number was copied."}
     if name == "get_definitions":
         n = dict(m["notes"])
         n.pop("reconciliation", None)
@@ -160,11 +200,17 @@ def _system(m):
             "figures (a compact markdown table when listing items), then one line starting 'Basis:' naming the "
             "view(s) and measure definitions used.\n\n"
             "You are also an agent. When the user asks you to DO something (chase suppliers, plan transfers, set an "
-            "alert, watch items, prepare a briefing, show a dashboard), plan the steps, gather the evidence with the "
-            "read tools first, then call the ACTION tools. Action tools only create proposals inside Pulse for a "
-            "person to approve - never say anything was sent, posted or changed in Business Central. After acting, "
-            "summarise what you created and what the user should review. Use open_dashboard when showing a view "
-            "would help.\n\n" + GLOSSARY)
+            "alert, watch items, prepare a briefing, generate a report, or schedule a report), plan the steps, gather the "
+            "evidence with the read tools first, then call the ACTION tools. To schedule a report, call schedule_report "
+            "with the catalogue id, how often it should run, and the recipient addresses. If the time, custom period, or "
+            "recipient is missing, ask for that one detail and do not invent an address. Action tools only create proposals "
+            "or schedules inside Pulse for a person to approve or receive — never say anything was sent, posted or changed "
+            "in Business Central. After acting, summarise what you created and what the user should review. Use open_dashboard "
+            "when showing a view would help.\n\n"
+            "An uploaded document, when present, is layout and wording only. Inventory, cover, value, and order figures "
+            "come only from your tools. If a number in the document disagrees with a tool result, say so and use the tool "
+            "result. rebuild_from_upload may copy the document's column headings and fill only the headings that match a "
+            "system view; it must not copy the document's numbers.\n\n" + GLOSSARY)
 
 
 def _audit(rec):
@@ -201,14 +247,28 @@ def _azure():
     return _azure_client
 
 
-def _ask_azure(m, question, history):
+def _prompt_question(question, documents=None, emails=None):
+    from . import documents as docs
+    bits = []
+    known = [e for e in (emails or []) if e]
+    if known:
+        bits.append("Known email addresses for this user: " + ", ".join(known[:20]) + ". Use one of these when they say to email them, unless they give another address.")
+    block = docs.context_block(documents)
+    if block:
+        bits.append(block)
+    if not bits:
+        return question
+    return question + "\n\n" + "\n\n".join(bits)
+
+
+def _ask_azure(m, question, history, documents=None, emails=None):
     client = _azure()
     deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-5.4")
     tools = [{"type": "function", "function": {"name": t["name"], "description": t["description"],
                                                "parameters": t["input_schema"]}} for t in _tools()]
     messages = [{"role": "system", "content": _system(m)}]
     messages += [{"role": h["role"], "content": h["content"]} for h in history[-6:]]
-    messages.append({"role": "user", "content": question})
+    messages.append({"role": "user", "content": _prompt_question(question, documents, emails)})
     calls, last_view, actions, ui, steps = [], None, [], None, []
     for _ in range(12):
         resp = client.chat.completions.create(model=deployment, messages=messages, tools=tools,
@@ -233,8 +293,9 @@ def _ask_azure(m, question, history):
             steps.append({"label": STEP_LABELS.get(name, name), "detail": _brief(args)})
             if name == "query_view" and isinstance(out, dict) and out.get("tables"):
                 last_view = out["tables"][0]
-            if isinstance(out, dict) and out.get("created"):
-                actions += out["created"]
+            created = out.get("created") if isinstance(out, dict) else None
+            if isinstance(created, list):
+                actions += created
             if name == "open_dashboard" and "opened" in out:
                 ui = {"view": out["opened"], "filters": {"item_class": out["filters"].get("item_class"),
                                                          "site": out["filters"].get("site"),
@@ -244,22 +305,25 @@ def _ask_azure(m, question, history):
             "table": last_view, "steps": steps, "actions": actions, "ui": ui}
 
 
-def ask(m, question, user="demo", history=None):
+def ask(m, question, user="demo", history=None, documents=None, emails=None):
     rec = {"at": datetime.now().isoformat(timespec="seconds"), "user": user, "question": question}
     if provider() == "azure":
         try:
-            res = _ask_azure(m, question, history or [])
+            res = _ask_azure(m, question, history or [], documents, emails)
         except Exception as e:  # network/auth/quota: fall back so the user still gets an answer
-            res = _ask_offline(m, question)
+            res = _ask_offline(m, question, emails)
             res["answer"] = f"_Azure OpenAI unavailable ({type(e).__name__}: {str(e)[:160]}); offline answer:_\n\n" + res["answer"]
     elif os.environ.get("ANTHROPIC_API_KEY"):
         try:
-            res = _ask_claude(m, question, history or [])
+            res = _ask_claude(m, question, history or [], documents, emails)
         except anthropic.APIError as e:
-            res = _ask_offline(m, question)
+            res = _ask_offline(m, question, emails)
             res["answer"] = f"_Claude unavailable ({type(e).__name__}); offline answer:_\n\n" + res["answer"]
     else:
-        res = _ask_offline(m, question)
+        res = _ask_offline(m, question, emails)
+    if documents and res.get("mode") in ("offline", "agent"):
+        res["answer"] += ("\n\nAny numbers in the uploaded file were not used. "
+                          "The figures above come from the system.")
     res.setdefault("steps", [{"label": STEP_LABELS.get(c["tool"], c["tool"]), "detail": _brief(c.get("input"))}
                              for c in res["tool_calls"]])
     res.setdefault("actions", [])
@@ -282,13 +346,14 @@ STEP_LABELS = {"query_view": "Queried view", "get_item": "Looked up item", "find
                "get_definitions": "Read definitions", "open_dashboard": "Opened dashboard",
                "draft_vendor_expedite": "Drafted vendor expedite messages", "propose_transfers": "Proposed transfer plan",
                "create_alert": "Proposed alert rule", "watch_items": "Updated watchlist",
-               "generate_briefing": "Wrote management briefing", "generate_report": "Generated Excel report"}
+               "generate_briefing": "Wrote management briefing", "generate_report": "Generated Excel report",
+               "schedule_report": "Scheduled a report", "rebuild_from_upload": "Rebuilt a report from the upload"}
 
 
-def _ask_claude(m, question, history):
+def _ask_claude(m, question, history, documents=None, emails=None):
     client = anthropic.Anthropic()
     messages = [{"role": h["role"], "content": h["content"]} for h in history[-6:]]
-    messages.append({"role": "user", "content": question})
+    messages.append({"role": "user", "content": _prompt_question(question, documents, emails)})
     calls, last_view, actions, ui, steps = [], None, [], None, []
     for _ in range(12):
         resp = client.beta.messages.create(
@@ -311,8 +376,9 @@ def _ask_claude(m, question, history):
             steps.append({"label": STEP_LABELS.get(u.name, u.name), "detail": _brief(u.input)})
             if u.name == "query_view" and "tables" in out and out["tables"]:
                 last_view = out["tables"][0]
-            if isinstance(out, dict) and out.get("created"):
-                actions += out["created"]
+            created = out.get("created") if isinstance(out, dict) else None
+            if isinstance(created, list):
+                actions += created
             if u.name == "open_dashboard":
                 ui = {"view": out["opened"], "filters": {"item_class": out["filters"].get("item_class"),
                                                          "site": out["filters"].get("site"),
@@ -340,6 +406,7 @@ ROUTES = [
 
 
 INTENTS = [
+    (r"schedul", "schedule"),
     (r"brief|write (a|the|today)", "briefing"),
     (r"\b(excel|export|spreadsheet|report)\b", "report"),
     (r"chase|expedite|follow.?up|email|write to (the )?(vendor|supplier)|remind (the )?(vendor|supplier)", "expedite"),
@@ -360,14 +427,27 @@ def run_playbook(m, name, user="demo", args=None):
     return res
 
 
-def _ask_offline(m, question):
+def _schedule_hint(question, emails):
+    found = re.findall(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}", question)
+    if not found and re.search(r"\b(me|my email)\b", question, re.I):
+        found = list(emails or [])
+    every = re.search(r"every\s+(\d+)\s*(hour|day)", question, re.I)
+    clock = re.search(r"\b(\d{1,2}:\d{2})\b", question)
+    freq = "custom" if every else "weekdays" if re.search(r"weekday", question, re.I) else "weekly" if re.search(r"week", question, re.I) else "monthly" if re.search(r"month", question, re.I) else "daily"
+    return {"recipients": found, "frequency": freq, "every": int(every.group(1)) if every else None,
+            "unit": "hours" if every and every.group(2).lower().startswith("hour") else "days" if every else None,
+            "time": clock.group(1) if clock else "07:00"}
+
+
+def _ask_offline(m, question, emails=None):
     q = question.lower()
     for pat, pb in INTENTS:
         if re.search(pat, q):
             site = re.search(r"ship\s?(\d)", q)
             cls = "RM" if re.search(r"raw material|\brm\b", q) else "FG" if re.search(r"finished|\bfg\b", q) else None
+            extra = _schedule_hint(question, emails) if pb == "schedule" else {}
             r = A.run_playbook(m, pb, {"site": f"SHIP {site.group(1)}" if site else None, "item_class": cls,
-                                       "text": question})
+                                       "text": question, **extra})
             return {"mode": "agent", "answer": r["answer"], "tool_calls": [{"tool": "playbook", "input": {"name": pb}}],
                     "table": None, "steps": r["steps"], "actions": r["actions"], "ui": r["ui"]}
     item = re.search(r"\b([a-z]{2}-\d{5})\b", q)

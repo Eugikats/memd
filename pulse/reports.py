@@ -472,25 +472,37 @@ def save_schedules(s):
 
 def next_run(sch, after=None):
     after = after or now()
-    hh, mm = (int(x) for x in sch.get("time", "07:00").split(":"))
+    hh, mm = (int(x) for x in (sch.get("time") or "07:00").split(":")[:2])
+    freq = sch.get("frequency", "daily")
+    if freq == "custom" and (sch.get("unit") or "days") == "hours":
+        every = max(1, min(int(sch.get("every") or 1), 24 * 30))
+        return after + timedelta(hours=every)
+    step = 1
+    if freq == "custom":
+        step = max(1, min(int(sch.get("every") or 1), 365))
     cand = after.replace(hour=hh, minute=mm, second=0, microsecond=0)
+    if cand <= after:
+        cand += timedelta(days=step)
     for _ in range(400):
-        if cand > after:
-            f = sch.get("frequency", "daily")
-            if (f == "daily" or (f == "weekdays" and cand.weekday() < 5)
-                    or (f == "weekly" and cand.weekday() == int(sch.get("weekday", 0)))
-                    or (f == "monthly" and cand.day == int(sch.get("monthday", 1)))):
-                return cand
-        cand += timedelta(days=1)
+        if cand > after and (freq in ("daily", "custom")
+                             or (freq == "weekdays" and cand.weekday() < 5)
+                             or (freq == "weekly" and cand.weekday() == int(sch.get("weekday", 0)))
+                             or (freq == "monthly" and cand.day == int(sch.get("monthday", 1)))):
+            return cand
+        cand += timedelta(days=1 if freq != "custom" else step)
     return None
 
 
-def add_schedule(report_id, params, frequency, time_, weekday=0, monthday=1, user=None):
+def add_schedule(report_id, params, frequency, time_, weekday=0, monthday=1, user=None, recipients=None, every=None, unit=None):
+    from . import mail
     s = schedules()
     sch = {"id": uuid.uuid4().hex[:8], "report_id": report_id, "params": params or {}, "frequency": frequency,
            "time": time_, "weekday": int(weekday), "monthday": int(monthday), "enabled": True,
-           "created_by": user, "last_run": None}
-    sch["next_run"] = next_run(sch).isoformat(timespec="minutes")
+           "created_by": user, "last_run": None, "recipients": mail.clean_recipients(recipients),
+           "every": int(every) if frequency == "custom" and every else None,
+           "unit": unit if frequency == "custom" and unit in ("hours", "days") else None}
+    nxt = next_run(sch)
+    sch["next_run"] = nxt.isoformat(timespec="minutes") if nxt else None
     s["reports"].append(sch)
     save_schedules(s)
     return sch

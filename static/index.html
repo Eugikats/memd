@@ -242,7 +242,8 @@ body.assist-open .assist-fab { display: none; }
 .sched-form { margin-bottom: 12px; }
 .print-head { display: none; }
 .builder { display: grid; grid-template-columns: 340px 1fr; gap: 14px; align-items: start; }
-.bform { display: flex; flex-direction: column; gap: 8px; position: sticky; top: 76px; max-height: calc(100vh - 96px); overflow-y: auto; }
+.bform { display: flex; flex-direction: column; gap: 0; position: sticky; top: 76px; max-height: calc(100vh - 240px); overflow: hidden; padding: 0; }
+.bform-scroll { flex: 1 1 auto; overflow: auto; min-height: 0; padding: 14px 14px 8px; display: flex; flex-direction: column; gap: 8px; }
 .bform label { font-size: 12px; color: var(--text-secondary); font-weight: 500; display: flex; flex-direction: column; gap: 4px; }
 .bform select, .bform input { background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border-strong); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 13px; min-width: 0; }
 .bform .chk { flex-direction: row; align-items: center; gap: 6px; font-weight: 400; color: var(--text-primary); }
@@ -252,10 +253,18 @@ body.assist-open .assist-fab { display: none; }
 .seg { display: flex; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; }
 .seg button { flex: 1; border: 0; background: var(--surface-1); padding: 7px; cursor: pointer; color: var(--text-secondary); font-size: 13px; }
 .seg button.on { background: var(--accent); color: #fff; }
-.bbtns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; } .bbtns .btn { display: inline-flex; gap: 5px; align-items: center; }
+.bbtns { display: flex; gap: 6px; flex-wrap: wrap; flex: none; margin: 0; padding: 10px 14px 14px; background: var(--surface-1); border-top: 1px solid var(--border); } .bbtns .btn { display: inline-flex; gap: 5px; align-items: center; }
 .chk { display: inline-flex; gap: 5px; align-items: center; font-size: 13px; cursor: pointer; }
 .banner { background: var(--surface-1); border: 1px solid var(--border); border-left: 4px solid var(--warning); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 13px; }
 @media (max-width: 900px) { .builder { grid-template-columns: 1fr; } .bform { position: static; max-height: none; } }
+.mail-picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.mail-picks label { display: inline-flex; gap: 5px; align-items: center; font-size: 12px; font-weight: 500; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px 8px; background: #fff; }
+.ask-file { width: 34px; height: 34px; border: 0; background: transparent; color: #64748b; cursor: pointer; display: grid; place-items: center; flex: none; }
+.ask-file:hover { color: #1769FF; }
+.ask-docs { display: flex; flex-wrap: wrap; gap: 6px; width: min(720px, 100%); }
+.ask-docs:empty { display: none; }
+.ask-docs button { border: 1px solid #e2e8f0; background: #fff; border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+th .colf { display: block; width: 100%; max-width: 9rem; margin-top: 4px; font: inherit; font-size: 11px; font-weight: 500; }
 @media print {
   .rail, .topbar, .filters, .vhead .rbtns, .vhead button, .inv-actions, #schedBox, .pager, [data-csv], .drawer, .assist-fab, .assist-mask { display: none !important; }
   body, html { background: #fff; } main { padding: 0; } .app { display: block; }
@@ -710,13 +719,14 @@ body.page-inv .tablehead.inv-tablehead .rbtns { width: auto; }
       <div class="hero-rule"></div>
       <div class="assist-recent" id="assistRecent" hidden></div>
       <div class="thread" id="assistThread"></div>
-      <div class="askbox"><svg class="spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M10 3l1.6 4.4L16 9l-4.4 1.6L10 15l-1.6-4.4L4 9l4.4-1.6z"/><path d="M18 13l.8 2.2L21 16l-2.2.8L18 19l-.8-2.2L15 16l2.2-.8zM17 3l.5 1.5L19 5l-1.5.5L17 7l-.5-1.5L15 5l1.5-.5z"/></svg><input id="assistQ" placeholder="Ask anything..." autocomplete="off"><button class="send" id="assistSend" title="Ask" disabled><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
+      <div class="askbox"><button type="button" class="ask-file" id="assistAttach" title="Attach a document" aria-label="Attach a document"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.6 12.7 20.3a5 5 0 0 1-7.1-7.1l8.5-8.5a3.5 3.5 0 0 1 5 5L10.4 18.4a2 2 0 0 1-2.8-2.8l7.8-7.8"/></svg></button><input id="assistFile" type="file" accept=".xlsx,.xlsm,.csv,.txt,.docx,.pptx" hidden><svg class="spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M10 3l1.6 4.4L16 9l-4.4 1.6L10 15l-1.6-4.4L4 9l4.4-1.6z"/><path d="M18 13l.8 2.2L21 16l-2.2.8L18 19l-.8-2.2L15 16l2.2-.8zM17 3l.5 1.5L19 5l-1.5.5L17 7l-.5-1.5L15 5l1.5-.5z"/></svg><input id="assistQ" placeholder="Ask anything..." autocomplete="off"><button class="send" id="assistSend" title="Ask" disabled><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
+      <div class="ask-docs" id="assistDocs"></div>
     </section>
   </div>
 </div>
 
 <script>
-const S = { meta: null, view: null, filters: { item_class: '', site: '', location: '', q: '' }, charts: [], history: [], thread: [], chatId: null, chats: [], settings: 'profile' };
+const S = { meta: null, view: null, filters: { item_class: '', site: '', location: '', q: '' }, charts: [], history: [], thread: [], chatId: null, chats: [], settings: 'profile', uploads: [] };
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const CLASS = { RM: '--series-1', WIP: '--series-2', FG: '--series-3', 'Raw Material': '--series-1', 'Work in Progress': '--series-2', 'Finished Goods': '--series-3' };
 const STATUS = [
@@ -920,6 +930,42 @@ function notesPref() {
 function saveNotes(p) { localStorage.setItem('pulse-notes', JSON.stringify(p)); }
 function seatList() { const v = readStore('pulse-seats', []); return Array.isArray(v) ? v : []; }
 function saveSeats(list) { localStorage.setItem('pulse-seats', JSON.stringify(list)); }
+function knownEmails() {
+  const list = [];
+  const mine = (profile().email || '').trim();
+  if (mine) list.push(mine);
+  seatList().forEach(s => { if (s.email) list.push(String(s.email).trim()); });
+  return [...new Set(list.filter(Boolean))];
+}
+function syncMailPrefs() {
+  const p = notesPref();
+  api('/api/notifications/mail', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: profile().email, refresh: !!p.refresh, reports: !!p.reports }) }).catch(() => {});
+}
+function paintUploads() {
+  ['heroDocs', 'assistDocs'].forEach(id => {
+    const box = document.getElementById(id);
+    if (!box) return;
+    box.innerHTML = (S.uploads || []).map(d => `<button type="button" data-drop="${esc(d.id)}">${esc(d.name)} ×</button>`).join('');
+    box.querySelectorAll('[data-drop]').forEach(b => b.onclick = () => { S.uploads = S.uploads.filter(d => d.id !== b.dataset.drop); paintUploads(); });
+  });
+}
+async function takeUpload(file) {
+  if (!file) return;
+  const body = new FormData();
+  body.append('file', file);
+  const res = await fetch('/api/documents', { method: 'POST', body });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) { window.alert(data.error || 'Could not read that file.'); return; }
+  S.uploads = [...(S.uploads || []).filter(d => d.id !== data.id), data].slice(-4);
+  paintUploads();
+}
+function bindUpload(buttonId, inputId) {
+  const button = document.getElementById(buttonId), input = document.getElementById(inputId);
+  if (!button || !input || button.dataset.bound) return;
+  button.dataset.bound = '1';
+  button.onclick = () => input.click();
+  input.onchange = () => { const file = input.files && input.files[0]; input.value = ''; takeUpload(file); };
+}
 function applyIdentity() {
   const name = displayName();
   const av = document.getElementById('railAvatar'), nm = document.getElementById('railName'), top = document.getElementById('topAvatar');
@@ -1052,6 +1098,7 @@ function bindAssist() {
   document.getElementById('assistNew').innerHTML = svg('plus', 16);
   document.getElementById('assistClose').innerHTML = svg('x', 16);
   armComposer(document.getElementById('assistQ'), document.getElementById('assistSend'), 'popup');
+  bindUpload('assistAttach', 'assistFile');
   document.getElementById('assistFab').onclick = openAssist;
   document.getElementById('assistClose').onclick = closeAssist;
   document.getElementById('assistNew').onclick = () => newChat();
@@ -1061,7 +1108,7 @@ function bindAssist() {
   syncAssist();
 }
 function newChat() {
-  S.chatId = null; S.history = []; S.thread = [];
+  S.chatId = null; S.history = []; S.thread = []; S.uploads = [];
   document.getElementById('rail').classList.remove('peek');
   paintChats();
   const assist = document.getElementById('assistThread');
@@ -1069,6 +1116,7 @@ function newChat() {
   const heroThread = document.getElementById('heroThread');
   if (heroThread) heroThread.replaceChildren();
   syncAssist();
+  paintUploads();
   if (S.view === 'command') renderCommand();
   if (document.body.classList.contains('assist-open')) openAssist();
 }
@@ -1197,6 +1245,7 @@ function paintProfile(body) {
     <button type="button" class="set-save" id="pfSave">Save profile</button> <span class="set-ok" id="pfOk" hidden>Saved</span>`;
   document.getElementById('pfSave').onclick = () => {
     saveProfile({ fullName: document.getElementById('pfName').value.trim(), jobTitle: document.getElementById('pfJob').value.trim(), department: document.getElementById('pfDept').value.trim(), phone: document.getElementById('pfPhone').value.trim(), timezone: document.getElementById('pfTz').value.trim(), email: document.getElementById('pfEmail').value.trim() });
+    syncMailPrefs();
     const ok = document.getElementById('pfOk'); ok.hidden = false;
     if (S.view === 'command' || S.view === 'inventory_position') go(S.view, true);
   };
@@ -1229,14 +1278,14 @@ function paintSecurity(body) {
 function paintNotifications(body) {
   const p = notesPref();
   const paused = p.pausedUntil && new Date(p.pausedUntil) > new Date();
-  body.innerHTML = `<div class="set-card"><h4>${paused ? 'Notifications paused' : 'Notifications on'}</h4><p class="set-note">${paused ? 'Paused until ' + esc(new Date(p.pausedUntil).toLocaleString()) + '.' : 'In-app preferences are saved in this browser. Manufacturing Intelligence Platform does not send email from here.'}</p>
+  body.innerHTML = `<div class="set-card"><h4>${paused ? 'Notifications paused' : 'Notifications on'}</h4><p class="set-note" id="mailNote">${paused ? 'Paused until ' + esc(new Date(p.pausedUntil).toLocaleString()) + '.' : 'Checking email delivery…'}</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="set-ghost" data-pause="1">Pause 1 hour</button><button type="button" class="set-ghost" data-pause="tomorrow">Until tomorrow 8:00</button><button type="button" class="set-ghost" data-pause="clear">Resume</button></div></div>
     <nav class="set-tabs">${[['receive', 'What you receive'], ['schedule', 'Delivery schedule'], ['postponed', 'Postponed']].map(([id, label]) => `<button type="button" data-ntab="${id}" class="${noteTab === id ? 'on' : ''}">${label}</button>`).join('')}</nav>
     <div id="notePane"></div>`;
   const pane = body.querySelector('#notePane');
   if (noteTab === 'receive') {
     pane.innerHTML = NOTE_CATS.map(([id, label, hint]) => `<div class="set-row"><div><b>${esc(label)}</b><div class="set-note">${esc(hint)}</div></div><button type="button" class="set-switch${p[id] ? ' on' : ''}" data-note="${id}" aria-pressed="${p[id]}"><i></i></button></div>`).join('');
-    pane.querySelectorAll('[data-note]').forEach(b => b.onclick = () => { const n = notesPref(); n[b.dataset.note] = !n[b.dataset.note]; saveNotes(n); paintNotifications(body); });
+    pane.querySelectorAll('[data-note]').forEach(b => b.onclick = () => { const n = notesPref(); n[b.dataset.note] = !n[b.dataset.note]; saveNotes(n); syncMailPrefs(); paintNotifications(body); });
   } else if (noteTab === 'schedule') {
     pane.innerHTML = `<div class="set-row"><div><b>Quiet hours</b><div class="set-note">Hold in-app reminders between these times.</div></div><button type="button" class="set-switch${p.quiet ? ' on' : ''}" id="quietSw" aria-pressed="${p.quiet}"><i></i></button></div>
       <div style="display:flex;gap:10px;max-width:360px"><label class="set-field" style="flex:1"><span>From</span><input id="qFrom" type="time" value="${esc(p.from)}"></label><label class="set-field" style="flex:1"><span>To</span><input id="qTo" type="time" value="${esc(p.to)}"></label></div>
@@ -1244,7 +1293,7 @@ function paintNotifications(body) {
     pane.querySelector('#quietSw').onclick = () => { const n = notesPref(); n.quiet = !n.quiet; saveNotes(n); paintNotifications(body); };
     pane.querySelector('#qSave').onclick = () => { const n = notesPref(); n.from = document.getElementById('qFrom').value; n.to = document.getElementById('qTo').value; saveNotes(n); };
   } else {
-    pane.innerHTML = `<div class="set-card"><h4>Nothing postponed</h4><p class="set-note">Manufacturing Intelligence Platform keeps notification choices in this browser. There is no held-email queue.</p></div>`;
+    pane.innerHTML = `<div class="set-card"><h4>Email follows the schedule</h4><p class="set-note">A finished scheduled report and a finished data refresh can email the address on your profile when those switches are on. There is no separate held-mail queue.</p></div>`;
   }
   body.querySelectorAll('[data-ntab]').forEach(b => b.onclick = () => { noteTab = b.dataset.ntab; paintNotifications(body); });
   body.querySelectorAll('[data-pause]').forEach(b => b.onclick = () => {
@@ -1252,8 +1301,15 @@ function paintNotifications(body) {
     if (b.dataset.pause === 'clear') n.pausedUntil = '';
     else if (b.dataset.pause === '1') n.pausedUntil = new Date(Date.now() + 3600000).toISOString();
     else { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(8, 0, 0, 0); n.pausedUntil = d.toISOString(); }
-    saveNotes(n); paintNotifications(body);
+    saveNotes(n); syncMailPrefs(); paintNotifications(body);
   });
+  api('/api/mail/status').then(s => {
+    const note = body.querySelector('#mailNote');
+    if (!note || (notesPref().pausedUntil && new Date(notesPref().pausedUntil) > new Date())) return;
+    note.textContent = s.configured
+      ? 'Scheduled reports email the addresses you choose. Data-refresh and report notices also go to the email on your profile when those switches are on.'
+      : 'Schedules still save the Excel in History. Email is not configured on this workspace yet, so messages are not sent.';
+  }).catch(() => {});
 }
 async function paintUsage(body) {
   body.innerHTML = '<p class="set-note">Loading usage…</p>';
@@ -1474,11 +1530,14 @@ function renderCommand() {
     <h1>${greeting()}${name ? `, <span>${esc(name)}</span>.` : ''}</h1>
     <div class="hero-rule"></div>
     <div class="thread" id="heroThread"></div>
-    <div class="askbox">${I.spark}<input id="q" placeholder="Ask anything..." autocomplete="off"><button class="send" id="send" title="Ask" disabled>${I.up}</button></div>
+    <div class="askbox"><button type="button" class="ask-file" id="heroAttach" title="Attach a document" aria-label="Attach a document"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.6 12.7 20.3a5 5 0 0 1-7.1-7.1l8.5-8.5a3.5 3.5 0 0 1 5 5L10.4 18.4a2 2 0 0 1-2.8-2.8l7.8-7.8"/></svg></button><input id="heroFile" type="file" accept=".xlsx,.xlsm,.csv,.txt,.docx,.pptx" hidden>${I.spark}<input id="q" placeholder="Ask anything..." autocomplete="off"><button class="send" id="send" title="Ask" disabled>${I.up}</button></div>
+    <div class="ask-docs" id="heroDocs"></div>
     <div class="cockpit-wave" id="cockpitWave"></div>
     <button type="button" class="flow-toggle" id="flowToggle">Inventory flow <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
     </section>`;
   armComposer(document.getElementById('q'), document.getElementById('send'), 'hero');
+  bindUpload('heroAttach', 'heroFile');
+  paintUploads();
   document.getElementById('flowToggle').onclick = () => go('trends');
   if (chatting) mirrorThreads(document.body.classList.contains('assist-open') ? 'assist' : 'hero');
   else loadCockpit();
@@ -1548,7 +1607,7 @@ async function ask(text, playbook, origin) {
   syncAssist();
   const r = playbook
     ? await api('/api/playbook/' + playbook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-    : await api('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, history: S.history }) });
+    : await api('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, history: S.history, documents: (S.uploads || []).map(d => d.id), emails: knownEmails() }) });
   S.history.push({ role: 'user', content: text }, { role: 'assistant', content: r.answer });
   persistChat();
   pending.forEach(a => renderAgentResult(a, r));
@@ -3065,13 +3124,21 @@ function renderTable(el, t, opts = {}) {
   const inv = opts.variant === 'inventory';
   const num = k => ['qty', 'money', 'days'].includes(k);
   const valueCol = (t.columns || []).find(c => c && c.kind === 'money') || (t.columns || []).find(c => c && num(c.kind)) || (t.columns || []).find(c => c && c.field) || null;
-  const st = { sort: valueCol ? valueCol.field : null, dir: -1, page: 0, size: opts.size || (inv ? 10 : 50), q: '', colsOpen: false };
+  const st = { sort: valueCol ? valueCol.field : null, dir: -1, page: 0, size: opts.size || (inv ? 10 : 50), q: '', colsOpen: false, colFilter: {} };
   const hidden = new Set();
   const barCols = (inv || t.bars === false) ? [] : t.columns.filter(c => c.kind === 'money' || (c.kind === 'qty' && !/days|line|parent|component/i.test(c.label))).map(c => c.field);
   const maxOf = {}; barCols.forEach(f => maxOf[f] = Math.max(1e-9, ...t.rows.map(r => Math.abs(r[f] || 0))));
   const toneOf = v => /healthy|ready|on time|made to order/i.test(v || '') ? 'good' : /excess|no movement|^low$/i.test(v || '') ? 'warn' : /stockout|critical|high/i.test(v || '') ? 'bad' : '';
   const draw = () => {
-    let rows = t.rows.slice();
+    const valuesOf = (field, except) => {
+      const base = t.rows.filter(r => Object.entries(st.colFilter).every(([f, v]) => !v || f === except || String(r[f] ?? '') === v));
+      return [...new Set(base.map(r => r[field]).filter(v => v != null && String(v) !== ''))].map(String);
+    };
+    const repeated = new Set(t.columns.filter(c => {
+      const all = [...new Set(t.rows.map(r => r[c.field]).filter(v => v != null && String(v) !== ''))];
+      return all.length > 1 && all.length < t.rows.length && all.length <= 40;
+    }).map(c => c.field));
+    let rows = t.rows.filter(r => Object.entries(st.colFilter).every(([f, v]) => !v || String(r[f] ?? '') === v));
     const cols = t.columns.filter(c => !inv || !hidden.has(c.field));
     if (st.sort) { const f = st.sort; rows.sort((a, b) => { const x = a[f], y = b[f]; if (x == null) return 1; if (y == null) return -1; return (x > y ? 1 : x < y ? -1 : 0) * st.dir; }); }
     if (inv && st.q) { const q = st.q.toLowerCase(); rows = rows.filter(r => t.columns.some(c => String(r[c.field] ?? '').toLowerCase().includes(q))); }
@@ -3113,9 +3180,10 @@ function renderTable(el, t, opts = {}) {
     const pager = inv
       ? `<div class="pager inv-pager"><button type="button" class="btn" data-p="-1" ${st.page === 0 ? 'disabled' : ''}>‹ Prev</button>${pgBtns.join('')}<button type="button" class="btn" data-p="1" ${st.page >= pages - 1 ? 'disabled' : ''}>Next ›</button><label class="rpp">Rows per page <select data-size>${[10, 25, 50].map(n => `<option value="${n}" ${st.size === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>`
       : (pages > 1 ? `<div class="pager"><button class="btn" data-p="-1">‹ Prev</button> Page ${st.page + 1} of ${pages} · ${rows.length.toLocaleString()} rows <button class="btn" data-p="1">Next ›</button></div>` : '');
-    el.innerHTML = `${head}<div class="tablewrap"><table><thead><tr>${cols.map(c => `<th class="${num(c.kind) ? 'num' : ''}" data-f="${c.field}">${esc(c.label)}${st.sort === c.field ? (st.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead>
+    el.innerHTML = `${head}<div class="tablewrap"><table><thead><tr>${cols.map(c => `<th class="${num(c.kind) ? 'num' : ''}" data-f="${c.field}"><span>${esc(c.label)}${st.sort === c.field ? (st.dir > 0 ? ' ▲' : ' ▼') : ''}</span>${repeated.has(c.field) ? `<select class="colf" data-cf="${esc(c.field)}"><option value="">All</option>${valuesOf(c.field, c.field).map(v => `<option value="${esc(v)}" ${st.colFilter[c.field] === v ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>` : ''}</th>`).join('')}</tr></thead>
       <tbody>${slice.map(r => `<tr class="${t.drill === 'item_no' && r.item_no ? 'click' : ''}" data-i="${esc(r.item_no || '')}">${cols.map(c => `<td class="${num(c.kind) ? 'num' : ''}"${bg(r, c)} title="${esc(r[c.field])}">${cell(r, c)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length}" class="muted">No rows match.</td></tr>`}</tbody></table></div>${pager}`;
-    el.querySelectorAll('th').forEach(th => th.onclick = () => { const f = th.dataset.f; if (!f) return; st.dir = st.sort === f ? -st.dir : (num(t.columns.find(c => c.field === f).kind) ? -1 : 1); st.sort = f; draw(); });
+    el.querySelectorAll('th').forEach(th => th.onclick = ev => { if (ev.target.closest('.colf')) return; const f = th.dataset.f; if (!f) return; st.dir = st.sort === f ? -st.dir : (num(t.columns.find(c => c.field === f).kind) ? -1 : 1); st.sort = f; draw(); });
+    el.querySelectorAll('.colf').forEach(sel => { sel.onclick = ev => ev.stopPropagation(); sel.onchange = () => { st.colFilter[sel.dataset.cf] = sel.value; st.page = 0; draw(); }; });
     const sortBtn = el.querySelector('[data-sort-toggle]');
     if (sortBtn) sortBtn.onclick = ev => { ev.stopPropagation(); st.dir = -(st.dir || -1); if (!st.sort && valueCol) st.sort = valueCol.field; st.page = 0; draw(); };
     el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { if (b.disabled) return; st.page = Math.max(0, Math.min(pages - 1, st.page + +b.dataset.p)); draw(); });
@@ -3182,7 +3250,7 @@ window.addEventListener('hashchange', () => { const v = location.hash.slice(1); 
 /* ---------------- Reporting ---------------- */
 const CAT_ICON = { Inventory: 'box', Cover: 'gauge', Supply: 'truck', Risk: 'alert', Production: 'factory', Management: 'flag', Governance: 'shield', 'My reports': 'star' };
 const qsOf = o => new URLSearchParams(Object.entries(o).filter(([, v]) => v)).toString();
-const FREQ = { daily: 'Every day', weekdays: 'Weekdays (Mon–Fri)', weekly: 'Weekly', monthly: 'Monthly' };
+const FREQ = { daily: 'Every day', weekdays: 'Weekdays (Mon–Fri)', weekly: 'Weekly', monthly: 'Monthly', custom: 'Custom period' };
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 async function renderReports() {
@@ -3282,22 +3350,50 @@ function printReport(r) {
 }
 
 function scheduleForm(box, rid, params) {
+  const known = knownEmails();
   box.innerHTML = `<div class="card sched-form"><h3>${svg('calendar', 15)} Schedule this report</h3>
     <div class="filters" style="margin:0">
       <select id="s_freq">${Object.entries(FREQ).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
       <select id="s_wd" hidden>${DAYS.map((d, i) => `<option value="${i}">${d}</option>`).join('')}</select>
       <select id="s_md" hidden>${Array.from({ length: 28 }, (_, i) => `<option>${i + 1}</option>`).join('')}</select>
+      <span id="s_everywrap" hidden><input id="s_every" type="number" min="1" value="1" style="width:72px;min-width:0"> <select id="s_unit"><option value="days">days</option><option value="hours">hours</option></select></span>
       <input type="time" id="s_time" value="07:00" style="min-width:0"> <span class="muted">EAT</span>
       <button class="btn primary" id="s_ok">Create schedule</button><button class="btn" id="s_x">Cancel</button></div>
-    <div class="muted" style="margin-top:8px">Each run saves an Excel file to Reports → History${Object.values(params || {}).some(Boolean) ? ' with the current filters' : ''}. Email delivery can be added once a mail sender is approved.</div></div>`;
+    <div style="margin-top:10px"><div class="muted" style="margin-bottom:6px">Email the Excel to</div>
+      <div class="mail-picks">${known.map(e => `<label><input type="checkbox" class="s_to" value="${esc(e)}" ${e === known[0] ? 'checked' : ''}> ${esc(e)}</label>`).join('') || '<span class="muted">No saved addresses yet.</span>'}
+      <input id="s_custom" type="email" placeholder="Add an email" style="min-width:180px"><button type="button" class="btn" id="s_add">Add</button></div></div>
+    <div class="muted" id="s_mailnote" style="margin-top:8px">Each run saves an Excel file to Reports → History${Object.values(params || {}).some(Boolean) ? ' with the current filters' : ''}.</div></div>`;
   const fr = box.querySelector('#s_freq');
-  fr.onchange = () => { box.querySelector('#s_wd').hidden = fr.value !== 'weekly'; box.querySelector('#s_md').hidden = fr.value !== 'monthly'; };
+  const syncFreq = () => {
+    box.querySelector('#s_wd').hidden = fr.value !== 'weekly';
+    box.querySelector('#s_md').hidden = fr.value !== 'monthly';
+    box.querySelector('#s_everywrap').hidden = fr.value !== 'custom';
+  };
+  fr.onchange = syncFreq;
+  box.querySelector('#s_add').onclick = () => {
+    const input = box.querySelector('#s_custom');
+    const email = input.value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    if ([...box.querySelectorAll('.s_to')].some(x => x.value.toLowerCase() === email.toLowerCase())) { input.value = ''; return; }
+    const label = document.createElement('label');
+    label.innerHTML = `<input type="checkbox" class="s_to" value="${esc(email)}" checked> ${esc(email)}`;
+    box.querySelector('.mail-picks').insertBefore(label, input);
+    input.value = '';
+  };
   box.querySelector('#s_x').onclick = () => box.innerHTML = '';
+  api('/api/mail/status').then(s => {
+    const note = box.querySelector('#s_mailnote');
+    if (note && !s.configured) note.textContent += ' Email is not configured on this workspace yet, so the file will not be sent.';
+  }).catch(() => {});
   box.querySelector('#s_ok').onclick = async () => {
+    const recipients = [...box.querySelectorAll('.s_to:checked')].map(x => x.value);
     const s = await api('/api/schedules/report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
       report_id: rid, params: Object.fromEntries(Object.entries(params || {}).filter(([, v]) => v)), frequency: fr.value,
-      time: box.querySelector('#s_time').value || '07:00', weekday: box.querySelector('#s_wd').value, monthday: box.querySelector('#s_md').value }) });
-    box.innerHTML = `<div class="card">${svg('check', 15)} Scheduled — next run ${esc((s.next_run || '').replace('T', ' ').slice(0, 16))} EAT. <a href="#schedules">Manage schedules</a></div>`;
+      time: box.querySelector('#s_time').value || '07:00', weekday: box.querySelector('#s_wd').value, monthday: box.querySelector('#s_md').value,
+      every: box.querySelector('#s_every').value, unit: box.querySelector('#s_unit').value, recipients }) });
+    if (s.error) { box.querySelector('#s_mailnote').textContent = s.error; return; }
+    const mailed = recipients.length ? (s.mail_configured ? ` It will be emailed to ${recipients.join(', ')}.` : ` Saved for ${recipients.join(', ')}, but email is not configured yet.`) : ' No email address was selected.';
+    box.innerHTML = `<div class="card">${svg('check', 15)} Scheduled — next run ${esc((s.next_run || '').replace('T', ' ').slice(0, 16))} EAT.${esc(mailed)} <a href="#schedules">Manage schedules</a></div>`;
   };
 }
 
@@ -3331,7 +3427,7 @@ async function renderBuilder() {
   document.getElementById('content').innerHTML = `<div class="inv-page">
     <div class="inv-head">${sectionTabs('builder')}<div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button></div></div>
     <div class="inv-kpis cols-4">${kpis}</div>
-    <div class="builder"><div class="card bform">
+    <div class="builder"><div class="card bform"><div class="bform-scroll">
       <label>Dataset<select id="b_ds">${Object.entries(D).map(([k, v]) => `<option value="${k}" ${k === b.dataset ? 'selected' : ''}>${esc(v.label)}</option>`).join('')}</select></label>
       <div class="seg"><button class="${b.mode === 'list' ? 'on' : ''}" data-mode="list">List rows</button><button class="${b.mode === 'group' ? 'on' : ''}" data-mode="group">Group & summarise</button></div>
       ${b.mode === 'list' ? `<label>Columns</label><div class="colpick">${cols.map(c => `<label class="chk"><input type="checkbox" value="${c.field}" ${b.columns.includes(c.field) ? 'checked' : ''}> ${esc(c.label)}</label>`).join('')}</div>`
@@ -3346,6 +3442,7 @@ async function renderBuilder() {
         <label>Site<select id="b_site"><option value="">All</option>${S.meta.sites.map(s => `<option ${b.filters.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label></div>
       <div class="row2"><label>Sort by<select id="b_sort">${opt(cols, b.sort.col, 'Default')}</select></label><label>Order<select id="b_dir"><option value="desc">High → low</option><option value="asc" ${b.sort.dir === 'asc' ? 'selected' : ''}>Low → high</option></select></label></div>
       <label>Max rows<input id="b_lim" type="number" min="1" value="${esc(b.limit)}" placeholder="All"></label>
+      </div>
       <div class="bbtns"><button class="btn primary" id="b_run">${svg('play', 14)} Run</button><button class="btn" id="b_xl">${svg('download', 14)} Excel</button><button class="btn" id="b_save">${svg('star', 14)} Save as report</button></div>
       <div id="b_msg" class="muted"></div>
     </div><div id="b_out"><div class="empty">${svg('sliders', 28)}<div>Configure the report and press Run.</div></div></div></div></div>`;
@@ -3389,7 +3486,7 @@ async function renderSchedules() {
   const [s, h, cat] = await Promise.all([api('/api/schedules'), api('/api/reports/history'), api('/api/reports')]);
   if (S.view !== 'schedules') return;
   S.reportCat = cat;
-  const when = x => x.frequency === 'weekly' ? `Weekly on ${DAYS[x.weekday]}` : x.frequency === 'monthly' ? `Monthly on day ${x.monthday}` : FREQ[x.frequency];
+  const when = x => x.frequency === 'custom' ? `Every ${x.every || 1} ${x.unit || 'days'}` : x.frequency === 'weekly' ? `Weekly on ${DAYS[x.weekday]}` : x.frequency === 'monthly' ? `Monthly on day ${x.monthday}` : FREQ[x.frequency];
   const total = s.reports.length, active = s.reports.filter(x => x.enabled).length, paused = total - active;
   const share = n => total ? Math.round(100 * n / total) : null;
   const faces = {
@@ -3409,7 +3506,7 @@ async function renderSchedules() {
     return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${k.value}</p>${cipSpark(null, face.fg, k.label)}</div></article>`;
   }).join('');
-  const schedRows = s.reports.map(x => `<tr><td>${esc(x.name)}</td><td>${esc(Object.entries(x.params || {}).map(([k, v]) => k + '=' + v).join(', ') || '–')}</td><td>${esc(when(x))} ${esc(x.time)}</td>
+  const schedRows = s.reports.map(x => `<tr><td>${esc(x.name)}</td><td>${esc(Object.entries(x.params || {}).map(([k, v]) => k + '=' + v).join(', ') || '–')}</td><td>${esc(when(x))} ${esc(x.time)}${(x.recipients || []).length ? `<div class="muted">${esc(x.recipients.join(', '))}</div>` : ''}</td>
         <td>${esc((x.enabled ? x.next_run || '' : 'Paused').replace('T', ' ').slice(0, 16))}</td><td>${esc((x.last_run || '–').replace('T', ' ').slice(0, 16))}</td>
         <td>${x.last_status ? `<span class="pill tone-${x.last_status === 'ok' ? 'good' : 'bad'}">${esc(x.last_status)}</span>` : '–'}</td><td>${esc(x.created_by || '')}</td>
         <td style="white-space:nowrap"><button class="btn" data-tog="${x.id}" data-en="${x.enabled ? 0 : 1}">${x.enabled ? 'Pause' : 'Resume'}</button> <button class="btn" data-del="${x.id}">${svg('trash', 12)}</button></td></tr>`).join('');

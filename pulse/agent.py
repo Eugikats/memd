@@ -276,6 +276,26 @@ def generate_report(m, report_id, params=None, user=None):
     return {"created": [a], "report": e}
 
 
+def schedule_report(m, report_id, frequency, time_="07:00", weekday=0, monthday=1, recipients=None,
+                    every=None, unit=None, params=None, user=None):
+    """Create the same schedule the report page uses. Does not invent a recipient."""
+    from . import mail
+    from . import reports as R
+    if report_id not in {c["id"] for c in R.catalogue()}:
+        return {"created": False, "error": "Unknown report"}
+    recipients = mail.clean_recipients(recipients)
+    if not recipients:
+        return {"created": False, "needs": "recipient"}
+    if frequency == "custom" and unit not in ("hours", "days"):
+        return {"created": False, "needs": "period"}
+    sch = R.add_schedule(report_id, params or {}, frequency, time_ or "07:00", weekday, monthday,
+                         user or "Pulse agent", recipients=recipients, every=every, unit=unit)
+    names = {c["id"]: c["name"] for c in R.catalogue()}
+    sch["name"] = names.get(report_id, report_id)
+    sch["mail_configured"] = mail.configured()
+    return {"created": True, "schedule": sch}
+
+
 def match_report(text):
     """Best catalogue match for free text (offline mode)."""
     from . import reports as R
@@ -339,6 +359,29 @@ def run_playbook(m, name, args=None):
         answer = (f"I added **{len(w['added'])}** critical items to your watchlist (shown on the Overview) and "
                   f"proposed an alert that fires whenever any item is projected to run out within 7 days "
                   f"(currently {r['current_value']}). Approve the alert to activate it.")
+    elif name == "schedule":
+        rid = args.get("report_id") or match_report(args.get("text") or "")
+        step("Chose report", rid)
+        result = schedule_report(m, rid, args.get("frequency") or "daily", args.get("time") or "07:00",
+                                 0, 1, args.get("recipients"), args.get("every"), args.get("unit"),
+                                 {k: args.get(k) for k in ("item_class", "site") if args.get(k)})
+        if not result.get("created"):
+            need = result.get("needs") or "detail"
+            step("Needs a detail before scheduling", need)
+            from . import reports as R
+            label = next((c["name"] for c in R.catalogue() if c["id"] == rid), rid.replace("_", " "))
+            answer = (f"I can schedule **{label}**. Tell me who should receive it"
+                      + (" and whether the custom period is hours or days." if need == "period" else "."))
+        else:
+            sch = result["schedule"]
+            step("Created the schedule", f"next run {sch.get('next_run')}")
+            mail_line = ("The Excel will be emailed when it runs." if sch.get("mail_configured")
+                         else "The Excel will be saved in History. Email is not configured on this workspace yet, so it will not be sent.")
+            answer = (f"Scheduled **{sch.get('name')}** ({sch.get('frequency')}"
+                      + (f", every {sch.get('every')} {sch.get('unit')}" if sch.get("frequency") == "custom" else "")
+                      + f") at {sch.get('time')} EAT. Next run {sch.get('next_run')}. "
+                      + f"Recipients: {', '.join(sch.get('recipients') or [])}. {mail_line}")
+        ui = {"view": "schedules", "filters": {}}
     elif name == "report":
         rid = args.get("report_id") or match_report(args.get("text") or "")
         step("Chose report", rid)
