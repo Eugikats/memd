@@ -86,10 +86,18 @@ def _tools():
          "description": "ACTION: write a management briefing (markdown) from the model and save it for review.",
          "input_schema": {"type": "object", "additionalProperties": False, "properties": {}}},
         {"name": "generate_report",
-         "description": "ACTION: produce a report as a downloadable Excel file (also saved in report history). "
+         "description": "ACTION: produce a catalogue report as a downloadable Excel file when the user did not attach a template. "
                         "Reports: " + "; ".join(f"{c[0]} = {c[1]}" for c in __import__("pulse.reports", fromlist=["x"]).CATALOGUE),
          "input_schema": {"type": "object", "additionalProperties": False, "required": ["report_id"], "properties": {
              "report_id": {"type": "string"},
+             "item_class": {"type": "string", "enum": ["RM", "WIP", "FG"]}, "site": {"type": "string"}}}},
+        {"name": "send_report",
+         "description": "ACTION: email a catalogue report now, with the Excel attached. Use this when the user says send, email this, or approves sending. "
+                        "Ask for the address if they did not give one. Do not invent an address. "
+                        "Reports: " + "; ".join(f"{c[0]} = {c[1]}" for c in __import__("pulse.reports", fromlist=["x"]).CATALOGUE),
+         "input_schema": {"type": "object", "additionalProperties": False, "required": ["recipients"], "properties": {
+             "report_id": {"type": "string"}, "history_id": {"type": "string"},
+             "recipients": {"type": "array", "items": {"type": "string"}},
              "item_class": {"type": "string", "enum": ["RM", "WIP", "FG"]}, "site": {"type": "string"}}}},
         {"name": "schedule_report",
          "description": "ACTION: schedule a catalogue report and email the Excel when it runs. "
@@ -104,10 +112,11 @@ def _tools():
                               "recipients": {"type": "array", "items": {"type": "string"}},
                               "item_class": {"type": "string", "enum": ["RM", "WIP", "FG"]}, "site": {"type": "string"}}}},
         {"name": "rebuild_from_upload",
-         "description": "Rebuild an Excel that follows an uploaded spreadsheet's header row. "
-                        "Cells are filled only when a header matches a column from a system view. Unmatched columns stay blank. "
+         "description": "ACTION: rebuild the attached file in its own sheets, tables, or slides. "
+                        "Keep calculated columns as formulas and write system figures only where a header matches a view. "
+                        "Use this when the user wants a report in the shape of an upload. Pass document_id from the upload context. "
                         "Never copy numbers out of the upload.",
-         "input_schema": {"type": "object", "additionalProperties": False, "required": ["document_id", "view"],
+         "input_schema": {"type": "object", "additionalProperties": False, "required": ["document_id"],
                           "properties": {"document_id": {"type": "string"}, "view": {"type": "string"}}}},
         {"name": "get_definitions",
          "description": "Return the documented definition of every measure and the data notes for this load.",
@@ -159,6 +168,9 @@ def run_tool(m, name, args):
         return {"created": r["created"], "markdown": r["markdown"][:6000]}
     if name == "generate_report":
         return A.generate_report(m, args["report_id"], {k: args.get(k) for k in ("item_class", "site") if args.get(k)})
+    if name == "send_report":
+        return A.send_report(m, args.get("report_id"), args.get("history_id"), args.get("recipients"),
+                             {k: args.get(k) for k in ("item_class", "site") if args.get(k)})
     if name == "schedule_report":
         return A.schedule_report(m, args.get("report_id"), args.get("frequency") or "daily", args.get("time") or "07:00",
                                  int(args.get("weekday") or 0), int(args.get("monthday") or 1), args.get("recipients"),
@@ -167,20 +179,23 @@ def run_tool(m, name, args):
     if name == "rebuild_from_upload":
         from . import documents
         from . import reports as R
-        built = documents.fill_layout(m, args.get("document_id"), args.get("view"))
+        built = documents.fill_layout(m, args.get("document_id"), args.get("view") or None)
         if built.get("error"):
             return built
         hid = __import__("uuid").uuid4().hex[:10]
+        ext = built.get("ext") or "xlsx"
         R.FILES.mkdir(parents=True, exist_ok=True)
-        (R.FILES / f"{hid}.xlsx").write_bytes(built["bytes"])
-        entry = {"id": hid, "report_id": "upload", "name": "Upload layout", "params": {"view": args.get("view")},
-                 "generated_at": R.now().isoformat(timespec="seconds"), "by": "Pulse agent", "trigger": "upload",
-                 "rows": built["rows"], "data_loaded": ""}
+        (R.FILES / f"{hid}.{ext}").write_bytes(built["bytes"])
+        entry = {"id": hid, "report_id": "upload", "name": built.get("name") or "Upload layout", "ext": ext,
+                 "params": {"view": args.get("view")}, "generated_at": R.now().isoformat(timespec="seconds"),
+                 "by": "Pulse agent", "trigger": "upload", "rows": built["rows"], "data_loaded": ""}
         hist = R._read(R.HISTORY, [])
         R._write(R.HISTORY, ([entry] + hist)[:500])
         return {"history_id": hid, "matched": built["matched"], "unmatched": built["unmatched"],
-                "view": built["view"], "rows": built["rows"],
-                "note": "Blank columns had no matching system field. No upload number was copied."}
+                "view": built["view"], "rows": built["rows"], "sheets": built.get("sheets"),
+                "formulas_kept": built.get("formulas_kept"),
+                "note": "Each sheet, table, or slide was kept. Formula columns were kept as formulas. "
+                        "Blank columns had no matching system field. No upload number was copied."}
     if name == "get_definitions":
         n = dict(m["notes"])
         n.pop("reconciliation", None)
@@ -200,17 +215,18 @@ def _system(m):
             "figures (a compact markdown table when listing items), then one line starting 'Basis:' naming the "
             "view(s) and measure definitions used.\n\n"
             "You are also an agent. When the user asks you to DO something (chase suppliers, plan transfers, set an "
-            "alert, watch items, prepare a briefing, generate a report, or schedule a report), plan the steps, gather the "
-            "evidence with the read tools first, then call the ACTION tools. To schedule a report, call schedule_report "
-            "with the catalogue id, how often it should run, and the recipient addresses. If the time, custom period, or "
-            "recipient is missing, ask for that one detail and do not invent an address. Action tools only create proposals "
-            "or schedules inside Pulse for a person to approve or receive — never say anything was sent, posted or changed "
-            "in Business Central. After acting, summarise what you created and what the user should review. Use open_dashboard "
-            "when showing a view would help.\n\n"
-            "An uploaded document, when present, is layout and wording only. Inventory, cover, value, and order figures "
-            "come only from your tools. If a number in the document disagrees with a tool result, say so and use the tool "
-            "result. rebuild_from_upload may copy the document's column headings and fill only the headings that match a "
-            "system view; it must not copy the document's numbers.\n\n" + GLOSSARY)
+            "alert, watch items, prepare a briefing, generate a report, email a report, or schedule a report), plan the steps, gather the "
+            "evidence with the read tools first, then call the ACTION tools. To schedule a future run, call schedule_report "
+            "with the catalogue id, how often it should run, and the recipient addresses. When the user asks to email a report now, "
+            "send it, or says they approve sending, call send_report with the address they gave. If the address or the custom period "
+            "is missing, ask for that one detail and do not invent an address. Do not say you are not allowed to email. If send_report "
+            "says the mailbox is not connected, say that plainly. Never say anything was posted or changed in Business Central. "
+            "After acting, summarise what you created and what the user should review. Use open_dashboard when showing a view would help.\n\n"
+            "An uploaded document is layout, sheets, and formulas. Inventory, cover, value, and order figures come only from your tools. "
+            "If a number in the document disagrees with a tool result, say so and use the tool result. Cached formula results are not "
+            "inventory figures. When the user wants a report in the shape of an attached file, call rebuild_from_upload with that "
+            "document id. It keeps every sheet, table, or slide and keeps calculated columns as formulas. Use generate_report only "
+            "when there is no uploaded template.\n\n" + GLOSSARY)
 
 
 def _audit(rec):
@@ -347,7 +363,8 @@ STEP_LABELS = {"query_view": "Queried view", "get_item": "Looked up item", "find
                "draft_vendor_expedite": "Drafted vendor expedite messages", "propose_transfers": "Proposed transfer plan",
                "create_alert": "Proposed alert rule", "watch_items": "Updated watchlist",
                "generate_briefing": "Wrote management briefing", "generate_report": "Generated Excel report",
-               "schedule_report": "Scheduled a report", "rebuild_from_upload": "Rebuilt a report from the upload"}
+               "send_report": "Emailed a report", "schedule_report": "Scheduled a report",
+               "rebuild_from_upload": "Rebuilt a report from the upload"}
 
 
 def _ask_claude(m, question, history, documents=None, emails=None):
@@ -407,6 +424,7 @@ ROUTES = [
 
 INTENTS = [
     (r"schedul", "schedule"),
+    (r"send (this|the|it|that|now)|email (this|it|me|the report)|mail (this|it|me)", "send"),
     (r"brief|write (a|the|today)", "briefing"),
     (r"\b(excel|export|spreadsheet|report)\b", "report"),
     (r"chase|expedite|follow.?up|email|write to (the )?(vendor|supplier)|remind (the )?(vendor|supplier)", "expedite"),
@@ -445,7 +463,7 @@ def _ask_offline(m, question, emails=None):
         if re.search(pat, q):
             site = re.search(r"ship\s?(\d)", q)
             cls = "RM" if re.search(r"raw material|\brm\b", q) else "FG" if re.search(r"finished|\bfg\b", q) else None
-            extra = _schedule_hint(question, emails) if pb == "schedule" else {}
+            extra = _schedule_hint(question, emails) if pb in ("schedule", "send") else {}
             r = A.run_playbook(m, pb, {"site": f"SHIP {site.group(1)}" if site else None, "item_class": cls,
                                        "text": question, **extra})
             return {"mode": "agent", "answer": r["answer"], "tool_calls": [{"tool": "playbook", "input": {"name": pb}}],

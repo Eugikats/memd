@@ -446,8 +446,16 @@ def history():
 
 def history_file(hid):
     e = next((h for h in history() if h["id"] == hid), None)
-    p = FILES / f"{hid}.xlsx"
-    return (e, p) if e and p.exists() else (None, None)
+    if not e:
+        return None, None
+    ext = (e.get("ext") or "xlsx").lower().lstrip(".")
+    if ext not in ("xlsx", "xlsm", "docx", "pptx", "csv"):
+        ext = "xlsx"
+    p = FILES / f"{hid}.{ext}"
+    if not p.exists():
+        alt = FILES / f"{hid}.xlsx"
+        p = alt if alt.exists() else p
+    return (e, p) if p.exists() else (None, None)
 
 
 # ---------------------------------------------------------------- schedules

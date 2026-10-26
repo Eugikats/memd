@@ -902,7 +902,7 @@ const NOTE_CATS = [
   ['refresh', 'Data refresh', 'When a Business Central load finishes or fails.'],
   ['actions', 'Agent actions', 'When the agent proposes something that needs approval.'],
   ['stock', 'Stock alerts', 'Cover, stockout and exception signals.'],
-  ['reports', 'Reports', 'When a report run is saved in this browser.'],
+  ['reports', 'Reports', 'Ask for a notice when a scheduled report finishes. This switch does not connect the mailbox.'],
 ];
 let chatsExpanded = false;
 let setTab = 'platform';
@@ -945,26 +945,55 @@ function paintUploads() {
   ['heroDocs', 'assistDocs'].forEach(id => {
     const box = document.getElementById(id);
     if (!box) return;
-    box.innerHTML = (S.uploads || []).map(d => `<button type="button" data-drop="${esc(d.id)}">${esc(d.name)} ×</button>`).join('');
+    box.innerHTML = (S.uploads || []).map(d => d.pending
+      ? `<button type="button" class="pending" disabled>${esc(d.name)} · Uploading…</button>`
+      : `<button type="button" data-drop="${esc(d.id)}">${esc(d.name)}${d.error ? ' · ' + esc(d.error) : ''} ×</button>`).join('');
     box.querySelectorAll('[data-drop]').forEach(b => b.onclick = () => { S.uploads = S.uploads.filter(d => d.id !== b.dataset.drop); paintUploads(); });
   });
 }
-async function takeUpload(file) {
+function readyUploads() {
+  return (S.uploads || []).filter(d => d.id && !d.pending && !d.error && !String(d.id).startsWith('up-'));
+}
+async function takeUpload(file, host) {
   if (!file) return;
+  const localId = 'up-' + Date.now();
+  const row = document.createElement('div');
+  row.className = 'msg';
+  row.innerHTML = `<div class="answer">Uploading ${esc(file.name)}…</div>`;
+  const thread = threadHost(host) || threadHost('assist') || threadHost('hero');
+  if (thread) {
+    thread.hidden = false;
+    thread.append(row);
+    S.thread.push(row);
+    thread.scrollTop = thread.scrollHeight;
+  }
+  const hero = document.getElementById('hero');
+  if (hero && host !== 'assist') hero.classList.add('chatting');
+  const popup = document.querySelector('.assist-hero');
+  if (popup && host === 'assist') popup.classList.add('chatting');
+  S.uploads = [...(S.uploads || []), { id: localId, name: file.name, pending: true }];
+  paintUploads();
   const body = new FormData();
   body.append('file', file);
-  const res = await fetch('/api/documents', { method: 'POST', body });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.error) { window.alert(data.error || 'Could not read that file.'); return; }
-  S.uploads = [...(S.uploads || []).filter(d => d.id !== data.id), data].slice(-4);
-  paintUploads();
+  try {
+    const res = await fetch('/api/documents', { method: 'POST', body });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || 'Could not read that file.');
+    S.uploads = [...(S.uploads || []).filter(d => d.id !== localId && d.id !== data.id), data].slice(-4);
+    paintUploads();
+    row.innerHTML = `<div class="answer">Attached ${esc(data.name)}.</div>`;
+  } catch (err) {
+    S.uploads = (S.uploads || []).map(d => d.id === localId ? { id: localId, name: file.name, error: err.message } : d);
+    paintUploads();
+    row.innerHTML = `<div class="answer">${esc(file.name)} was not attached. ${esc(err.message)}</div>`;
+  }
 }
-function bindUpload(buttonId, inputId) {
+function bindUpload(buttonId, inputId, host) {
   const button = document.getElementById(buttonId), input = document.getElementById(inputId);
   if (!button || !input || button.dataset.bound) return;
   button.dataset.bound = '1';
   button.onclick = () => input.click();
-  input.onchange = () => { const file = input.files && input.files[0]; input.value = ''; takeUpload(file); };
+  input.onchange = () => { const file = input.files && input.files[0]; input.value = ''; takeUpload(file, host); };
 }
 function applyIdentity() {
   const name = displayName();
@@ -1098,7 +1127,7 @@ function bindAssist() {
   document.getElementById('assistNew').innerHTML = svg('plus', 16);
   document.getElementById('assistClose').innerHTML = svg('x', 16);
   armComposer(document.getElementById('assistQ'), document.getElementById('assistSend'), 'popup');
-  bindUpload('assistAttach', 'assistFile');
+  bindUpload('assistAttach', 'assistFile', 'assist');
   document.getElementById('assistFab').onclick = openAssist;
   document.getElementById('assistClose').onclick = closeAssist;
   document.getElementById('assistNew').onclick = () => newChat();
@@ -1293,7 +1322,7 @@ function paintNotifications(body) {
     pane.querySelector('#quietSw').onclick = () => { const n = notesPref(); n.quiet = !n.quiet; saveNotes(n); paintNotifications(body); };
     pane.querySelector('#qSave').onclick = () => { const n = notesPref(); n.from = document.getElementById('qFrom').value; n.to = document.getElementById('qTo').value; saveNotes(n); };
   } else {
-    pane.innerHTML = `<div class="set-card"><h4>Email follows the schedule</h4><p class="set-note">A finished scheduled report and a finished data refresh can email the address on your profile when those switches are on. There is no separate held-mail queue.</p></div>`;
+    pane.innerHTML = `<div class="set-card"><h4>Email follows the schedule</h4><p class="set-note">The Reports switch asks for a notice. It does not connect the mailbox. A finished scheduled report can be emailed only when the workspace mailbox is connected.</p></div>`;
   }
   body.querySelectorAll('[data-ntab]').forEach(b => b.onclick = () => { noteTab = b.dataset.ntab; paintNotifications(body); });
   body.querySelectorAll('[data-pause]').forEach(b => b.onclick = () => {
@@ -1307,8 +1336,8 @@ function paintNotifications(body) {
     const note = body.querySelector('#mailNote');
     if (!note || (notesPref().pausedUntil && new Date(notesPref().pausedUntil) > new Date())) return;
     note.textContent = s.configured
-      ? 'Scheduled reports email the addresses you choose. Data-refresh and report notices also go to the email on your profile when those switches are on.'
-      : 'Schedules still save the Excel in History. Email is not configured on this workspace yet, so messages are not sent.';
+      ? 'Scheduled reports email the addresses you choose. Data-refresh and report notices also go to the email on your profile when those switches are on. The switches do not replace the mailbox connection.'
+      : 'The Reports switch only asks for a notice. The mailbox is not connected on this workspace yet, so messages are not sent. Schedules still save the Excel in History.';
   }).catch(() => {});
 }
 async function paintUsage(body) {
@@ -1536,7 +1565,7 @@ function renderCommand() {
     <button type="button" class="flow-toggle" id="flowToggle">Inventory flow <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
     </section>`;
   armComposer(document.getElementById('q'), document.getElementById('send'), 'hero');
-  bindUpload('heroAttach', 'heroFile');
+  bindUpload('heroAttach', 'heroFile', 'hero');
   paintUploads();
   document.getElementById('flowToggle').onclick = () => go('trends');
   if (chatting) mirrorThreads(document.body.classList.contains('assist-open') ? 'assist' : 'hero');
@@ -1607,7 +1636,7 @@ async function ask(text, playbook, origin) {
   syncAssist();
   const r = playbook
     ? await api('/api/playbook/' + playbook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-    : await api('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, history: S.history, documents: (S.uploads || []).map(d => d.id), emails: knownEmails() }) });
+    : await api('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, history: S.history, documents: readyUploads().map(d => d.id), emails: knownEmails() }) });
   S.history.push({ role: 'user', content: text }, { role: 'assistant', content: r.answer });
   persistChat();
   pending.forEach(a => renderAgentResult(a, r));
@@ -3383,7 +3412,7 @@ function scheduleForm(box, rid, params) {
   box.querySelector('#s_x').onclick = () => box.innerHTML = '';
   api('/api/mail/status').then(s => {
     const note = box.querySelector('#s_mailnote');
-    if (note && !s.configured) note.textContent += ' Email is not configured on this workspace yet, so the file will not be sent.';
+    if (note && !s.configured) note.textContent += ' The mailbox is not connected on this workspace yet, so the file will not be sent.';
   }).catch(() => {});
   box.querySelector('#s_ok').onclick = async () => {
     const recipients = [...box.querySelectorAll('.s_to:checked')].map(x => x.value);
@@ -3392,7 +3421,7 @@ function scheduleForm(box, rid, params) {
       time: box.querySelector('#s_time').value || '07:00', weekday: box.querySelector('#s_wd').value, monthday: box.querySelector('#s_md').value,
       every: box.querySelector('#s_every').value, unit: box.querySelector('#s_unit').value, recipients }) });
     if (s.error) { box.querySelector('#s_mailnote').textContent = s.error; return; }
-    const mailed = recipients.length ? (s.mail_configured ? ` It will be emailed to ${recipients.join(', ')}.` : ` Saved for ${recipients.join(', ')}, but email is not configured yet.`) : ' No email address was selected.';
+    const mailed = recipients.length ? (s.mail_configured ? ` It will be emailed to ${recipients.join(', ')}.` : ` Saved for ${recipients.join(', ')}. The mailbox is not connected yet, so it will not be sent.`) : ' No email address was selected.';
     box.innerHTML = `<div class="card">${svg('check', 15)} Scheduled — next run ${esc((s.next_run || '').replace('T', ' ').slice(0, 16))} EAT.${esc(mailed)} <a href="#schedules">Manage schedules</a></div>`;
   };
 }

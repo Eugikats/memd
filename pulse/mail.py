@@ -76,7 +76,7 @@ def send(to, subject, html, attachment=None):
     if not recipients:
         return "no recipients"
     if not configured():
-        return "mail sender is not configured"
+        return "mailbox is not connected"
     token, err = _token()
     if err:
         return err

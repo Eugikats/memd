@@ -348,8 +348,9 @@ def report_history_download(hid):
     e, p = R.history_file(hid)
     if not e:
         return _json({"error": "not found"}, 404)
+    ext = p.suffix or ".xlsx"
     return send_file(p, as_attachment=True,
-                     download_name=f"{e['name'].replace(' ', '_').replace('&', 'and')}_{e['generated_at'][:10]}.xlsx")
+                     download_name=f"{e['name'].replace(' ', '_').replace('&', 'and')}_{e['generated_at'][:10]}{ext}")
 
 
 @app.get("/api/mail/status")

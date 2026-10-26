@@ -276,6 +276,37 @@ def generate_report(m, report_id, params=None, user=None):
     return {"created": [a], "report": e}
 
 
+def send_report(m, report_id=None, history_id=None, recipients=None, params=None, user=None):
+    """Email a catalogue report or a history file now. Does not invent a recipient."""
+    from . import mail
+    from . import reports as R
+    recipients = mail.clean_recipients(recipients)
+    if not recipients:
+        return {"sent": False, "needs": "recipient"}
+    if history_id:
+        entry, path = R.history_file(history_id)
+        if not entry or not path:
+            return {"sent": False, "error": "That report is not in history."}
+    else:
+        if report_id not in {c["id"] for c in R.catalogue()}:
+            return {"sent": False, "error": "Unknown report"}
+        entry = R.generate(m, report_id, params or {}, user=user or "Pulse agent", trigger="email")
+        entry, path = R.history_file(entry["id"])
+    ext = (entry.get("ext") or "xlsx").lstrip(".")
+    types = {"xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+             "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+             "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation"}
+    status = mail.send(recipients, f"Report: {entry['name']}",
+                       f"<p><b>{entry['name']}</b> is attached. The figures come from the Manufacturing Intelligence Platform.</p>",
+                       (f"{entry['name'].replace(' ', '_')}.{ext}", path.read_bytes(), types.get(ext, "application/octet-stream")))
+    if status == "mail sender is not configured":
+        status = "mailbox is not connected"
+    action = _add_action("report", f"Report: {entry['name']}", f"{entry.get('rows', 0):,} rows · ready to download",
+                         {"history_id": entry["id"], "report_id": entry.get("report_id"), "name": entry["name"]})
+    return {"sent": status == "sent", "status": status, "history_id": entry["id"], "name": entry["name"],
+            "recipients": recipients, "created": [action]}
+
+
 def schedule_report(m, report_id, frequency, time_="07:00", weekday=0, monthday=1, recipients=None,
                     every=None, unit=None, params=None, user=None):
     """Create the same schedule the report page uses. Does not invent a recipient."""
@@ -376,12 +407,35 @@ def run_playbook(m, name, args=None):
             sch = result["schedule"]
             step("Created the schedule", f"next run {sch.get('next_run')}")
             mail_line = ("The Excel will be emailed when it runs." if sch.get("mail_configured")
-                         else "The Excel will be saved in History. Email is not configured on this workspace yet, so it will not be sent.")
+                         else "The Excel will be saved in History. The mailbox is not connected on this workspace yet, so it will not be sent.")
             answer = (f"Scheduled **{sch.get('name')}** ({sch.get('frequency')}"
                       + (f", every {sch.get('every')} {sch.get('unit')}" if sch.get("frequency") == "custom" else "")
                       + f") at {sch.get('time')} EAT. Next run {sch.get('next_run')}. "
                       + f"Recipients: {', '.join(sch.get('recipients') or [])}. {mail_line}")
         ui = {"view": "schedules", "filters": {}}
+    elif name == "send":
+        rid = args.get("report_id") or match_report(args.get("text") or "")
+        step("Chose report", rid)
+        result = send_report(m, rid, None, args.get("recipients"),
+                             {k: args.get(k) for k in ("item_class", "site") if args.get(k)})
+        if result.get("needs") == "recipient":
+            from . import reports as R
+            label = next((c["name"] for c in R.catalogue() if c["id"] == rid), rid.replace("_", " "))
+            step("Needs an address before sending", "recipient")
+            answer = f"I can email **{label}** now. Tell me which address should receive it."
+        elif result.get("error"):
+            step("Could not send", result["error"])
+            answer = result["error"]
+        else:
+            actions += result.get("created") or []
+            step("Prepared the report", result.get("history_id") or "")
+            if result.get("sent"):
+                answer = (f"Sent **{result.get('name')}** to {', '.join(result.get('recipients') or [])}. "
+                          "The same file is in Reports → History.")
+            else:
+                answer = (f"I prepared **{result.get('name')}** for {', '.join(result.get('recipients') or [])}, "
+                          "but the mailbox is not connected, so it was not sent. The file is in Reports → History.")
+        ui = {"view": "reports", "filters": {}}
     elif name == "report":
         rid = args.get("report_id") or match_report(args.get("text") or "")
         step("Chose report", rid)
