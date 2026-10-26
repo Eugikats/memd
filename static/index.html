@@ -716,8 +716,7 @@ body.page-inv .tablehead.inv-tablehead .rbtns { width: auto; }
 </div>
 
 <script>
-const S = { meta: null, view: null, filters: { item_class: '', site: '', location: '', q: '' }, sortDir: -1, charts: [], history: [], thread: [], chatId: null, chats: [], settings: 'profile' };
-const sortHooks = [];
+const S = { meta: null, view: null, filters: { item_class: '', site: '', location: '', q: '' }, charts: [], history: [], thread: [], chatId: null, chats: [], settings: 'profile' };
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const CLASS = { RM: '--series-1', WIP: '--series-2', FG: '--series-3', 'Raw Material': '--series-1', 'Work in Progress': '--series-2', 'Finished Goods': '--series-3' };
 const STATUS = [
@@ -831,12 +830,6 @@ const KPI_MARK = {
 function kpiMark(name) {
   const d = KPI_MARK[name] || KPI_MARK.chart;
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
-}
-function registerSort(el, fn) {
-  for (let i = sortHooks.length - 1; i >= 0; i--) {
-    if (sortHooks[i].el === el || (sortHooks[i].el && !sortHooks[i].el.isConnected)) sortHooks.splice(i, 1);
-  }
-  sortHooks.push({ el, fn });
 }
 const VIEW_ICON = { overview: 'grid', inventory_position: 'box', inventory_by_location: 'pin', rm_consumption_cover: 'gauge', wip_cover: 'layers', fg_cover: 'package',
   in_transit_overdue: 'truck', projection_stockout: 'trend', inventory_risk: 'alert', location_risk: 'shuffle', bom_readiness: 'factory', exceptions: 'flag' };
@@ -1429,7 +1422,6 @@ function go(v, force) {
   if (S.cockpitTimer) { clearInterval(S.cockpitTimer); S.cockpitTimer = null; }
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
-  sortHooks.length = 0;
   S.view = v;
   const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview', reports: 'Report library', builder: 'Report builder', schedules: 'Schedules & history', trends: 'Trends', command: 'Command Center' };
   const invShell = Object.prototype.hasOwnProperty.call(INV_SHELL, v);
@@ -1566,16 +1558,21 @@ async function ask(text, playbook, origin) {
   if (focus) focus.focus();
 }
 
+function tableHasColumns(t) {
+  const col = t && t.columns && t.columns[0];
+  return !!(t && t.rows && t.rows.length && col && typeof col === 'object' && col.field);
+}
 function renderAgentResult(el, r) {
   const steps = r.steps || [];
+  const showTable = tableHasColumns(r.table);
   const by = r.mode === 'azure' ? `Azure OpenAI agent${S.meta.ai_model ? ' (' + S.meta.ai_model + ')' : ''}` : r.mode === 'claude' ? 'Claude agent' : r.mode === 'agent' ? 'Agent playbook' : 'Offline router';
   el.innerHTML = `${steps.length ? `<details class="steps" ${r.actions && r.actions.length ? 'open' : ''}><summary>${svg('check', 14)} ${steps.length} step${steps.length > 1 ? 's' : ''} completed · ${esc(by)}</summary>
       ${steps.map((s, i) => `<div class="step"><span class="n">${i + 1}</span><div><b>${esc(s.label)}</b>${s.detail ? `<div class="muted">${esc(s.detail)}</div>` : ''}</div></div>`).join('')}</details>` : ''}
     <div class="answer">${marked.parse(r.answer || '')}</div>
-    ${r.table && r.table.rows && r.table.rows.length ? '<div class="tbl"></div>' : ''}
+    ${showTable ? '<div class="tbl"></div>' : ''}
     ${r.actions && r.actions.length ? `<div class="acts-head">${svg('inbox', 15)} ${r.actions.length} proposed action${r.actions.length > 1 ? 's' : ''} — awaiting your approval</div><div class="acts"></div>` : ''}
     ${r.ui && r.ui.view ? `<button class="btn open-ui">${svg(VIEW_ICON[r.ui.view] || 'grid', 14)} Open ${esc(viewTitle(r.ui.view))} ${svg('arrow', 14)}</button>` : ''}`;
-  if (r.table && r.table.rows && r.table.rows.length) renderTable(el.querySelector('.tbl'), r.table, { size: 10 });
+  if (showTable) renderTable(el.querySelector('.tbl'), r.table, { size: 10 });
   if (r.actions && r.actions.length) { const box = el.querySelector('.acts'); r.actions.forEach(x => box.appendChild(actionCard(x, true))); }
   const o = el.querySelector('.open-ui');
   if (o) o.onclick = () => { S.filters = { item_class: r.ui.filters?.item_class || '', site: r.ui.filters?.site || '', q: r.ui.filters?.q || '' }; go(r.ui.view, true); };
@@ -1650,20 +1647,17 @@ async function renderActions() {
     <div class="inv-head"><div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
       <button class="btn primary" id="newRun">${svg('play', 14)} Run the agent</button></div></div>
     <div class="inv-kpis cols-6">${kpis}</div>
-    <div class="filters inv-filters"><div class="seg inv-seg" id="af">${filters}</div>${sortToggleHtml()}</div>
+    <div class="filters inv-filters"><div class="seg inv-seg" id="af">${filters}</div></div>
     <div id="alist" class="alist"></div>
     <div class="inv-charts2"><section class="card inv-card"><div class="inv-ch-head"><div><h3>Alert rules</h3><p>Checked after each refresh once a person approves the rule</p></div></div><div class="inv-pad" id="alerts"></div></section>
       <section class="card inv-card"><div class="inv-ch-head"><div><h3>Watchlist</h3><p>Items the agent is watching</p></div></div><div class="inv-pad" id="watch"></div></section></div></div>`;
   const draw = () => {
     const f = S.actFilter || 'proposed', box = document.getElementById('alist');
-    const dir = S.sortDir || -1;
-    const list = acts.filter(a => f === 'all' || a.status === f).slice().sort((a, b) => (String(a.created) > String(b.created) ? 1 : String(a.created) < String(b.created) ? -1 : 0) * dir);
+    const list = acts.filter(a => f === 'all' || a.status === f);
     box.innerHTML = list.length ? '' : `<div class="empty">${svg('inbox', 28)}<div>No ${f === 'all' ? '' : f} actions yet.</div><div class="muted">Ask the Command Center to chase overdue POs, plan transfers, set alerts or write a briefing.</div></div>`;
     list.forEach(a => box.appendChild(actionCard(a)));
   };
   document.getElementById('af').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { S.actFilter = b.dataset.f; renderActions(); } };
-  registerSort(document.getElementById('alist'), draw);
-  bindSortToggles();
   document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Which proposed agent actions, alerts and watched items need a decision?'), 50); };
   document.getElementById('newRun').onclick = () => go('command');
   draw();
@@ -1686,28 +1680,9 @@ function renderWatch(el, watch, after) {
 }
 
 /* ---------------- Dashboards ---------------- */
-function sortToggleHtml() {
-  const desc = (S.sortDir || -1) < 0;
+function sortToggleHtml(dir) {
+  const desc = dir < 0;
   return `<button type="button" class="sort-toggle" data-sort-toggle title="${desc ? 'Sorted descending. Click for ascending.' : 'Sorted ascending. Click for descending.'}"><span>Sort</span><span class="sort-arrows" aria-hidden="true"><svg class="up${desc ? ' dim' : ''}" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3M3.5 5.5 6 3l2.5 2.5"/></svg><svg class="down${desc ? '' : ' dim'}" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v6M3.5 6.5 6 9l2.5-2.5"/></svg></span></button>`;
-}
-function paintSortToggle(btn) {
-  const desc = (S.sortDir || -1) < 0;
-  btn.title = desc ? 'Sorted descending. Click for ascending.' : 'Sorted ascending. Click for descending.';
-  btn.setAttribute('aria-label', btn.title);
-  btn.querySelector('.up').classList.toggle('dim', desc);
-  btn.querySelector('.down').classList.toggle('dim', !desc);
-}
-function bindSortToggles(root) {
-  (root || document).querySelectorAll('[data-sort-toggle]').forEach(btn => {
-    paintSortToggle(btn);
-    if (btn.dataset.bound) return;
-    btn.dataset.bound = '1';
-    btn.onclick = () => {
-      S.sortDir = -(S.sortDir || -1);
-      document.querySelectorAll('[data-sort-toggle]').forEach(paintSortToggle);
-      sortHooks.slice().forEach(h => { if (!h.el || h.el.isConnected) h.fn(); });
-    };
-  });
 }
 function filterBar() {
   const f = S.filters, m = S.meta;
@@ -1715,7 +1690,6 @@ function filterBar() {
     <select id="f_class"><option value="">All classes</option>${['RM', 'WIP', 'FG'].map(c => `<option ${f.item_class === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
     <select id="f_site"><option value="">All sites</option>${m.sites.map(s => `<option ${f.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
     <input id="f_q" placeholder="Search item, description, vendor, PO…" value="${esc(f.q)}">
-    ${sortToggleHtml()}
     <button class="btn" id="f_clear">Clear</button></div>`;
 }
 
@@ -1813,7 +1787,6 @@ function invFilters() {
     <select id="f_class"><option value="">All classes</option>${['RM', 'WIP', 'FG'].map(c => `<option ${f.item_class === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
     <select id="f_site"><option value="">All sites</option>${m.sites.map(s => `<option ${f.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
     <label class="inv-search">${svg('search', 15)}<input id="f_q" placeholder="Search item, description, vendor, posting group…" value="${esc(f.q)}"></label>
-    ${sortToggleHtml()}
     <div class="inv-filterwrap"><button type="button" class="btn inv-filterbtn" id="f_filters">${svg('lines', 14)} Filters</button>
       <div class="inv-filterpop" id="f_pop" hidden><label>Location<select id="f_loc"><option value="">All locations</option>${locs.map(s => `<option ${f.location === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label></div></div>
     <button class="btn ghost" id="f_clear">Clear</button></div>`;
@@ -2844,7 +2817,6 @@ function bindFilters() {
     bindFilters.outside = () => { const p = document.getElementById('f_pop'); if (p) p.hidden = true; };
     document.addEventListener('click', bindFilters.outside);
   }
-  bindSortToggles();
 }
 
 /* ---------- building blocks ---------- */
@@ -3092,9 +3064,8 @@ function drawHeatmap(el, ch) {
 function renderTable(el, t, opts = {}) {
   const inv = opts.variant === 'inventory';
   const num = k => ['qty', 'money', 'days'].includes(k);
-  const valueCol = t.columns.find(c => c.kind === 'money') || t.columns.find(c => num(c.kind)) || t.columns[0];
-  const st = { sort: valueCol ? valueCol.field : null, dir: S.sortDir || -1, page: 0, size: opts.size || (inv ? 10 : 50), q: '', colsOpen: false };
-  registerSort(el, () => { st.dir = S.sortDir || -1; if (!st.sort && valueCol) st.sort = valueCol.field; st.page = 0; draw(); });
+  const valueCol = (t.columns || []).find(c => c && c.kind === 'money') || (t.columns || []).find(c => c && num(c.kind)) || (t.columns || []).find(c => c && c.field) || null;
+  const st = { sort: valueCol ? valueCol.field : null, dir: -1, page: 0, size: opts.size || (inv ? 10 : 50), q: '', colsOpen: false };
   const hidden = new Set();
   const barCols = (inv || t.bars === false) ? [] : t.columns.filter(c => c.kind === 'money' || (c.kind === 'qty' && !/days|line|parent|component/i.test(c.label))).map(c => c.field);
   const maxOf = {}; barCols.forEach(f => maxOf[f] = Math.max(1e-9, ...t.rows.map(r => Math.abs(r[f] || 0))));
@@ -3134,17 +3105,19 @@ function renderTable(el, t, opts = {}) {
     seq.forEach(n => { if (prevN >= 0 && n - prevN > 1) pgBtns.push('<span class="ellipsis">…</span>'); pgBtns.push(`<button type="button" class="pg${n === st.page ? ' on' : ''}" data-go="${n}">${n + 1}</button>`); prevN = n; });
     const head = inv
       ? `<div class="tablehead inv-tablehead"><h3 style="margin:0">${esc(t.title)} <span class="muted" style="font-weight:400">${t.total_rows.toLocaleString()} rows${t.total_rows > t.rows.length ? `, top ${t.rows.length} shown` : ''}</span></h3>
-        <div class="rbtns"><label class="inv-search">${svg('search', 14)}<input class="tfilter" placeholder="${esc(opts.search || 'Search items…')}"></label>
+        <div class="rbtns">${sortToggleHtml(st.dir)}<label class="inv-search">${svg('search', 14)}<input class="tfilter" placeholder="${esc(opts.search || 'Search items…')}"></label>
         <div class="colmenu-wrap"><button type="button" class="btn" data-cols>${svg('sliders', 12)} Columns</button><div class="colmenu${st.colsOpen ? ' open' : ''}">${t.columns.map(c => `<label><input type="checkbox" data-col="${c.field}" ${hidden.has(c.field) ? '' : 'checked'}> ${esc(c.label)}</label>`).join('')}</div></div>
         <button type="button" class="btn" data-csv>${svg('download', 12)} CSV</button></div></div>`
       : `<div class="tablehead"><h3 style="margin:0">${esc(t.title)} <span class="muted" style="font-weight:400">· ${t.total_rows.toLocaleString()} rows${t.total_rows > t.rows.length ? `, top ${t.rows.length} shown` : ''}</span></h3>
-      <div class="rbtns"><input class="tfilter" placeholder="Filter rows…"><button class="btn" data-csv>${svg('download', 12)} CSV</button></div></div>`;
+      <div class="rbtns">${sortToggleHtml(st.dir)}<input class="tfilter" placeholder="Filter rows…"><button class="btn" data-csv>${svg('download', 12)} CSV</button></div></div>`;
     const pager = inv
       ? `<div class="pager inv-pager"><button type="button" class="btn" data-p="-1" ${st.page === 0 ? 'disabled' : ''}>‹ Prev</button>${pgBtns.join('')}<button type="button" class="btn" data-p="1" ${st.page >= pages - 1 ? 'disabled' : ''}>Next ›</button><label class="rpp">Rows per page <select data-size>${[10, 25, 50].map(n => `<option value="${n}" ${st.size === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>`
       : (pages > 1 ? `<div class="pager"><button class="btn" data-p="-1">‹ Prev</button> Page ${st.page + 1} of ${pages} · ${rows.length.toLocaleString()} rows <button class="btn" data-p="1">Next ›</button></div>` : '');
     el.innerHTML = `${head}<div class="tablewrap"><table><thead><tr>${cols.map(c => `<th class="${num(c.kind) ? 'num' : ''}" data-f="${c.field}">${esc(c.label)}${st.sort === c.field ? (st.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead>
       <tbody>${slice.map(r => `<tr class="${t.drill === 'item_no' && r.item_no ? 'click' : ''}" data-i="${esc(r.item_no || '')}">${cols.map(c => `<td class="${num(c.kind) ? 'num' : ''}"${bg(r, c)} title="${esc(r[c.field])}">${cell(r, c)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length}" class="muted">No rows match.</td></tr>`}</tbody></table></div>${pager}`;
-    el.querySelectorAll('th').forEach(th => th.onclick = () => { const f = th.dataset.f; st.dir = st.sort === f ? -st.dir : (num(t.columns.find(c => c.field === f).kind) ? -1 : 1); st.sort = f; S.sortDir = st.dir; document.querySelectorAll('[data-sort-toggle]').forEach(paintSortToggle); draw(); });
+    el.querySelectorAll('th').forEach(th => th.onclick = () => { const f = th.dataset.f; if (!f) return; st.dir = st.sort === f ? -st.dir : (num(t.columns.find(c => c.field === f).kind) ? -1 : 1); st.sort = f; draw(); });
+    const sortBtn = el.querySelector('[data-sort-toggle]');
+    if (sortBtn) sortBtn.onclick = ev => { ev.stopPropagation(); st.dir = -(st.dir || -1); if (!st.sort && valueCol) st.sort = valueCol.field; st.page = 0; draw(); };
     el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { if (b.disabled) return; st.page = Math.max(0, Math.min(pages - 1, st.page + +b.dataset.p)); draw(); });
     el.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { st.page = +b.dataset.go; draw(); });
     el.querySelectorAll('tr.click').forEach(tr => tr.onclick = () => openItem(tr.dataset.i));
@@ -3241,7 +3214,7 @@ async function renderReports() {
       <button class="btn" id="toBuilder">${svg('sliders', 14)} Build a custom report</button>
       <button class="btn primary" id="toSched">${svg('calendar', 14)} Schedules & history</button></div></div>
     <div class="inv-kpis cols-4">${kpis}</div>
-    <div class="filters inv-filters"><label class="inv-search">${svg('search', 15)}<input id="repQ" placeholder="Search reports…"></label>${sortToggleHtml()}</div>
+    <div class="filters inv-filters"><label class="inv-search">${svg('search', 15)}<input id="repQ" placeholder="Search reports…"></label></div>
     <div id="repGroups">${cats.map(cat => `<section class="card inv-card rgroup" data-cat="${esc(cat)}"><div class="inv-ch-head"><div><h3>${esc(cat)}</h3><p>${d.catalogue.filter(c => c.category === cat).length} reports</p></div></div>
       <div class="inv-pad rcards">${d.catalogue.filter(c => c.category === cat).map(c => `<button class="rcard" data-r="${esc(c.id)}" data-find="${esc((c.name + ' ' + c.description).toLowerCase())}"><div class="rc-ic">${svg(CAT_ICON[cat] || 'doc', 18)}</div><div><b>${esc(c.name)}</b><div class="muted">${esc(c.description)}</div></div>${svg('arrow', 14)}</button>`).join('')}</div></section>`).join('')}</div></div>`;
   document.querySelectorAll('.rcard').forEach(b => b.onclick = () => go('report:' + b.dataset.r));
@@ -3260,16 +3233,6 @@ async function renderReports() {
       group.hidden = shown === 0;
     });
   };
-  const groups = document.getElementById('repGroups');
-  const sortReports = () => {
-    const dir = S.sortDir || -1;
-    groups.querySelectorAll('.rcards').forEach(box => {
-      [...box.querySelectorAll('.rcard')].sort((a, b) => a.querySelector('b').textContent.localeCompare(b.querySelector('b').textContent) * dir).forEach(card => box.appendChild(card));
-    });
-  };
-  registerSort(groups, sortReports);
-  bindSortToggles();
-  sortReports();
 }
 
 async function renderReport(rid) {
@@ -3284,9 +3247,8 @@ async function renderReport(rid) {
       <button class="btn" id="save">${svg('star', 14)} Save to history</button><button class="btn" id="askR">${I.spark.replace('class="spark"', 'width="14" height="14"')} Ask agent</button></div></div></div>
     <div class="filters"><select id="f_class"><option value="">All classes</option>${['RM', 'WIP', 'FG'].map(x => `<option ${f.item_class === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
       <select id="f_site"><option value="">All sites</option>${S.meta.sites.map(s => `<option ${f.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
-      <input id="f_q" placeholder="Search item, description, vendor, PO…" value="${esc(f.q)}">${sortToggleHtml()}<button class="btn" id="f_clear">Clear</button></div>
+      <input id="f_q" placeholder="Search item, description, vendor, PO…" value="${esc(f.q)}"><button class="btn" id="f_clear">Clear</button></div>
     <div id="schedBox"></div><div id="rbody"><div class="empty"><span class="thinking"><i></i><i></i><i></i></span> Building report…</div></div>`;
-  bindSortToggles();
   const upd = () => { S.rFilters = { item_class: f_class.value, site: f_site.value, q: f_q.value.trim() }; renderReport(rid); };
   f_class.onchange = upd; f_site.onchange = upd; let t; f_q.oninput = () => { clearTimeout(t); t = setTimeout(upd, 500); };
   f_clear.onclick = () => { S.rFilters = { item_class: '', site: '', q: '' }; renderReport(rid); };
@@ -3381,7 +3343,7 @@ async function renderBuilder() {
         <input data-ci="${i}" class="b_cval" value="${esc(cd.value || '')}" placeholder="value"><button class="btn" data-crm="${i}">${svg('x', 12)}</button></div>`).join('')}
       <button class="btn" id="b_cadd">${svg('plus', 12)} Add condition</button>
       <div class="row2"><label>Class<select id="b_cls"><option value="">All</option>${['RM', 'WIP', 'FG'].map(x => `<option ${b.filters.item_class === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
-        <label>Site<select id="b_site"><option value="">All</option>${S.meta.sites.map(s => `<option ${b.filters.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label>${sortToggleHtml()}</div>
+        <label>Site<select id="b_site"><option value="">All</option>${S.meta.sites.map(s => `<option ${b.filters.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label></div>
       <div class="row2"><label>Sort by<select id="b_sort">${opt(cols, b.sort.col, 'Default')}</select></label><label>Order<select id="b_dir"><option value="desc">High → low</option><option value="asc" ${b.sort.dir === 'asc' ? 'selected' : ''}>Low → high</option></select></label></div>
       <label>Max rows<input id="b_lim" type="number" min="1" value="${esc(b.limit)}" placeholder="All"></label>
       <div class="bbtns"><button class="btn primary" id="b_run">${svg('play', 14)} Run</button><button class="btn" id="b_xl">${svg('download', 14)} Excel</button><button class="btn" id="b_save">${svg('star', 14)} Save as report</button></div>
@@ -3412,7 +3374,6 @@ async function renderBuilder() {
     drawReportBody(document.getElementById('b_out'), { ...r, name: D[b.dataset].label });
   };
   document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Help me build a report: which dataset, columns and conditions should I use for the question I have?'), 50); };
-  bindSortToggles();
   b_run.onclick = run;
   b_xl.onclick = async () => { read(); const res = await fetch('/api/reports/custom/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ spec: spec(), name: D[b.dataset].label }) });
     const a = document.createElement('a'); a.href = URL.createObjectURL(await res.blob()); a.download = D[b.dataset].label.replace(/\W+/g, '_') + '.xlsx'; a.click(); };
@@ -3468,9 +3429,8 @@ async function renderSchedules() {
     box.innerHTML = `<div class="card inv-card" style="margin-top:14px"><div class="inv-ch-head"><div><h3>New schedule</h3><p>Choose the report, then how often it should run.</p></div></div>
       <div class="inv-pad"><div class="filters inv-filters" style="margin:0"><select id="ns_r">${cat.catalogue.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select>
       <select id="ns_c"><option value="">All classes</option><option>RM</option><option>WIP</option><option>FG</option></select>
-      <select id="ns_s"><option value="">All sites</option>${S.meta.sites.map(x => `<option>${esc(x)}</option>`).join('')}</select>${sortToggleHtml()}</div><div id="ns_f" style="margin-top:8px"></div></div></div>`;
+      <select id="ns_s"><option value="">All sites</option>${S.meta.sites.map(x => `<option>${esc(x)}</option>`).join('')}</select></div><div id="ns_f" style="margin-top:8px"></div></div></div>`;
     const draw = () => scheduleForm(document.getElementById('ns_f'), ns_r.value, { item_class: ns_c.value, site: ns_s.value });
-    bindSortToggles(box);
     ns_r.onchange = draw; ns_c.onchange = draw; ns_s.onchange = draw; draw();
     const orig = document.getElementById('ns_f');
     new MutationObserver(() => { if (orig.textContent.includes('Scheduled —')) setTimeout(renderSchedules, 900); }).observe(orig, { childList: true, subtree: true });
@@ -3649,7 +3609,7 @@ async function renderAudit() {
       <button class="btn primary" id="exportInv">${svg('download', 14)} Export</button></div></div>
     <div class="inv-kpis cols-6">${kpis}</div>
     <div class="filters inv-filters"><select id="a_t"><option value="">All events</option>${types.map(t => `<option value="${esc(t)}">${esc(typeLabel(t))}</option>`).join('')}</select>
-      ${sortToggleHtml()}<button class="btn ghost" id="a_clear">Clear</button></div>
+      <button class="btn ghost" id="a_clear">Clear</button></div>
     <div class="card tablecard inv-table" id="alog"></div></div>`;
   const draw = () => {
     const spec = tableOf(shown());
@@ -3660,7 +3620,6 @@ async function renderAudit() {
   document.getElementById('pdfThis').onclick = () => window.print();
   document.getElementById('a_t').onchange = draw;
   document.getElementById('a_clear').onclick = () => { document.getElementById('a_t').value = ''; draw(); };
-  bindSortToggles();
   draw();
 }
 
