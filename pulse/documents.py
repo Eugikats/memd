@@ -84,8 +84,6 @@ def extract(name, data):
 
 
 def save(name, data):
-    if len(data) > 8 * 1024 * 1024:
-        raise ValueError("Files must be 8 MB or smaller.")
     text, headers = extract(name, data)
     if not text:
         raise ValueError("No text could be read from that file.")
