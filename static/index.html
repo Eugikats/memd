@@ -123,7 +123,9 @@ body.assist-open .assist-fab { display: none; }
 .assist-tools { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; gap: 2px; }
 .assist-tools button { width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: #64748b; cursor: pointer; display: grid; place-items: center; }
 .assist-tools button:hover, .assist-tools button.on { background: #f1f5f9; color: #1769FF; }
-.assist-hero { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; padding: 48px 24px 16px; overflow: auto; background: #fff; }
+.assist-hero { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 56px 24px 16px; overflow: auto; background: #fff; }
+.assist-hero:not(.chatting) { justify-content: center; padding-top: 24px; padding-bottom: 24px; }
+.assist-hero:not(.chatting) .thread { display: none; }
 .assist-hero h1 { font-family: "Times New Roman", "Source Serif 4", Times, serif; font-weight: 700; font-size: 40px; letter-spacing: -.6px; margin: 12px 0 0; text-align: center; color: #0B1640; }
 .assist-hero h1 span { color: #0B1640; }
 .assist-hero .thread { width: min(720px, 100%); margin-top: 18px; }
@@ -562,7 +564,14 @@ body.page-inv #topAvatar { display: none; }
 .inv-kpi.link { cursor: pointer; }
 .inv-wide { margin-top: 14px; }
 .inv-kpi-top { display: flex; align-items: center; gap: 8px; min-width: 0; padding-right: 46px; min-height: 40px; }
-.inv-kpi-ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none; }
+.inv-kpi-ic { width: 26px; height: 26px; display: grid; place-items: center; flex: none; background: none; color: #1e3a5f; }
+.inv-kpi-ic svg { width: 24px; height: 24px; display: block; }
+.sort-toggle { display: inline-flex; align-items: center; gap: 4px; height: 32px; margin-left: 2px; padding: 0 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; color: #475569; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; flex: none; }
+.sort-toggle:hover { background: #f8fafc; }
+.sort-arrows { display: inline-flex; flex-direction: column; color: #1769FF; line-height: 0; }
+.sort-arrows svg { width: 10px; height: 10px; }
+.sort-arrows svg.dim { opacity: .35; }
+.sort-arrows svg + svg { margin-top: -2px; }
 .inv-kpi-l { margin: 0; flex: 1; min-width: 0; color: #64748b; font-size: 12px; font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .inv-ring { position: absolute; top: 12px; right: 10px; width: 42px; height: 42px; }
 .inv-kpi-row { margin-top: 10px; display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden; }
@@ -707,7 +716,8 @@ body.page-inv .tablehead.inv-tablehead .rbtns { width: auto; }
 </div>
 
 <script>
-const S = { meta: null, view: null, filters: { item_class: '', site: '', location: '', q: '' }, charts: [], history: [], thread: [], chatId: null, chats: [], settings: 'profile' };
+const S = { meta: null, view: null, filters: { item_class: '', site: '', location: '', q: '' }, sortDir: -1, charts: [], history: [], thread: [], chatId: null, chats: [], settings: 'profile' };
+const sortHooks = [];
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const CLASS = { RM: '--series-1', WIP: '--series-2', FG: '--series-3', 'Raw Material': '--series-1', 'Work in Progress': '--series-2', 'Finished Goods': '--series-3' };
 const STATUS = [
@@ -777,6 +787,57 @@ const P = {
   pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
 };
 const svg = (n, s = 18) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${P[n] || ''}</svg>`;
+const KPI_MARK = {
+  vault: '<rect x="4.2" y="3.2" width="15.6" height="17.6" rx="3"/><circle cx="12" cy="12" r="3.1"/><path d="M12 10.1v2.1l1.5.9"/><path d="M4.2 8.2H6M4.2 15.8H6"/>',
+  box: '<path d="M5 8.2h14v11.2H5z"/><path d="M5 8.2 7.4 4.8h9.2L19 8.2"/><path d="M8.2 8.2v11.2M12 8.2v11.2M15.8 8.2v11.2"/>',
+  layers: '<path d="M7 15.6h12.2v4.1H7z"/><path d="M4.8 10.6h12.2v4.1H4.8z"/><path d="M2.8 5.6h12.2v4.1H2.8z"/>',
+  package: '<rect x="5" y="3.6" width="14" height="16.8" rx="2"/><path d="M5 8.6h14"/><path d="M9 13.4l2.1 2.1 4-4.2"/>',
+  alert: '<path d="M12 3.2 20.4 12 12 20.8 3.6 12z"/><path d="M12 8.4v4.3"/><circle cx="12" cy="15.6" r=".75" fill="currentColor" stroke="none"/>',
+  alertMid: '<path d="M12 4.2 19 18.2H5z"/><path d="M12 9.2v4"/><circle cx="12" cy="15.6" r=".75" fill="currentColor" stroke="none"/>',
+  alertLow: '<rect x="4.5" y="4.5" width="15" height="15" rx="3"/><path d="M12 8.4v4.2"/><circle cx="12" cy="15.5" r=".75" fill="currentColor" stroke="none"/>',
+  pin: '<path d="M12 21.2s-6-5.2-6-9.6a6 6 0 0 1 12 0c0 4.4-6 9.6-6 9.6z"/><rect x="10" y="8.4" width="4" height="4" rx=".7"/>',
+  building: '<path d="M3.5 20.5h17"/><path d="M6 20.5V7.2L12 4.2l6 3v13.3"/><path d="M9.2 10.2h1.5M13.3 10.2h1.5M9.2 13.6h1.5M13.3 13.6h1.5M9.2 17h1.5M13.3 17h1.5"/>',
+  trend: '<path d="M3.2 16.8c2.4-.8 3.4-5.6 5.8-5.6 1.8 0 2.3 3.1 4.4 3.1 2.4 0 3.2-4.6 7.4-6.4"/><circle cx="3.2" cy="16.8" r="1.05" fill="currentColor" stroke="none"/><circle cx="20.6" cy="7.8" r="1.25" fill="currentColor" stroke="none"/>',
+  truck: '<path d="M2.8 15.2V8.2h9.2v7"/><path d="M12 10.6h3.4l2.4 2.6v2"/><circle cx="6.6" cy="17.2" r="1.55"/><circle cx="15.8" cy="17.2" r="1.55"/><path d="M8.2 17.2h6"/>',
+  gauge: '<path d="M4 16.8a8.2 8.2 0 1 1 16 0"/><path d="M12 16.8 16.6 9.6"/><circle cx="12" cy="16.8" r="1.25" fill="currentColor" stroke="none"/>',
+  clock: '<circle cx="12" cy="12" r="8"/><path d="M12 7.4V12l3.3 2.1"/>',
+  clockAlert: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4.4"/><circle cx="12" cy="15.4" r=".7" fill="currentColor" stroke="none"/>',
+  clockSoft: '<circle cx="12" cy="12" r="8"/><path d="M12 7.6V12l2.2 2.2"/><path d="M12 4.1v1.5"/>',
+  factory: '<path d="M2.8 20.2V10.2l4.6 2.8V10l4.6 2.8V7.4l2.6-1.4v14.2"/><path d="M14.6 7.6h6.6v12.6"/><path d="M16.8 11.2h1.6M16.8 14.6h1.6"/><path d="M5.6 20.2v-2.2M8.6 20.2v-2.2"/>',
+  doc: '<path d="M7 3.2h6.6L18 7.6V20.6H7z"/><path d="M13.6 3.2V7.6H18"/><path d="M9.6 12.8h5M9.6 16h3.4"/>',
+  check: '<circle cx="12" cy="12" r="8"/><path d="M8.1 12.2 10.8 14.9 15.9 9.4"/>',
+  x: '<circle cx="12" cy="12" r="8"/><path d="M9 9l6 6M15 9l-6 6"/>',
+  bell: '<path d="M6.4 16.4h11.2"/><path d="M7.2 16.4V10.8a4.8 4.8 0 0 1 9.6 0v5.6"/><path d="M10.2 16.4a1.8 1.8 0 0 0 3.6 0"/><path d="M12 4.6v1.4"/>',
+  star: '<circle cx="12" cy="12" r="2.5"/><path d="M2.6 12S6.4 6.4 12 6.4 21.4 12 21.4 12 17.6 17.6 12 17.6 2.6 12 2.6 12"/>',
+  inbox: '<path d="M4 13.2h4.1l1.5 2.2h4.8l1.5-2.2H20"/><path d="M5.4 13.2 7.2 6.2h9.6l1.8 7"/><path d="M4 13.2V18a1.4 1.4 0 0 0 1.4 1.4h13.2A1.4 1.4 0 0 0 20 18v-4.8"/>',
+  flag: '<path d="M6 20.4V3.8"/><path d="M6 4.4h10.8L14.4 8l2.4 3.6H6"/>',
+  swap: '<path d="M7 7.2h10.6"/><path d="M14.6 4.2 18 7.2l-3.4 3"/><path d="M17 16.8H6.4"/><path d="M9.4 13.8 6 16.8l3.4 3"/>',
+  filter: '<path d="M4 6h16M6.5 12h11M9.5 18h5"/><circle cx="15.2" cy="6" r="1.35" fill="currentColor" stroke="none"/><circle cx="9" cy="12" r="1.35" fill="currentColor" stroke="none"/><circle cx="14.2" cy="18" r="1.35" fill="currentColor" stroke="none"/>',
+  sliders: '<path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="1.7"/><circle cx="15" cy="12" r="1.7"/><circle cx="8" cy="17" r="1.7"/>',
+  calendar: '<rect x="4" y="5" width="16" height="14.6" rx="2"/><path d="M4 9.6h16M8 3.4v3.2M16 3.4v3.2"/><rect x="8" y="12.2" width="2.5" height="2.5" rx=".4" fill="currentColor" stroke="none"/>',
+  play: '<circle cx="12" cy="12" r="8"/><path d="M10.2 8.7v6.6L16.1 12z"/>',
+  shield: '<path d="M12 3.1 19.2 6v5.5c0 4.3-2.9 7-7.2 8.4-4.3-1.4-7.2-4.1-7.2-8.4V6z"/><path d="M8.7 12.1 11 14.4 15.4 9.7"/>',
+  refresh: '<path d="M7.2 8.2A6.6 6.6 0 0 1 17.4 9"/><path d="M16 6.1 18.2 9.5 14.6 10.1"/><path d="M16.8 15.8A6.6 6.6 0 0 1 6.6 15"/><path d="M8 17.9 5.8 14.5 9.4 13.9"/>',
+  sparkle: '<path d="M12 3.2v4.2M12 16.6v4.2M3.2 12h4.2M16.6 12h4.2"/><path d="M6.4 6.4l2.6 2.6M15 15l2.6 2.6M17.6 6.4 15 9M9 15l-2.6 2.6"/>',
+  book: '<path d="M12 6.2C10.3 4.8 8.2 4.2 5.6 4.2v13.4c2.6 0 4.7.6 6.4 2 1.7-1.4 3.8-2 6.4-2V4.2c-2.6 0-4.7.6-6.4 2z"/><path d="M12 6.2v13.4"/>',
+  grid: '<rect x="3.8" y="3.8" width="6.6" height="6.6" rx="1.5"/><rect x="13.6" y="3.8" width="6.6" height="6.6" rx="1.5"/><rect x="3.8" y="13.6" width="6.6" height="6.6" rx="1.5"/><rect x="13.6" y="13.6" width="6.6" height="6.6" rx="1.5"/>',
+  chart: '<path d="M4 19.4h16"/><path d="M7.2 16.2V11M12 16.2V7.4M16.8 16.2V9.2"/>',
+  idle: '<path d="M5 8.5h14v9H5z"/><path d="M8 8.5V6.8M16 8.5V6.8"/><path d="M9 13h6"/>',
+  empty: '<path d="M7 8.2h10l-1.2 9.2H8.2z"/><path d="M9.2 8.2 10 5.2h4l.8 3"/><path d="M10 12.4h4"/>',
+  late: '<circle cx="12" cy="12" r="8"/><path d="M12 7.6V12l2.8 2.4"/><path d="M16.8 4.6 19.2 7"/>',
+  gap: '<path d="M4 17.5h6.2V8.2H4zM13.8 17.5H20V5.5h-6.2z"/><path d="M10.2 12.2h3.6"/>',
+  lock: '<rect x="6" y="10.2" width="12" height="8.6" rx="1.6"/><path d="M8.4 10.2V8.1a3.6 3.6 0 0 1 7.2 0v2.1"/><circle cx="12" cy="14.4" r="1" fill="currentColor" stroke="none"/>',
+};
+function kpiMark(name) {
+  const d = KPI_MARK[name] || KPI_MARK.chart;
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+}
+function registerSort(el, fn) {
+  for (let i = sortHooks.length - 1; i >= 0; i--) {
+    if (sortHooks[i].el === el || (sortHooks[i].el && !sortHooks[i].el.isConnected)) sortHooks.splice(i, 1);
+  }
+  sortHooks.push({ el, fn });
+}
 const VIEW_ICON = { overview: 'grid', inventory_position: 'box', inventory_by_location: 'pin', rm_consumption_cover: 'gauge', wip_cover: 'layers', fg_cover: 'package',
   in_transit_overdue: 'truck', projection_stockout: 'trend', inventory_risk: 'alert', location_risk: 'shuffle', bom_readiness: 'factory', exceptions: 'flag' };
 const GROUPS = [
@@ -1368,6 +1429,7 @@ function go(v, force) {
   if (S.cockpitTimer) { clearInterval(S.cockpitTimer); S.cockpitTimer = null; }
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
+  sortHooks.length = 0;
   S.view = v;
   const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview', reports: 'Report library', builder: 'Report builder', schedules: 'Schedules & history', trends: 'Trends', command: 'Command Center' };
   const invShell = Object.prototype.hasOwnProperty.call(INV_SHELL, v);
@@ -1575,7 +1637,7 @@ async function renderActions() {
   ];
   const kpis = cards.map(k => {
     const face = faces[k.label];
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${k.value}</p>${cipSpark(null, face.fg, k.label)}</div></article>`;
   }).join('');
   const active = S.actFilter || 'proposed';
@@ -1588,17 +1650,20 @@ async function renderActions() {
     <div class="inv-head"><div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
       <button class="btn primary" id="newRun">${svg('play', 14)} Run the agent</button></div></div>
     <div class="inv-kpis cols-6">${kpis}</div>
-    <div class="filters inv-filters"><div class="seg inv-seg" id="af">${filters}</div></div>
+    <div class="filters inv-filters"><div class="seg inv-seg" id="af">${filters}</div>${sortToggleHtml()}</div>
     <div id="alist" class="alist"></div>
     <div class="inv-charts2"><section class="card inv-card"><div class="inv-ch-head"><div><h3>Alert rules</h3><p>Checked after each refresh once a person approves the rule</p></div></div><div class="inv-pad" id="alerts"></div></section>
       <section class="card inv-card"><div class="inv-ch-head"><div><h3>Watchlist</h3><p>Items the agent is watching</p></div></div><div class="inv-pad" id="watch"></div></section></div></div>`;
   const draw = () => {
     const f = S.actFilter || 'proposed', box = document.getElementById('alist');
-    const list = acts.filter(a => f === 'all' || a.status === f);
+    const dir = S.sortDir || -1;
+    const list = acts.filter(a => f === 'all' || a.status === f).slice().sort((a, b) => (String(a.created) > String(b.created) ? 1 : String(a.created) < String(b.created) ? -1 : 0) * dir);
     box.innerHTML = list.length ? '' : `<div class="empty">${svg('inbox', 28)}<div>No ${f === 'all' ? '' : f} actions yet.</div><div class="muted">Ask the Command Center to chase overdue POs, plan transfers, set alerts or write a briefing.</div></div>`;
     list.forEach(a => box.appendChild(actionCard(a)));
   };
   document.getElementById('af').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { S.actFilter = b.dataset.f; renderActions(); } };
+  registerSort(document.getElementById('alist'), draw);
+  bindSortToggles();
   document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Which proposed agent actions, alerts and watched items need a decision?'), 50); };
   document.getElementById('newRun').onclick = () => go('command');
   draw();
@@ -1621,12 +1686,36 @@ function renderWatch(el, watch, after) {
 }
 
 /* ---------------- Dashboards ---------------- */
+function sortToggleHtml() {
+  const desc = (S.sortDir || -1) < 0;
+  return `<button type="button" class="sort-toggle" data-sort-toggle title="${desc ? 'Sorted descending. Click for ascending.' : 'Sorted ascending. Click for descending.'}"><span>Sort</span><span class="sort-arrows" aria-hidden="true"><svg class="up${desc ? ' dim' : ''}" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3M3.5 5.5 6 3l2.5 2.5"/></svg><svg class="down${desc ? '' : ' dim'}" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v6M3.5 6.5 6 9l2.5-2.5"/></svg></span></button>`;
+}
+function paintSortToggle(btn) {
+  const desc = (S.sortDir || -1) < 0;
+  btn.title = desc ? 'Sorted descending. Click for ascending.' : 'Sorted ascending. Click for descending.';
+  btn.setAttribute('aria-label', btn.title);
+  btn.querySelector('.up').classList.toggle('dim', desc);
+  btn.querySelector('.down').classList.toggle('dim', !desc);
+}
+function bindSortToggles(root) {
+  (root || document).querySelectorAll('[data-sort-toggle]').forEach(btn => {
+    paintSortToggle(btn);
+    if (btn.dataset.bound) return;
+    btn.dataset.bound = '1';
+    btn.onclick = () => {
+      S.sortDir = -(S.sortDir || -1);
+      document.querySelectorAll('[data-sort-toggle]').forEach(paintSortToggle);
+      sortHooks.slice().forEach(h => { if (!h.el || h.el.isConnected) h.fn(); });
+    };
+  });
+}
 function filterBar() {
   const f = S.filters, m = S.meta;
   return `<div class="filters">
     <select id="f_class"><option value="">All classes</option>${['RM', 'WIP', 'FG'].map(c => `<option ${f.item_class === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
     <select id="f_site"><option value="">All sites</option>${m.sites.map(s => `<option ${f.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
     <input id="f_q" placeholder="Search item, description, vendor, PO…" value="${esc(f.q)}">
+    ${sortToggleHtml()}
     <button class="btn" id="f_clear">Clear</button></div>`;
 }
 
@@ -1724,22 +1813,23 @@ function invFilters() {
     <select id="f_class"><option value="">All classes</option>${['RM', 'WIP', 'FG'].map(c => `<option ${f.item_class === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
     <select id="f_site"><option value="">All sites</option>${m.sites.map(s => `<option ${f.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
     <label class="inv-search">${svg('search', 15)}<input id="f_q" placeholder="Search item, description, vendor, posting group…" value="${esc(f.q)}"></label>
+    ${sortToggleHtml()}
     <div class="inv-filterwrap"><button type="button" class="btn inv-filterbtn" id="f_filters">${svg('lines', 14)} Filters</button>
       <div class="inv-filterpop" id="f_pop" hidden><label>Location<select id="f_loc"><option value="">All locations</option>${locs.map(s => `<option ${f.location === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label></div></div>
     <button class="btn ghost" id="f_clear">Clear</button></div>`;
 }
 function renderInventory(c, d) {
   const faces = {
-    'Total Inventory Value': { icon: 'box', bg: '#e8f1ff', fg: '#2563EB' },
+    'Total Inventory Value': { icon: 'vault', bg: '#e8f1ff', fg: '#2563EB' },
     'Raw Material': { icon: 'box', bg: '#e8f1ff', fg: '#2563EB' },
     'Work in Progress': { icon: 'layers', bg: '#f3eefe', fg: '#7c5cf0' },
     'Finished Goods': { icon: 'package', bg: '#e8f8ef', fg: '#16a34a' },
-    'Excess / Not Moving': { icon: 'alert', bg: '#fff4e8', fg: '#e07a12' },
+    'Excess / Not Moving': { icon: 'idle', bg: '#fff4e8', fg: '#e07a12' },
   };
   const kpis = (d.kpis || []).map(k => {
     const title = { 'Total RM / WIP / FG value': 'Total Inventory Value', 'Excess / not moving': 'Excess / Not Moving' }[k.label] || k.label;
     const face = faces[title] || { icon: 'chart', bg: '#eef2f7', fg: '#475569' };
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(title)}</p>${invRing(k.pct, face.fg)}</div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(title)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${k.kind === 'money' ? moneyRich(k.value) : esc(String(fmt(k.value, k.kind)))}</p>${cipSpark(k.spark, face.fg, title)}</div></article>`;
   }).join('');
   const donut = (d.charts || []).find(ch => ch.type === 'doughnut');
@@ -1852,7 +1942,7 @@ function renderLocation(c, d) {
   };
   const kpis = (d.kpis || []).map(k => {
     const face = faces[k.label] || { icon: 'pin', bg: '#eef2f7', fg: '#475569' };
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v${k.kind === 'text' ? ' text' : ''}">${kpiValue(k)}</p>${cipSpark(k.spark, face.fg, k.label)}</div></article>`;
   }).join('');
   const find = title => (d.charts || []).find(ch => ch.title === title);
@@ -1930,8 +2020,8 @@ function renderRm(c, d) {
   const faces = {
     'RM use / day': { icon: 'gauge', bg: '#e8f1ff', fg: '#2563EB' },
     'RM cover': { icon: 'clock', bg: '#f3eefe', fg: '#7c5cf0' },
-    'Under 7 days': { icon: 'alert', bg: '#fdecec', fg: '#d03b3b' },
-    'Under 14 days': { icon: 'alert', bg: '#fff4e8', fg: '#e07a12' },
+    'Under 7 days': { icon: 'clockAlert', bg: '#fdecec', fg: '#d03b3b' },
+    'Under 14 days': { icon: 'clockSoft', bg: '#fff4e8', fg: '#e07a12' },
     'RM stock': { icon: 'box', bg: '#e8f8ef', fg: '#16a34a' },
   };
   const kpiValue = k => {
@@ -1943,7 +2033,7 @@ function renderRm(c, d) {
   const kpis = (d.kpis || []).map(k => {
     const label = short[k.label] || k.label;
     const face = faces[label] || { icon: 'gauge', bg: '#eef2f7', fg: '#475569' };
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${kpiValue(k)}</p>${cipSpark(k.spark, face.fg, label)}</div></article>`;
   }).join('');
   const find = re => (d.charts || []).find(ch => re.test(ch.title));
@@ -2011,7 +2101,7 @@ function renderWip(c, d) {
   const faces = {
     'WIP value': { icon: 'layers', bg: '#f3eefe', fg: '#7c5cf0' },
     'On a BOM': { icon: 'factory', bg: '#e8f1ff', fg: '#2563EB' },
-    'Under 7 days': { icon: 'alert', bg: '#fff4e8', fg: '#e07a12' },
+    'Under 7 days': { icon: 'clockAlert', bg: '#fff4e8', fg: '#e07a12' },
     'Median cover': { icon: 'clock', bg: '#e8f8ef', fg: '#16a34a' },
   };
   const kpiValue = (k, label) => {
@@ -2023,7 +2113,7 @@ function renderWip(c, d) {
   const kpis = (d.kpis || []).map(k => {
     const label = short[k.label] || k.label;
     const face = faces[label] || { icon: 'layers', bg: '#eef2f7', fg: '#475569' };
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${kpiValue(k, label)}</p>${cipSpark(k.spark, face.fg, label)}</div></article>`;
   }).join('');
   const find = re => (d.charts || []).find(ch => re.test(ch.title));
@@ -2094,9 +2184,9 @@ function renderFg(c, d) {
     'FG value': { icon: 'package', bg: '#e8f8ef', fg: '#16a34a' },
     'Demand / day': { icon: 'trend', bg: '#e8f1ff', fg: '#2563EB' },
     'FG cover': { icon: 'clock', bg: '#f3eefe', fg: '#7c5cf0' },
-    'Stockouts': { icon: 'alert', bg: '#fdecec', fg: '#d03b3b' },
+    'Stockouts': { icon: 'empty', bg: '#fdecec', fg: '#d03b3b' },
     'Made to order': { icon: 'factory', bg: '#eef2ff', fg: '#4f46e5' },
-    'Excess FG': { icon: 'alert', bg: '#fff4e8', fg: '#e07a12' },
+    'Excess FG': { icon: 'idle', bg: '#fff4e8', fg: '#e07a12' },
   };
   const kpiValue = k => {
     if (k.kind === 'money') return moneyRich(k.value);
@@ -2107,7 +2197,7 @@ function renderFg(c, d) {
   const kpis = (d.kpis || []).map(k => {
     const label = short[k.label] || k.label;
     const face = faces[label] || { icon: 'package', bg: '#eef2f7', fg: '#475569' };
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${kpiValue(k)}</p>${cipSpark(k.spark, face.fg, label)}</div></article>`;
   }).join('');
   const find = re => (d.charts || []).find(ch => re.test(ch.title));
@@ -2176,8 +2266,8 @@ function renderTransit(c, d) {
   const faces = {
     'Open lines': { icon: 'doc', bg: '#e8f1ff', fg: '#2563EB' },
     'Outstanding': { icon: 'package', bg: '#eef2ff', fg: '#4f46e5' },
-    'Overdue': { icon: 'alert', bg: '#fdecec', fg: '#d03b3b' },
-    'Stale': { icon: 'alert', bg: '#fff4e8', fg: '#e07a12' },
+    'Overdue': { icon: 'late', bg: '#fdecec', fg: '#d03b3b' },
+    'Stale': { icon: 'idle', bg: '#fff4e8', fg: '#e07a12' },
     'Days late': { icon: 'clock', bg: '#f3eefe', fg: '#7c5cf0' },
     'In transit': { icon: 'truck', bg: '#e8f8ef', fg: '#16a34a' },
   };
@@ -2190,7 +2280,7 @@ function renderTransit(c, d) {
   const kpis = (d.kpis || []).map(k => {
     const label = short[k.label] || k.label;
     const face = faces[label] || { icon: 'truck', bg: '#eef2f7', fg: '#475569' };
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${kpiValue(k)}</p>${cipSpark(k.spark, face.fg, label)}</div></article>`;
   }).join('');
   const find = re => (d.charts || []).find(ch => re.test(ch.title));
@@ -2254,9 +2344,9 @@ function renderProjection(c, d) {
   };
   const faces = {
     'Exposed': { icon: 'alert', bg: '#fdecec', fg: '#d03b3b' },
-    'Out of stock': { icon: 'alert', bg: '#fdecec', fg: '#b42318' },
-    'Within 7 days': { icon: 'clock', bg: '#fff4e8', fg: '#e07a12' },
-    'In 8–30 days': { icon: 'clock', bg: '#fff8e8', fg: '#c26a00' },
+    'Out of stock': { icon: 'empty', bg: '#fdecec', fg: '#b42318' },
+    'Within 7 days': { icon: 'clockAlert', bg: '#fff4e8', fg: '#e07a12' },
+    'In 8–30 days': { icon: 'clockSoft', bg: '#fff8e8', fg: '#c26a00' },
     'In 12 weeks': { icon: 'trend', bg: '#e8f1ff', fg: '#2563EB' },
   };
   const kpiValue = k => {
@@ -2268,7 +2358,7 @@ function renderProjection(c, d) {
   const kpis = (d.kpis || []).map(k => {
     const label = short[k.label] || k.label;
     const face = faces[label] || { icon: 'trend', bg: '#eef2f7', fg: '#475569' };
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${kpiValue(k)}</p>${cipSpark(k.spark, face.fg, label)}</div></article>`;
   }).join('');
   const find = re => (d.charts || []).find(ch => re.test(ch.title));
@@ -2318,8 +2408,8 @@ function renderRisk(c, d) {
   };
   const faces = {
     'High risk': { icon: 'alert', bg: '#fdecec', fg: '#d03b3b' },
-    'Medium risk': { icon: 'alert', bg: '#fff1ea', fg: '#e07a12' },
-    'Low risk': { icon: 'alert', bg: '#fff8e8', fg: '#c26a00' },
+    'Medium risk': { icon: 'alertMid', bg: '#fff1ea', fg: '#e07a12' },
+    'Low risk': { icon: 'alertLow', bg: '#fff8e8', fg: '#c26a00' },
     'Usage at risk': { icon: 'trend', bg: '#e8f1ff', fg: '#2563EB' },
   };
   const kpiValue = k => {
@@ -2331,7 +2421,7 @@ function renderRisk(c, d) {
   const kpis = (d.kpis || []).map(k => {
     const label = short[k.label] || k.label;
     const face = faces[label] || { icon: 'alert', bg: '#eef2f7', fg: '#475569' };
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${kpiValue(k)}</p>${cipSpark(k.spark, face.fg, label)}</div></article>`;
   }).join('');
   const find = re => (d.charts || []).find(ch => re.test(ch.title));
@@ -2401,7 +2491,7 @@ function renderLocRisk(c, d) {
     'Transferable value': 'Transfer value',
   };
   const faces = {
-    'Shortages': { icon: 'alert', bg: '#fdecec', fg: '#d03b3b' },
+    'Shortages': { icon: 'gap', bg: '#fdecec', fg: '#d03b3b' },
     'Sites': { icon: 'pin', bg: '#e8f1ff', fg: '#2563EB' },
     'Fully covered': { icon: 'swap', bg: '#e8f8ef', fg: '#16a34a' },
     'Partly covered': { icon: 'swap', bg: '#fff4e8', fg: '#e07a12' },
@@ -2416,7 +2506,7 @@ function renderLocRisk(c, d) {
   const kpis = (d.kpis || []).map(k => {
     const label = short[k.label] || k.label;
     const face = faces[label] || { icon: 'pin', bg: '#eef2f7', fg: '#475569' };
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${kpiValue(k, label)}</p>${cipSpark(k.spark, face.fg, label)}</div></article>`;
   }).join('');
   const find = re => (d.charts || []).find(ch => re.test(ch.title));
@@ -2469,8 +2559,8 @@ function renderBom(c, d) {
   };
   const faces = {
     'Products': { icon: 'factory', bg: '#eef2ff', fg: '#4f46e5' },
-    'Constrained': { icon: 'alert', bg: '#fdecec', fg: '#d03b3b' },
-    'At risk': { icon: 'alert', bg: '#fff4e8', fg: '#e07a12' },
+    'Constrained': { icon: 'lock', bg: '#fdecec', fg: '#d03b3b' },
+    'At risk': { icon: 'alertMid', bg: '#fff4e8', fg: '#e07a12' },
     'Ready': { icon: 'check', bg: '#e8f8ef', fg: '#16a34a' },
   };
   const kpiValue = k => {
@@ -2482,7 +2572,7 @@ function renderBom(c, d) {
   const kpis = (d.kpis || []).map(k => {
     const label = short[k.label] || k.label;
     const face = faces[label] || { icon: 'factory', bg: '#eef2f7', fg: '#475569' };
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${kpiValue(k)}</p>${cipSpark(k.spark, face.fg, label)}</div></article>`;
   }).join('');
   const find = re => (d.charts || []).find(ch => re.test(ch.title));
@@ -2547,8 +2637,8 @@ function renderExceptions(c, d) {
   const faces = {
     'Exceptions': { icon: 'flag', bg: '#eef2ff', fg: '#4f46e5' },
     'High': { icon: 'alert', bg: '#fdecec', fg: '#d03b3b' },
-    'Medium': { icon: 'alert', bg: '#fff4e8', fg: '#e07a12' },
-    'Low': { icon: 'alert', bg: '#fff8e8', fg: '#c26a00' },
+    'Medium': { icon: 'alertMid', bg: '#fff4e8', fg: '#e07a12' },
+    'Low': { icon: 'alertLow', bg: '#fff8e8', fg: '#c26a00' },
   };
   const kpiValue = k => {
     if (k.kind === 'money') return moneyRich(k.value);
@@ -2558,7 +2648,7 @@ function renderExceptions(c, d) {
   const kpis = (d.kpis || []).map(k => {
     const label = short[k.label] || k.label;
     const face = faces[label] || { icon: 'flag', bg: '#eef2f7', fg: '#475569' };
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${kpiValue(k)}</p>${cipSpark(k.spark, face.fg, label)}</div></article>`;
   }).join('');
   const find = re => (d.charts || []).find(ch => re.test(ch.title));
@@ -2754,6 +2844,7 @@ function bindFilters() {
     bindFilters.outside = () => { const p = document.getElementById('f_pop'); if (p) p.hidden = true; };
     document.addEventListener('click', bindFilters.outside);
   }
+  bindSortToggles();
 }
 
 /* ---------- building blocks ---------- */
@@ -3000,9 +3091,11 @@ function drawHeatmap(el, ch) {
 /* ---------- tables with in-cell data bars ---------- */
 function renderTable(el, t, opts = {}) {
   const inv = opts.variant === 'inventory';
-  const st = { sort: null, dir: 1, page: 0, size: opts.size || (inv ? 10 : 50), q: '', colsOpen: false };
-  const hidden = new Set();
   const num = k => ['qty', 'money', 'days'].includes(k);
+  const valueCol = t.columns.find(c => c.kind === 'money') || t.columns.find(c => num(c.kind)) || t.columns[0];
+  const st = { sort: valueCol ? valueCol.field : null, dir: S.sortDir || -1, page: 0, size: opts.size || (inv ? 10 : 50), q: '', colsOpen: false };
+  registerSort(el, () => { st.dir = S.sortDir || -1; if (!st.sort && valueCol) st.sort = valueCol.field; st.page = 0; draw(); });
+  const hidden = new Set();
   const barCols = (inv || t.bars === false) ? [] : t.columns.filter(c => c.kind === 'money' || (c.kind === 'qty' && !/days|line|parent|component/i.test(c.label))).map(c => c.field);
   const maxOf = {}; barCols.forEach(f => maxOf[f] = Math.max(1e-9, ...t.rows.map(r => Math.abs(r[f] || 0))));
   const toneOf = v => /healthy|ready|on time|made to order/i.test(v || '') ? 'good' : /excess|no movement|^low$/i.test(v || '') ? 'warn' : /stockout|critical|high/i.test(v || '') ? 'bad' : '';
@@ -3051,7 +3144,7 @@ function renderTable(el, t, opts = {}) {
       : (pages > 1 ? `<div class="pager"><button class="btn" data-p="-1">‹ Prev</button> Page ${st.page + 1} of ${pages} · ${rows.length.toLocaleString()} rows <button class="btn" data-p="1">Next ›</button></div>` : '');
     el.innerHTML = `${head}<div class="tablewrap"><table><thead><tr>${cols.map(c => `<th class="${num(c.kind) ? 'num' : ''}" data-f="${c.field}">${esc(c.label)}${st.sort === c.field ? (st.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('')}</tr></thead>
       <tbody>${slice.map(r => `<tr class="${t.drill === 'item_no' && r.item_no ? 'click' : ''}" data-i="${esc(r.item_no || '')}">${cols.map(c => `<td class="${num(c.kind) ? 'num' : ''}"${bg(r, c)} title="${esc(r[c.field])}">${cell(r, c)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length}" class="muted">No rows match.</td></tr>`}</tbody></table></div>${pager}`;
-    el.querySelectorAll('th').forEach(th => th.onclick = () => { const f = th.dataset.f; st.dir = st.sort === f ? -st.dir : (num(t.columns.find(c => c.field === f).kind) ? -1 : 1); st.sort = f; draw(); });
+    el.querySelectorAll('th').forEach(th => th.onclick = () => { const f = th.dataset.f; st.dir = st.sort === f ? -st.dir : (num(t.columns.find(c => c.field === f).kind) ? -1 : 1); st.sort = f; S.sortDir = st.dir; document.querySelectorAll('[data-sort-toggle]').forEach(paintSortToggle); draw(); });
     el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { if (b.disabled) return; st.page = Math.max(0, Math.min(pages - 1, st.page + +b.dataset.p)); draw(); });
     el.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { st.page = +b.dataset.go; draw(); });
     el.querySelectorAll('tr.click').forEach(tr => tr.onclick = () => openItem(tr.dataset.i));
@@ -3140,7 +3233,7 @@ async function renderReports() {
   ];
   const kpis = cards.map(k => {
     const face = faces[k.label];
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p></div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(k.label)}</p></div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${esc(String(fmt(k.n, 'qty')))}<small> ${k.unit}</small></p>${cipSpark(null, face.fg, k.label)}</div></article>`;
   }).join('');
   document.getElementById('content').innerHTML = `<div class="inv-page">
@@ -3148,7 +3241,7 @@ async function renderReports() {
       <button class="btn" id="toBuilder">${svg('sliders', 14)} Build a custom report</button>
       <button class="btn primary" id="toSched">${svg('calendar', 14)} Schedules & history</button></div></div>
     <div class="inv-kpis cols-4">${kpis}</div>
-    <div class="filters inv-filters"><label class="inv-search">${svg('search', 15)}<input id="repQ" placeholder="Search reports…"></label></div>
+    <div class="filters inv-filters"><label class="inv-search">${svg('search', 15)}<input id="repQ" placeholder="Search reports…"></label>${sortToggleHtml()}</div>
     <div id="repGroups">${cats.map(cat => `<section class="card inv-card rgroup" data-cat="${esc(cat)}"><div class="inv-ch-head"><div><h3>${esc(cat)}</h3><p>${d.catalogue.filter(c => c.category === cat).length} reports</p></div></div>
       <div class="inv-pad rcards">${d.catalogue.filter(c => c.category === cat).map(c => `<button class="rcard" data-r="${esc(c.id)}" data-find="${esc((c.name + ' ' + c.description).toLowerCase())}"><div class="rc-ic">${svg(CAT_ICON[cat] || 'doc', 18)}</div><div><b>${esc(c.name)}</b><div class="muted">${esc(c.description)}</div></div>${svg('arrow', 14)}</button>`).join('')}</div></section>`).join('')}</div></div>`;
   document.querySelectorAll('.rcard').forEach(b => b.onclick = () => go('report:' + b.dataset.r));
@@ -3167,6 +3260,16 @@ async function renderReports() {
       group.hidden = shown === 0;
     });
   };
+  const groups = document.getElementById('repGroups');
+  const sortReports = () => {
+    const dir = S.sortDir || -1;
+    groups.querySelectorAll('.rcards').forEach(box => {
+      [...box.querySelectorAll('.rcard')].sort((a, b) => a.querySelector('b').textContent.localeCompare(b.querySelector('b').textContent) * dir).forEach(card => box.appendChild(card));
+    });
+  };
+  registerSort(groups, sortReports);
+  bindSortToggles();
+  sortReports();
 }
 
 async function renderReport(rid) {
@@ -3181,8 +3284,9 @@ async function renderReport(rid) {
       <button class="btn" id="save">${svg('star', 14)} Save to history</button><button class="btn" id="askR">${I.spark.replace('class="spark"', 'width="14" height="14"')} Ask agent</button></div></div></div>
     <div class="filters"><select id="f_class"><option value="">All classes</option>${['RM', 'WIP', 'FG'].map(x => `<option ${f.item_class === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
       <select id="f_site"><option value="">All sites</option>${S.meta.sites.map(s => `<option ${f.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
-      <input id="f_q" placeholder="Search item, description, vendor, PO…" value="${esc(f.q)}"><button class="btn" id="f_clear">Clear</button></div>
+      <input id="f_q" placeholder="Search item, description, vendor, PO…" value="${esc(f.q)}">${sortToggleHtml()}<button class="btn" id="f_clear">Clear</button></div>
     <div id="schedBox"></div><div id="rbody"><div class="empty"><span class="thinking"><i></i><i></i><i></i></span> Building report…</div></div>`;
+  bindSortToggles();
   const upd = () => { S.rFilters = { item_class: f_class.value, site: f_site.value, q: f_q.value.trim() }; renderReport(rid); };
   f_class.onchange = upd; f_site.onchange = upd; let t; f_q.oninput = () => { clearTimeout(t); t = setTimeout(upd, 500); };
   f_clear.onclick = () => { S.rFilters = { item_class: '', site: '', q: '' }; renderReport(rid); };
@@ -3258,7 +3362,7 @@ async function renderBuilder() {
   ];
   const kpis = cards.map(k => {
     const face = faces[k.label];
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p></div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(k.label)}</p></div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${k.value}</p>${cipSpark(null, face.fg, k.label)}</div></article>`;
   }).join('');
   const opt = (list, sel, blank) => (blank ? `<option value="">${blank}</option>` : '') + list.map(c => `<option value="${c.field}" ${c.field === sel ? 'selected' : ''}>${esc(c.label)}</option>`).join('');
@@ -3277,7 +3381,7 @@ async function renderBuilder() {
         <input data-ci="${i}" class="b_cval" value="${esc(cd.value || '')}" placeholder="value"><button class="btn" data-crm="${i}">${svg('x', 12)}</button></div>`).join('')}
       <button class="btn" id="b_cadd">${svg('plus', 12)} Add condition</button>
       <div class="row2"><label>Class<select id="b_cls"><option value="">All</option>${['RM', 'WIP', 'FG'].map(x => `<option ${b.filters.item_class === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label>
-        <label>Site<select id="b_site"><option value="">All</option>${S.meta.sites.map(s => `<option ${b.filters.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label></div>
+        <label>Site<select id="b_site"><option value="">All</option>${S.meta.sites.map(s => `<option ${b.filters.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label>${sortToggleHtml()}</div>
       <div class="row2"><label>Sort by<select id="b_sort">${opt(cols, b.sort.col, 'Default')}</select></label><label>Order<select id="b_dir"><option value="desc">High → low</option><option value="asc" ${b.sort.dir === 'asc' ? 'selected' : ''}>Low → high</option></select></label></div>
       <label>Max rows<input id="b_lim" type="number" min="1" value="${esc(b.limit)}" placeholder="All"></label>
       <div class="bbtns"><button class="btn primary" id="b_run">${svg('play', 14)} Run</button><button class="btn" id="b_xl">${svg('download', 14)} Excel</button><button class="btn" id="b_save">${svg('star', 14)} Save as report</button></div>
@@ -3308,6 +3412,7 @@ async function renderBuilder() {
     drawReportBody(document.getElementById('b_out'), { ...r, name: D[b.dataset].label });
   };
   document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Help me build a report: which dataset, columns and conditions should I use for the question I have?'), 50); };
+  bindSortToggles();
   b_run.onclick = run;
   b_xl.onclick = async () => { read(); const res = await fetch('/api/reports/custom/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ spec: spec(), name: D[b.dataset].label }) });
     const a = document.createElement('a'); a.href = URL.createObjectURL(await res.blob()); a.download = D[b.dataset].label.replace(/\W+/g, '_') + '.xlsx'; a.click(); };
@@ -3340,7 +3445,7 @@ async function renderSchedules() {
   ];
   const kpis = cards.map(k => {
     const face = faces[k.label];
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${k.value}</p>${cipSpark(null, face.fg, k.label)}</div></article>`;
   }).join('');
   const schedRows = s.reports.map(x => `<tr><td>${esc(x.name)}</td><td>${esc(Object.entries(x.params || {}).map(([k, v]) => k + '=' + v).join(', ') || '–')}</td><td>${esc(when(x))} ${esc(x.time)}</td>
@@ -3363,8 +3468,9 @@ async function renderSchedules() {
     box.innerHTML = `<div class="card inv-card" style="margin-top:14px"><div class="inv-ch-head"><div><h3>New schedule</h3><p>Choose the report, then how often it should run.</p></div></div>
       <div class="inv-pad"><div class="filters inv-filters" style="margin:0"><select id="ns_r">${cat.catalogue.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}</select>
       <select id="ns_c"><option value="">All classes</option><option>RM</option><option>WIP</option><option>FG</option></select>
-      <select id="ns_s"><option value="">All sites</option>${S.meta.sites.map(x => `<option>${esc(x)}</option>`).join('')}</select></div><div id="ns_f" style="margin-top:8px"></div></div></div>`;
+      <select id="ns_s"><option value="">All sites</option>${S.meta.sites.map(x => `<option>${esc(x)}</option>`).join('')}</select>${sortToggleHtml()}</div><div id="ns_f" style="margin-top:8px"></div></div></div>`;
     const draw = () => scheduleForm(document.getElementById('ns_f'), ns_r.value, { item_class: ns_c.value, site: ns_s.value });
+    bindSortToggles(box);
     ns_r.onchange = draw; ns_c.onchange = draw; ns_s.onchange = draw; draw();
     const orig = document.getElementById('ns_f');
     new MutationObserver(() => { if (orig.textContent.includes('Scheduled —')) setTimeout(renderSchedules, 900); }).observe(orig, { childList: true, subtree: true });
@@ -3405,7 +3511,7 @@ async function renderTrends() {
   ];
   const kpis = cards.map(c => {
     const face = faces[c.label];
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(c.label)}</p></div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(c.label)}</p></div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${c.value}</p>${cipSpark(c.spark, face.fg, c.label)}</div><p class="inv-kpi-note">${esc(weekNote)}</p></article>`;
   }).join('');
   const loadNote = n < 3 ? `${n} load${n === 1 ? '' : 's'} so far — this line builds up with every scheduled refresh during the proof period.` : 'On-hand value at each Business Central load';
@@ -3457,7 +3563,7 @@ async function renderDataRefresh() {
   ];
   const kpis = cards.map(k => {
     const face = faces[k.label];
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p></div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(k.label)}</p></div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${k.value}</p>${cipSpark(k.spark, face.fg, k.label)}</div>${k.note ? `<p class="inv-kpi-note">${esc(k.note)}</p>` : ''}</article>`;
   }).join('');
   const logTable = { title: 'Refresh run log', total_rows: log.length, drill: null,
@@ -3526,7 +3632,7 @@ async function renderAudit() {
   ];
   const kpis = cards.map(k => {
     const face = faces[k.label];
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${esc(String(fmt(k.n, 'qty')))}<small> events</small></p>${cipSpark(null, face.fg, k.label)}</div></article>`;
   }).join('');
   const typeLabel = t => { const s = String(t || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; };
@@ -3543,7 +3649,7 @@ async function renderAudit() {
       <button class="btn primary" id="exportInv">${svg('download', 14)} Export</button></div></div>
     <div class="inv-kpis cols-6">${kpis}</div>
     <div class="filters inv-filters"><select id="a_t"><option value="">All events</option>${types.map(t => `<option value="${esc(t)}">${esc(typeLabel(t))}</option>`).join('')}</select>
-      <button class="btn ghost" id="a_clear">Clear</button></div>
+      ${sortToggleHtml()}<button class="btn ghost" id="a_clear">Clear</button></div>
     <div class="card tablecard inv-table" id="alog"></div></div>`;
   const draw = () => {
     const spec = tableOf(shown());
@@ -3554,6 +3660,7 @@ async function renderAudit() {
   document.getElementById('pdfThis').onclick = () => window.print();
   document.getElementById('a_t').onchange = draw;
   document.getElementById('a_clear').onclick = () => { document.getElementById('a_t').value = ''; draw(); };
+  bindSortToggles();
   draw();
 }
 
@@ -3575,7 +3682,7 @@ function renderDefinitions() {
   ];
   const kpis = cards.map(k => {
     const face = faces[k.label];
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="background:${face.bg};color:${face.fg}">${svg(face.icon, 15)}</span><p class="inv-kpi-l">${esc(k.label)}</p></div>
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(k.label)}</p></div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${k.value}</p>${cipSpark(null, face.fg, k.label)}</div><p class="inv-kpi-note">${esc(k.note)}</p></article>`;
   }).join('');
   const defs = { title: 'Measure definitions', total_rows: Object.keys(S.meta.definitions || {}).length, drill: null,
