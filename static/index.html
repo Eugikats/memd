@@ -97,6 +97,7 @@ main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 .hero { background: #fff; border-radius: 0; padding: 56px 24px 48px; min-height: calc(100vh - 88px); display: flex; flex-direction: column; align-items: center; }
 .hero:not(.chatting) { height: calc(100vh - 62px); max-height: calc(100vh - 62px); min-height: 0; padding: 20px 24px 8px; box-sizing: border-box; overflow: hidden; }
 .hero:not(.chatting) .askbox { margin-top: 16px; }
+.hero:not(.chatting) .thread { display: none; }
 .hero:not(.chatting) .chips { margin-top: 12px; }
 .cockpit-kicker { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: #94a3b8; }
 .hero h1 { font-family: "Times New Roman", "Source Serif 4", Times, serif; font-weight: 700; font-size: 46px; letter-spacing: -.6px; margin: 12px 0 0; text-align: center; color: #0B1640; }
@@ -116,26 +117,23 @@ main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 .assist-fab:hover { color: #1769FF; }
 .assist-fab svg { width: 44px; height: 44px; }
 body.assist-open .assist-fab { display: none; }
-.assist-mask { position: fixed; inset: 0; z-index: 76; background: rgba(0, 0, 0, .3); backdrop-filter: blur(4px); display: flex; align-items: flex-end; justify-content: center; }
+.assist-mask { position: fixed; inset: 0; z-index: 76; background: rgba(15, 23, 42, .28); display: flex; align-items: flex-end; justify-content: center; }
 .assist-mask[hidden] { display: none; }
-.assist-panel { width: 100%; height: 100dvh; display: flex; flex-direction: column; background: #f7f9fc; box-shadow: 0 24px 60px rgba(15, 23, 42, .22); }
-.assist-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid rgba(226, 232, 240, .8); background: rgba(255, 255, 255, .86); }
-.assist-head h2 { margin: 0; min-width: 0; font-size: 14px; font-weight: 650; color: #0B1B4D; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.assist-tools { display: flex; flex: none; gap: 2px; }
+.assist-panel { position: relative; width: 100%; height: 100dvh; display: flex; flex-direction: column; background: #fff; box-shadow: 0 24px 60px rgba(15, 23, 42, .22); }
+.assist-tools { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; gap: 2px; }
 .assist-tools button { width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: #64748b; cursor: pointer; display: grid; place-items: center; }
 .assist-tools button:hover, .assist-tools button.on { background: #f1f5f9; color: #1769FF; }
-.assist-body { flex: 1; min-height: 0; overflow: auto; padding: 20px 20px 8px; }
-.assist-welcome { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 12px; }
-.assist-welcome h3 { margin: 0; font-size: 28px; line-height: 1.15; font-weight: 650; color: #0B1B4D; }
-.assist-welcome h3 span { color: #1769FF; font-style: italic; font-weight: 650; }
-.assist-welcome p { margin: 12px 0 0; max-width: 440px; color: #64748b; font-size: 14px; }
-.assist-body .thread { width: min(680px, 100%); margin: 0 auto; }
-.assist-compose { flex: none; padding: 8px 16px 16px; }
-.assist-compose .askbox { width: min(680px, 100%); margin: 0 auto; }
-.assist-recent { flex: 1; min-height: 0; overflow: auto; padding: 16px 20px 20px; }
+.assist-hero { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; padding: 48px 24px 16px; overflow: auto; background: #fff; }
+.assist-hero h1 { font-family: "Times New Roman", "Source Serif 4", Times, serif; font-weight: 700; font-size: 40px; letter-spacing: -.6px; margin: 12px 0 0; text-align: center; color: #0B1640; }
+.assist-hero h1 span { color: #0B1640; }
+.assist-hero .thread { width: min(720px, 100%); margin-top: 18px; }
+.assist-hero .askbox { width: min(720px, 100%); margin-top: 16px; }
+.assist-hero.chatting { padding-top: 56px; }
+.assist-hero.chatting h1 { font-size: 26px; }
+.assist-hero.chatting .askbox { position: sticky; bottom: 8px; }
+.assist-recent { width: min(720px, 100%); flex: 1; min-height: 0; overflow: auto; margin-top: 18px; }
 .assist-recent p.lab { margin: 0 0 10px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #94a3b8; }
-.assist-recent[hidden], .assist-body[hidden], .assist-welcome[hidden], .assist-compose[hidden] { display: none; }
-#assistBody:has(#assistWelcome:not([hidden])) > .thread { display: none; }
+.assist-recent[hidden] { display: none; }
 @media (min-width: 640px) {
   .assist-mask { align-items: center; padding: 16px; }
   .assist-panel { height: min(640px, calc(100dvh - 2rem)); max-width: 900px; border-radius: 16px; overflow: hidden; }
@@ -433,7 +431,7 @@ body.page-inv { background: #f5f7fb; color: #14213D; --accent: #2563EB; --accent
 body.page-inv .shell, body.page-inv main { background: #f5f7fb; }
 body.page-inv main { padding-top: 8px; }
 body.page-inv .hero { margin: -8px -24px -48px; }
-body.page-inv:has(.hero:not(.chatting)) { overflow: hidden; }
+body.page-inv:has(.hero:not(.chatting)) { overflow: visible; }
 body.page-inv main:has(.hero:not(.chatting)) { overflow: hidden; padding-bottom: 0; }
 body.page-inv .hero:not(.chatting) { margin-bottom: 0; }
 body.page-inv .topbar { background: #fff; border-bottom-color: #E2E8F0; }
@@ -692,26 +690,19 @@ body.page-inv .tablehead.inv-tablehead .rbtns { width: auto; }
   </svg>
 </button>
 <div class="assist-mask" id="assistMask" hidden>
-  <div class="assist-panel" role="dialog" aria-modal="true" aria-labelledby="assistTitle">
-    <header class="assist-head">
-      <h2 id="assistTitle">Manufacturing Intelligence Platform</h2>
-      <div class="assist-tools">
-        <button type="button" id="assistHist" title="History" aria-label="History"></button>
-        <button type="button" id="assistNew" title="New chat" aria-label="New chat"></button>
-        <button type="button" id="assistClose" title="Close" aria-label="Close"></button>
-      </div>
-    </header>
-    <div class="assist-recent" id="assistRecent" hidden></div>
-    <div class="assist-body" id="assistBody">
-      <div class="assist-welcome" id="assistWelcome">
-        <h3>Ready when you are<span id="assistName"></span></h3>
-        <p>Ask about stock, cover, overdue orders, or what production can still run. The answer uses the same figures as the dashboards.</p>
-      </div>
+  <div class="assist-panel" role="dialog" aria-modal="true" aria-label="Command Center chat">
+    <div class="assist-tools">
+      <button type="button" id="assistHist" title="History" aria-label="History"></button>
+      <button type="button" id="assistNew" title="New chat" aria-label="New chat"></button>
+      <button type="button" id="assistClose" title="Close" aria-label="Close"></button>
+    </div>
+    <section class="assist-hero" id="assistHero">
+      <h1 id="assistHello"></h1>
+      <div class="hero-rule"></div>
+      <div class="assist-recent" id="assistRecent" hidden></div>
       <div class="thread" id="assistThread"></div>
-    </div>
-    <div class="assist-compose">
-      <div class="askbox"><svg class="spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M10 3l1.6 4.4L16 9l-4.4 1.6L10 15l-1.6-4.4L4 9l4.4-1.6z"/><path d="M18 13l.8 2.2L21 16l-2.2.8L18 19l-.8-2.2L15 16l2.2-.8zM17 3l.5 1.5L19 5l-1.5.5L17 7l-.5-1.5L15 5l1.5-.5z"/></svg><input id="q" placeholder="Ask about inventory, cover, orders, or production…" autocomplete="off"><button class="send" id="send" title="Ask" disabled><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
-    </div>
+      <div class="askbox"><svg class="spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M10 3l1.6 4.4L16 9l-4.4 1.6L10 15l-1.6-4.4L4 9l4.4-1.6z"/><path d="M18 13l.8 2.2L21 16l-2.2.8L18 19l-.8-2.2L15 16l2.2-.8zM17 3l.5 1.5L19 5l-1.5.5L17 7l-.5-1.5L15 5l1.5-.5z"/></svg><input id="assistQ" placeholder="Ask anything..." autocomplete="off"><button class="send" id="assistSend" title="Ask" disabled><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
+    </section>
   </div>
 </div>
 
@@ -928,30 +919,33 @@ function paintChats() {
   box.querySelectorAll('[data-chat]').forEach(b => b.onclick = e => { e.stopPropagation(); openChat(b.dataset.chat); });
 }
 function syncAssist() {
-  const welcome = document.getElementById('assistWelcome');
-  const thread = document.getElementById('assistThread');
-  const name = document.getElementById('assistName');
+  const hello = document.getElementById('assistHello');
+  const hero = document.getElementById('assistHero');
   const who = displayName();
-  if (name) name.textContent = who ? `, ${who.split(' ')[0]}` : '';
-  if (welcome && thread) welcome.hidden = thread.children.length > 0;
+  if (hello) hello.innerHTML = `${greeting()}${who ? `, <span>${esc(who)}</span>.` : ''}`;
+  if (hero) hero.classList.toggle('chatting', document.getElementById('assistThread').children.length > 0);
 }
 function openAssist() {
   document.getElementById('assistMask').hidden = false;
   document.body.classList.add('assist-open');
   showAssistHistory(false);
-  syncAssist();
-  const q = document.getElementById('q');
+  mirrorThreads('assist');
+  const q = document.getElementById('assistQ');
   if (q) q.focus();
 }
 function closeAssist() {
   document.getElementById('assistMask').hidden = true;
   document.body.classList.remove('assist-open');
   showAssistHistory(false);
+  mirrorThreads('hero');
 }
 function showAssistHistory(on) {
-  document.getElementById('assistRecent').hidden = !on;
-  document.getElementById('assistBody').hidden = on;
-  document.querySelector('.assist-compose').hidden = on;
+  const recent = document.getElementById('assistRecent');
+  const thread = document.getElementById('assistThread');
+  const box = document.querySelector('#assistHero .askbox');
+  recent.hidden = !on;
+  thread.hidden = on;
+  if (box) box.hidden = on;
   document.getElementById('assistHist').classList.toggle('on', on);
   if (on) paintAssistHistory();
 }
@@ -962,35 +956,67 @@ function paintAssistHistory() {
   box.innerHTML = `<p class="lab">Recent chats</p>${S.chats.length ? `<div class="recent-list">${rows}</div>` : '<p class="recent-empty">No conversations yet</p>'}`;
   box.querySelectorAll('[data-chat]').forEach(b => b.onclick = () => openChat(b.dataset.chat));
 }
-function mountThread() {
-  const thread = document.getElementById('assistThread');
-  thread.replaceChildren();
-  S.thread.forEach(el => thread.appendChild(el));
+function threadHost(which) {
+  if (which === 'assist') return document.getElementById('assistThread');
+  return document.getElementById('heroThread');
+}
+function mirrorThreads(prefer) {
+  const live = threadHost(prefer) || threadHost('assist') || threadHost('hero');
+  if (!live) return;
+  [...live.children].forEach(el => { if (!S.thread.includes(el)) el.remove(); });
+  S.thread.forEach(el => { if (el.parentElement !== live) live.appendChild(el); });
+  ['hero', 'assist'].forEach(which => {
+    const host = threadHost(which);
+    if (!host || host === live) return;
+    host.replaceChildren();
+    S.thread.forEach(el => host.appendChild(el.cloneNode(true)));
+  });
+  const hero = document.getElementById('hero');
+  if (hero) hero.classList.toggle('chatting', S.thread.length > 0);
   syncAssist();
-  thread.scrollTop = thread.scrollHeight;
+  live.scrollTop = live.scrollHeight;
+}
+function clearComposers() {
+  ['q', 'assistQ'].forEach(id => {
+    const input = document.getElementById(id);
+    const send = document.getElementById(id === 'q' ? 'send' : 'assistSend');
+    if (!input || !send) return;
+    input.value = '';
+    send.classList.remove('ready');
+    send.disabled = true;
+  });
+}
+function armComposer(input, button, origin) {
+  if (!input || !button) return;
+  const arm = () => { const on = !!input.value.trim(); button.classList.toggle('ready', on); button.disabled = !on; };
+  input.oninput = arm;
+  button.onclick = () => { if (!button.disabled) ask(input.value.trim(), null, origin); };
+  input.onkeydown = e => { if (e.key === 'Enter' && !button.disabled) ask(input.value.trim(), null, origin); };
 }
 function bindAssist() {
   document.getElementById('assistHist').innerHTML = svg('book', 16);
   document.getElementById('assistNew').innerHTML = svg('plus', 16);
   document.getElementById('assistClose').innerHTML = svg('x', 16);
-  const q = document.getElementById('q'), send = document.getElementById('send');
-  const arm = () => { const on = !!q.value.trim(); send.classList.toggle('ready', on); send.disabled = !on; };
-  q.oninput = arm;
-  send.onclick = () => { if (!send.disabled) ask(q.value.trim()); };
-  q.onkeydown = e => { if (e.key === 'Enter' && !send.disabled) ask(q.value.trim()); };
+  armComposer(document.getElementById('assistQ'), document.getElementById('assistSend'), 'popup');
   document.getElementById('assistFab').onclick = openAssist;
   document.getElementById('assistClose').onclick = closeAssist;
   document.getElementById('assistNew').onclick = () => newChat();
   document.getElementById('assistHist').onclick = () => showAssistHistory(document.getElementById('assistRecent').hidden);
   document.getElementById('assistMask').addEventListener('click', e => { if (e.target.id === 'assistMask') closeAssist(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('assistMask').hidden) closeAssist(); });
+  syncAssist();
 }
 function newChat() {
   S.chatId = null; S.history = []; S.thread = [];
   document.getElementById('rail').classList.remove('peek');
   paintChats();
-  mountThread();
-  openAssist();
+  const assist = document.getElementById('assistThread');
+  if (assist) assist.replaceChildren();
+  const heroThread = document.getElementById('heroThread');
+  if (heroThread) heroThread.replaceChildren();
+  syncAssist();
+  if (S.view === 'command') renderCommand();
+  if (document.body.classList.contains('assist-open')) openAssist();
 }
 function openChat(id) {
   const c = S.chats.find(x => x.id === id);
@@ -1000,7 +1026,7 @@ function openChat(id) {
   S.thread = S.history.map(m => chatBubble(m.role, m.content));
   document.getElementById('rail').classList.remove('peek');
   paintChats();
-  mountThread();
+  if (S.view === 'command') renderCommand();
   openAssist();
 }
 function openSettings(id) {
@@ -1389,14 +1415,19 @@ function paintCockpit(decks, step, animate) {
 }
 function renderCommand() {
   const name = displayName();
-  document.getElementById('content').innerHTML = `<section class="hero" id="hero">
+  const chatting = S.thread.length > 0;
+  document.getElementById('content').innerHTML = `<section class="hero ${chatting ? 'chatting' : ''}" id="hero">
     <h1>${greeting()}${name ? `, <span>${esc(name)}</span>.` : ''}</h1>
     <div class="hero-rule"></div>
+    <div class="thread" id="heroThread"></div>
+    <div class="askbox">${I.spark}<input id="q" placeholder="Ask anything..." autocomplete="off"><button class="send" id="send" title="Ask" disabled>${I.up}</button></div>
     <div class="cockpit-wave" id="cockpitWave"></div>
     <button type="button" class="flow-toggle" id="flowToggle">Inventory flow <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
     </section>`;
+  armComposer(document.getElementById('q'), document.getElementById('send'), 'hero');
   document.getElementById('flowToggle').onclick = () => go('trends');
-  loadCockpit();
+  if (chatting) mirrorThreads(document.body.classList.contains('assist-open') ? 'assist' : 'hero');
+  else loadCockpit();
 }
 async function loadCockpit() {
   const wave = document.getElementById('cockpitWave');
@@ -1439,26 +1470,38 @@ async function loadInsights() {
   box.onclick = e => { const b = e.target.closest('.insight'); if (b) ask(cards[+b.dataset.i].question); };
 }
 
-async function ask(text, playbook) {
+async function ask(text, playbook, origin) {
   if (!text) return;
-  openAssist();
-  const thread = document.getElementById('assistThread'), q = document.getElementById('q'), send = document.getElementById('send');
-  q.value = ''; send.classList.remove('ready'); send.disabled = true;
-  const u = document.createElement('div'); u.className = 'msg user'; u.textContent = text;
-  const a = document.createElement('div'); a.className = 'msg';
-  a.innerHTML = `<div class="steps live"><div class="step"><span class="thinking"><i></i><i></i><i></i></span> ${playbook ? 'Agent is planning and working…' : 'Planning and querying the supply chain model…'}</div></div>`;
-  thread.append(u, a); S.thread.push(u, a);
+  const fromPopup = origin === 'popup' || (origin !== 'hero' && document.body.classList.contains('assist-open'));
+  if (fromPopup) openAssist();
+  else if (S.view === 'command') {
+    const hero = document.getElementById('hero');
+    if (hero) hero.classList.add('chatting');
+  } else openAssist();
+  clearComposers();
+  const hosts = [threadHost('hero'), threadHost('assist')].filter(Boolean);
+  const liveId = fromPopup || S.view !== 'command' ? 'assistThread' : 'heroThread';
+  const thinking = `<div class="steps live"><div class="step"><span class="thinking"><i></i><i></i><i></i></span> ${playbook ? 'Agent is planning and working…' : 'Planning and querying the supply chain model…'}</div></div>`;
+  const pending = hosts.map(thread => {
+    const u = document.createElement('div'); u.className = 'msg user'; u.textContent = text;
+    const a = document.createElement('div'); a.className = 'msg'; a.innerHTML = thinking;
+    thread.append(u, a);
+    if (thread.id === liveId) S.thread.push(u, a);
+    thread.hidden = false;
+    thread.scrollTop = thread.scrollHeight;
+    return a;
+  });
   syncAssist();
-  thread.scrollTop = thread.scrollHeight;
   const r = playbook
     ? await api('/api/playbook/' + playbook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
     : await api('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, history: S.history }) });
   S.history.push({ role: 'user', content: text }, { role: 'assistant', content: r.answer });
   persistChat();
-  renderAgentResult(a, r);
+  pending.forEach(a => renderAgentResult(a, r));
   updateBadge();
-  thread.scrollTop = thread.scrollHeight;
-  q.focus();
+  hosts.forEach(thread => { thread.scrollTop = thread.scrollHeight; });
+  const focus = document.getElementById(fromPopup ? 'assistQ' : 'q') || document.getElementById('assistQ');
+  if (focus) focus.focus();
 }
 
 function renderAgentResult(el, r) {
