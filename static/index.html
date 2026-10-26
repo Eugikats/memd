@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pulse Command Center</title>
-<link rel="icon" type="image/png" href="/static/pulse-logo.png">
+<title>Manufacturing Intelligence Platform</title>
+<link rel="icon" type="image/png" href="/static/mip-logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -39,7 +39,7 @@ button { font: inherit; }
 .logo-img { width: 32px; height: 32px; flex: none; object-fit: contain; background: transparent; border: 0; padding: 0; border-radius: 8px; }
 .logo-mark { width: 36px; height: 36px; flex: none; border-radius: 11px; display: grid; place-items: center; color: #fff; font-weight: 700; font-family: var(--serif); font-size: 20px;
   background: linear-gradient(135deg, #1f6bff, #4aa3ff); box-shadow: 0 4px 10px -3px rgba(31,107,255,.5); }
-.logo-text { font-weight: 700; font-size: 14px; letter-spacing: -.01em; white-space: nowrap; }
+.logo-text { font-weight: 700; font-size: 12.5px; letter-spacing: -.01em; line-height: 1.15; white-space: nowrap; }
 .logo-text small { display: block; font-weight: 500; font-size: 11px; color: var(--text-muted); letter-spacing: 0; }
 .rail .toggle { margin: 0; width: 28px; height: 28px; border: 0; background: none; color: #94a3b8; border-radius: 6px; cursor: pointer; display: grid; place-items: center; flex: none; padding: 0; }
 .rail .toggle:hover { background: #f1f5f9; color: #334155; }
@@ -112,6 +112,38 @@ main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 .askbox input::placeholder { color: var(--text-muted); }
 .askbox .send { width: 42px; height: 42px; border-radius: 50%; border: 0; background: #e6edf5; color: #94a3b8; cursor: default; display: grid; place-items: center; flex: none; }
 .askbox .send.ready { background: #2563EB; color: #fff; cursor: pointer; }
+.assist-fab { position: fixed; right: 20px; bottom: 20px; z-index: 70; width: 52px; height: 52px; padding: 4px; border: 0; background: transparent; color: #6B9BFF; cursor: pointer; display: grid; place-items: center; }
+.assist-fab:hover { color: #1769FF; }
+.assist-fab svg { width: 44px; height: 44px; }
+body.assist-open .assist-fab { display: none; }
+.assist-mask { position: fixed; inset: 0; z-index: 76; background: rgba(0, 0, 0, .3); backdrop-filter: blur(4px); display: flex; align-items: flex-end; justify-content: center; }
+.assist-mask[hidden] { display: none; }
+.assist-panel { width: 100%; height: 100dvh; display: flex; flex-direction: column; background: #f7f9fc; box-shadow: 0 24px 60px rgba(15, 23, 42, .22); }
+.assist-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid rgba(226, 232, 240, .8); background: rgba(255, 255, 255, .86); }
+.assist-head h2 { margin: 0; min-width: 0; font-size: 14px; font-weight: 650; color: #0B1B4D; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assist-tools { display: flex; flex: none; gap: 2px; }
+.assist-tools button { width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: #64748b; cursor: pointer; display: grid; place-items: center; }
+.assist-tools button:hover, .assist-tools button.on { background: #f1f5f9; color: #1769FF; }
+.assist-body { flex: 1; min-height: 0; overflow: auto; padding: 20px 20px 8px; }
+.assist-welcome { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 12px; }
+.assist-welcome h3 { margin: 0; font-size: 28px; line-height: 1.15; font-weight: 650; color: #0B1B4D; }
+.assist-welcome h3 span { color: #1769FF; font-style: italic; font-weight: 650; }
+.assist-welcome p { margin: 12px 0 0; max-width: 440px; color: #64748b; font-size: 14px; }
+.assist-body .thread { width: min(680px, 100%); margin: 0 auto; }
+.assist-compose { flex: none; padding: 8px 16px 16px; }
+.assist-compose .askbox { width: min(680px, 100%); margin: 0 auto; }
+.assist-recent { flex: 1; min-height: 0; overflow: auto; padding: 16px 20px 20px; }
+.assist-recent p.lab { margin: 0 0 10px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #94a3b8; }
+.assist-recent[hidden], .assist-body[hidden], .assist-welcome[hidden], .assist-compose[hidden] { display: none; }
+#assistBody:has(#assistWelcome:not([hidden])) > .thread { display: none; }
+@media (min-width: 640px) {
+  .assist-mask { align-items: center; padding: 16px; }
+  .assist-panel { height: min(640px, calc(100dvh - 2rem)); max-width: 900px; border-radius: 16px; overflow: hidden; }
+}
+@media (min-width: 1024px) {
+  .assist-fab { right: 32px; bottom: 32px; width: 56px; height: 56px; }
+  .assist-fab svg { width: 48px; height: 48px; }
+}
 .cockpit { width: min(980px, 100%); margin-top: 42px; }
 .cockpit-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 16px; text-align: center; }
 .cockpit-metrics .lab { margin: 0; font-size: 13px; color: #64748b; font-weight: 500; }
@@ -225,7 +257,7 @@ main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 .banner { background: var(--surface-1); border: 1px solid var(--border); border-left: 4px solid var(--warning); padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 13px; }
 @media (max-width: 900px) { .builder { grid-template-columns: 1fr; } .bform { position: static; max-height: none; } }
 @media print {
-  .rail, .topbar, .filters, .vhead .rbtns, .vhead button, .inv-actions, #schedBox, .pager, [data-csv], .drawer { display: none !important; }
+  .rail, .topbar, .filters, .vhead .rbtns, .vhead button, .inv-actions, #schedBox, .pager, [data-csv], .drawer, .assist-fab, .assist-mask { display: none !important; }
   body, html { background: #fff; } main { padding: 0; } .app { display: block; }
   .print-head { display: block; font-size: 12px; color: #333; margin-bottom: 10px; }
   .tablewrap { max-height: none !important; overflow: visible !important; border: 0; }
@@ -642,7 +674,7 @@ body.page-inv .tablehead.inv-tablehead .rbtns { width: auto; }
   <div class="shell">
     <header class="topbar">
       <button class="menu-btn" id="menuBtn" aria-label="Open menu"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-      <img class="top-logo" src="/static/pulse-logo.png" alt="Pulse">
+      <img class="top-logo" src="/static/mip-logo.png" alt="Manufacturing Intelligence Platform">
       <select class="mobile-nav btn" id="mobileNav" hidden></select>
       <div class="page" id="pageTitle">Command Center</div>
       <div class="right"><div class="when" id="when"></div><div class="avatar ghost" id="topAvatar"></div></div>
@@ -653,6 +685,35 @@ body.page-inv .tablehead.inv-tablehead .rbtns { width: auto; }
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="drawer"></aside>
 <div id="settings" class="set-overlay" hidden></div>
+<button type="button" class="assist-fab" id="assistFab" aria-label="Open assistant">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 24" fill="none" aria-hidden="true">
+    <path d="M13.5 3.25H6.25C4.73 3.25 3.5 4.48 3.5 6v8.25c0 1.52 1.23 2.75 2.75 2.75H8.1v2.85L12.35 17H16.5c1.1 0 2-.9 2-2V11.25" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M22.25 1.4C22.25 5.15 23.9 6.8 27.65 6.8C23.9 6.8 22.25 8.45 22.25 12.2C22.25 8.45 20.6 6.8 16.85 6.8C20.6 6.8 22.25 5.15 22.25 1.4Z" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</button>
+<div class="assist-mask" id="assistMask" hidden>
+  <div class="assist-panel" role="dialog" aria-modal="true" aria-labelledby="assistTitle">
+    <header class="assist-head">
+      <h2 id="assistTitle">Manufacturing Intelligence Platform</h2>
+      <div class="assist-tools">
+        <button type="button" id="assistHist" title="History" aria-label="History"></button>
+        <button type="button" id="assistNew" title="New chat" aria-label="New chat"></button>
+        <button type="button" id="assistClose" title="Close" aria-label="Close"></button>
+      </div>
+    </header>
+    <div class="assist-recent" id="assistRecent" hidden></div>
+    <div class="assist-body" id="assistBody">
+      <div class="assist-welcome" id="assistWelcome">
+        <h3>Ready when you are<span id="assistName"></span></h3>
+        <p>Ask about stock, cover, overdue orders, or what production can still run. The answer uses the same figures as the dashboards.</p>
+      </div>
+      <div class="thread" id="assistThread"></div>
+    </div>
+    <div class="assist-compose">
+      <div class="askbox"><svg class="spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M10 3l1.6 4.4L16 9l-4.4 1.6L10 15l-1.6-4.4L4 9l4.4-1.6z"/><path d="M18 13l.8 2.2L21 16l-2.2.8L18 19l-.8-2.2L15 16l2.2-.8zM17 3l.5 1.5L19 5l-1.5.5L17 7l-.5-1.5L15 5l1.5-.5z"/></svg><input id="q" placeholder="Ask about inventory, cover, orders, or production…" autocomplete="off"><button class="send" id="send" title="Ask" disabled><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button></div>
+    </div>
+  </div>
+</div>
 
 <script>
 const S = { meta: null, view: null, filters: { item_class: '', site: '', location: '', q: '' }, charts: [], history: [], thread: [], chatId: null, chats: [], settings: 'profile' };
@@ -768,13 +829,13 @@ async function api(path, opts) { const r = await fetch(path, opts); return r.jso
 const initials = n => (n || '').split(/\s+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
 const SET_SECTIONS = [
-  { id: 'security', label: 'Security & Login', title: 'Security & Login', desc: 'How this Pulse workspace signs in and what it can read from Business Central.', icon: 'shield' },
-  { id: 'notifications', label: 'Notifications', title: 'Notifications', desc: 'Choose which Pulse events stay visible in this browser.', icon: 'bell' },
+  { id: 'security', label: 'Security & Login', title: 'Security & Login', desc: 'How this Manufacturing Intelligence Platform workspace signs in and what it can read from Business Central.', icon: 'shield' },
+  { id: 'notifications', label: 'Notifications', title: 'Notifications', desc: 'Choose which Manufacturing Intelligence Platform events stay visible in this browser.', icon: 'bell' },
   { id: 'usage', label: 'Usage', title: 'Usage', desc: 'Activity in this browser and the latest Business Central load.', icon: 'trend' },
-  { id: 'billing', label: 'Billing', title: 'Billing & Invoices', desc: 'This Pulse workspace is included with the deployment.', icon: 'card' },
-  { id: 'seats', label: 'Account Seats', title: 'Account Seats', desc: 'People who use this Pulse workspace.', icon: 'users' },
-  { id: 'organization', label: 'Organization', title: 'Organization', desc: 'The company and environment this Pulse workspace reads.', icon: 'building' },
-  { id: 'profile', label: 'Profile', title: 'Profile', desc: 'How your name appears in Pulse on this browser.', icon: 'user' },
+  { id: 'billing', label: 'Billing', title: 'Billing & Invoices', desc: 'This Manufacturing Intelligence Platform workspace is included with the deployment.', icon: 'card' },
+  { id: 'seats', label: 'Account Seats', title: 'Account Seats', desc: 'People who use this Manufacturing Intelligence Platform workspace.', icon: 'users' },
+  { id: 'organization', label: 'Organization', title: 'Organization', desc: 'The company and environment this Manufacturing Intelligence Platform workspace reads.', icon: 'building' },
+  { id: 'profile', label: 'Profile', title: 'Profile', desc: 'How your name appears in Manufacturing Intelligence Platform on this browser.', icon: 'user' },
 ];
 const SEAT_ROLES = [
   ['viewer', 'Viewer', 'Reads inventory, cover and reports.'],
@@ -866,11 +927,70 @@ function paintChats() {
   if (less) less.onclick = e => { e.stopPropagation(); chatsExpanded = false; paintChats(); };
   box.querySelectorAll('[data-chat]').forEach(b => b.onclick = e => { e.stopPropagation(); openChat(b.dataset.chat); });
 }
+function syncAssist() {
+  const welcome = document.getElementById('assistWelcome');
+  const thread = document.getElementById('assistThread');
+  const name = document.getElementById('assistName');
+  const who = displayName();
+  if (name) name.textContent = who ? `, ${who.split(' ')[0]}` : '';
+  if (welcome && thread) welcome.hidden = thread.children.length > 0;
+}
+function openAssist() {
+  document.getElementById('assistMask').hidden = false;
+  document.body.classList.add('assist-open');
+  showAssistHistory(false);
+  syncAssist();
+  const q = document.getElementById('q');
+  if (q) q.focus();
+}
+function closeAssist() {
+  document.getElementById('assistMask').hidden = true;
+  document.body.classList.remove('assist-open');
+  showAssistHistory(false);
+}
+function showAssistHistory(on) {
+  document.getElementById('assistRecent').hidden = !on;
+  document.getElementById('assistBody').hidden = on;
+  document.querySelector('.assist-compose').hidden = on;
+  document.getElementById('assistHist').classList.toggle('on', on);
+  if (on) paintAssistHistory();
+}
+function paintAssistHistory() {
+  const box = document.getElementById('assistRecent');
+  if (!box) return;
+  const rows = S.chats.map(c => `<button type="button" class="recent-item${c.id === S.chatId ? ' on' : ''}" data-chat="${esc(c.id)}"><b>${esc(c.title || 'New chat')}</b><em><span>${esc(c.preview || 'Conversation')}</span><span>${esc(relTime(c.updatedAt))}</span></em></button>`).join('');
+  box.innerHTML = `<p class="lab">Recent chats</p>${S.chats.length ? `<div class="recent-list">${rows}</div>` : '<p class="recent-empty">No conversations yet</p>'}`;
+  box.querySelectorAll('[data-chat]').forEach(b => b.onclick = () => openChat(b.dataset.chat));
+}
+function mountThread() {
+  const thread = document.getElementById('assistThread');
+  thread.replaceChildren();
+  S.thread.forEach(el => thread.appendChild(el));
+  syncAssist();
+  thread.scrollTop = thread.scrollHeight;
+}
+function bindAssist() {
+  document.getElementById('assistHist').innerHTML = svg('book', 16);
+  document.getElementById('assistNew').innerHTML = svg('plus', 16);
+  document.getElementById('assistClose').innerHTML = svg('x', 16);
+  const q = document.getElementById('q'), send = document.getElementById('send');
+  const arm = () => { const on = !!q.value.trim(); send.classList.toggle('ready', on); send.disabled = !on; };
+  q.oninput = arm;
+  send.onclick = () => { if (!send.disabled) ask(q.value.trim()); };
+  q.onkeydown = e => { if (e.key === 'Enter' && !send.disabled) ask(q.value.trim()); };
+  document.getElementById('assistFab').onclick = openAssist;
+  document.getElementById('assistClose').onclick = closeAssist;
+  document.getElementById('assistNew').onclick = () => newChat();
+  document.getElementById('assistHist').onclick = () => showAssistHistory(document.getElementById('assistRecent').hidden);
+  document.getElementById('assistMask').addEventListener('click', e => { if (e.target.id === 'assistMask') closeAssist(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('assistMask').hidden) closeAssist(); });
+}
 function newChat() {
   S.chatId = null; S.history = []; S.thread = [];
   document.getElementById('rail').classList.remove('peek');
   paintChats();
-  go('command', true);
+  mountThread();
+  openAssist();
 }
 function openChat(id) {
   const c = S.chats.find(x => x.id === id);
@@ -880,7 +1000,8 @@ function openChat(id) {
   S.thread = S.history.map(m => chatBubble(m.role, m.content));
   document.getElementById('rail').classList.remove('peek');
   paintChats();
-  go('command', true);
+  mountThread();
+  openAssist();
 }
 function openSettings(id) {
   S.settings = SET_SECTIONS.some(s => s.id === id) ? id : 'profile';
@@ -991,7 +1112,7 @@ function paintProfile(body) {
     ${field('Department', 'pfDept', p.department, 'placeholder="Supply chain" maxlength="120"')}
     ${field('Phone', 'pfPhone', p.phone, 'placeholder="+256 700 000000" maxlength="32"')}
     ${field('Timezone', 'pfTz', p.timezone || 'Africa/Kampala', 'placeholder="Africa/Kampala" maxlength="64"')}
-    <label class="set-field"><span>Access level</span><input value="Signed in" readonly><p class="set-note">Sign-in is Microsoft Entra. Pulse does not store a separate password.</p></label>
+    <label class="set-field"><span>Access level</span><input value="Signed in" readonly><p class="set-note">Sign-in is Microsoft Entra. Manufacturing Intelligence Platform does not store a separate password.</p></label>
     ${field('Email', 'pfEmail', p.email, 'placeholder="name@company.com" maxlength="200"')}
     <button type="button" class="set-save" id="pfSave">Save profile</button> <span class="set-ok" id="pfOk" hidden>Saved</span>`;
   document.getElementById('pfSave').onclick = () => {
@@ -1019,16 +1140,16 @@ function paintProfile(body) {
 function paintSecurity(body) {
   const n = S.meta.notes;
   body.innerHTML = `<nav class="set-tabs">${[['platform', 'Sign-in'], ['posture', 'Security posture']].map(([id, label]) => `<button type="button" data-stab="${id}" class="${setTab === id ? 'on' : ''}">${label}</button>`).join('')}</nav>
-    ${setTab === 'platform' ? `<div class="set-card"><h4>Microsoft Entra</h4><p class="set-note">This is how you reach Pulse. The app does not keep a local password.</p><div class="set-row"><div><b>Workforce sign-in</b><div class="set-note">${esc(displayName() || 'Signed-in user')}</div></div><span class="set-pill"><i></i> Active</span></div></div>
-      <div class="set-card"><h4>Business Central</h4><p class="set-note">Pulse reads inventory from Business Central. It does not post documents back.</p><div class="set-row"><div><b>${esc(n.company || 'Company')}</b><div class="set-note">${esc(n.environment || '')} · read only</div></div><span class="set-pill"><i></i> Connected</span></div></div>`
+    ${setTab === 'platform' ? `<div class="set-card"><h4>Microsoft Entra</h4><p class="set-note">This is how you reach Manufacturing Intelligence Platform. The app does not keep a local password.</p><div class="set-row"><div><b>Workforce sign-in</b><div class="set-note">${esc(displayName() || 'Signed-in user')}</div></div><span class="set-pill"><i></i> Active</span></div></div>
+      <div class="set-card"><h4>Business Central</h4><p class="set-note">Manufacturing Intelligence Platform reads inventory from Business Central. It does not post documents back.</p><div class="set-row"><div><b>${esc(n.company || 'Company')}</b><div class="set-note">${esc(n.environment || '')} · read only</div></div><span class="set-pill"><i></i> Connected</span></div></div>`
     : `<div class="set-metrics"><div><span>Environment</span><b style="font-size:14px">${esc(n.environment || '–')}</b></div><div><span>Access</span><b style="font-size:14px">Read only</b></div><div><span>Last load</span><b style="font-size:14px">${esc((n.extracted_at || '').replace('T', ' ').slice(0, 16) || '–')}</b></div><div><span>Reporting date</span><b style="font-size:14px">${esc(n.reporting_date || '–')}</b></div></div>
-      <div class="set-card"><h4>What Pulse can do</h4><div class="set-row"><span>Read items, ledger, orders and production</span><span class="set-pill"><i></i> On</span></div><div class="set-row"><span>Post or change Business Central documents</span><span class="muted">Off</span></div><div class="set-row"><span>Approve agent actions before anything is downloaded</span><span class="set-pill"><i></i> On</span></div></div>`}`;
+      <div class="set-card"><h4>What Manufacturing Intelligence Platform can do</h4><div class="set-row"><span>Read items, ledger, orders and production</span><span class="set-pill"><i></i> On</span></div><div class="set-row"><span>Post or change Business Central documents</span><span class="muted">Off</span></div><div class="set-row"><span>Approve agent actions before anything is downloaded</span><span class="set-pill"><i></i> On</span></div></div>`}`;
   body.querySelectorAll('[data-stab]').forEach(b => b.onclick = () => { setTab = b.dataset.stab; paintSecurity(body); });
 }
 function paintNotifications(body) {
   const p = notesPref();
   const paused = p.pausedUntil && new Date(p.pausedUntil) > new Date();
-  body.innerHTML = `<div class="set-card"><h4>${paused ? 'Notifications paused' : 'Notifications on'}</h4><p class="set-note">${paused ? 'Paused until ' + esc(new Date(p.pausedUntil).toLocaleString()) + '.' : 'In-app preferences are saved in this browser. Pulse does not send email from here.'}</p>
+  body.innerHTML = `<div class="set-card"><h4>${paused ? 'Notifications paused' : 'Notifications on'}</h4><p class="set-note">${paused ? 'Paused until ' + esc(new Date(p.pausedUntil).toLocaleString()) + '.' : 'In-app preferences are saved in this browser. Manufacturing Intelligence Platform does not send email from here.'}</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="set-ghost" data-pause="1">Pause 1 hour</button><button type="button" class="set-ghost" data-pause="tomorrow">Until tomorrow 8:00</button><button type="button" class="set-ghost" data-pause="clear">Resume</button></div></div>
     <nav class="set-tabs">${[['receive', 'What you receive'], ['schedule', 'Delivery schedule'], ['postponed', 'Postponed']].map(([id, label]) => `<button type="button" data-ntab="${id}" class="${noteTab === id ? 'on' : ''}">${label}</button>`).join('')}</nav>
     <div id="notePane"></div>`;
@@ -1043,7 +1164,7 @@ function paintNotifications(body) {
     pane.querySelector('#quietSw').onclick = () => { const n = notesPref(); n.quiet = !n.quiet; saveNotes(n); paintNotifications(body); };
     pane.querySelector('#qSave').onclick = () => { const n = notesPref(); n.from = document.getElementById('qFrom').value; n.to = document.getElementById('qTo').value; saveNotes(n); };
   } else {
-    pane.innerHTML = `<div class="set-card"><h4>Nothing postponed</h4><p class="set-note">Pulse keeps notification choices in this browser. There is no held-email queue.</p></div>`;
+    pane.innerHTML = `<div class="set-card"><h4>Nothing postponed</h4><p class="set-note">Manufacturing Intelligence Platform keeps notification choices in this browser. There is no held-email queue.</p></div>`;
   }
   body.querySelectorAll('[data-ntab]').forEach(b => b.onclick = () => { noteTab = b.dataset.ntab; paintNotifications(body); });
   body.querySelectorAll('[data-pause]').forEach(b => b.onclick = () => {
@@ -1062,11 +1183,11 @@ async function paintUsage(body) {
   const proposed = (actions || []).filter(a => a.status === 'proposed').length;
   body.innerHTML = `<div class="set-metrics"><div><span>Questions saved</span><b>${questions}</b></div><div><span>Conversations</span><b>${S.chats.length}</b></div><div><span>Actions waiting</span><b>${proposed}</b></div><div><span>Refresh log rows</span><b>${(log || []).length}</b></div></div>
     <div class="set-card"><h4>Business Central loads</h4><p class="set-note">${(log || []).slice(0, 4).map(r => esc(String(r.started || r.finished_at || '').replace('T', ' ').slice(0, 16) + (r.status ? ' · ' + r.status : ''))).filter(Boolean).join('<br>') || 'No refresh log on this workspace yet.'}</p></div>
-    <div class="set-card"><h4>Audit</h4><p class="set-note">${(audit || []).length} audit ${ (audit || []).length === 1 ? 'entry' : 'entries' } on this workspace. Pulse does not meter tokens or currency here.</p></div>`;
+    <div class="set-card"><h4>Audit</h4><p class="set-note">${(audit || []).length} audit ${ (audit || []).length === 1 ? 'entry' : 'entries' } on this workspace. Manufacturing Intelligence Platform does not meter tokens or currency here.</p></div>`;
 }
 function paintBilling(body) {
-  body.innerHTML = `<div class="set-card"><div class="set-row" style="border-top:0;padding-top:0"><div><h4>This month</h4><p class="set-note">Pulse workspace · included with this deployment. There is no usage invoice.</p></div><button type="button" class="recent-new" id="toUsage">View usage</button></div></div>
-    <div class="set-card"><h4>Plan</h4><div class="set-row"><div><b>Pulse workspace</b><div class="set-note">${esc(S.meta.notes.company || 'Business Central company')} · ${esc(S.meta.notes.environment || '')}</div></div><span class="set-pill"><i></i> Included</span></div></div>
+  body.innerHTML = `<div class="set-card"><div class="set-row" style="border-top:0;padding-top:0"><div><h4>This month</h4><p class="set-note">Manufacturing Intelligence Platform · included with this deployment. There is no usage invoice.</p></div><button type="button" class="recent-new" id="toUsage">View usage</button></div></div>
+    <div class="set-card"><h4>Plan</h4><div class="set-row"><div><b>Manufacturing Intelligence Platform</b><div class="set-note">${esc(S.meta.notes.company || 'Business Central company')} · ${esc(S.meta.notes.environment || '')}</div></div><span class="set-pill"><i></i> Included</span></div></div>
     <div class="set-card"><h4>Payment method</h4><p class="set-note">No card on file. This workspace does not take payments.</p></div>
     <div class="set-card"><h4>Invoices</h4><p class="set-note">No invoices.</p></div>`;
   document.getElementById('toUsage').onclick = () => openSettings('usage');
@@ -1074,7 +1195,7 @@ function paintBilling(body) {
 function paintSeats(body) {
   const me = displayName() || 'Signed-in user';
   const pending = seatList();
-  body.innerHTML = `<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:8px"><div><h4 style="margin:0">People</h4><p class="set-note">Invites are saved in this browser. Pulse does not email them.</p></div><button type="button" class="set-save" id="seatAdd">Invite</button></div>
+  body.innerHTML = `<div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:8px"><div><h4 style="margin:0">People</h4><p class="set-note">Invites are saved in this browser. Manufacturing Intelligence Platform does not email them.</p></div><button type="button" class="set-save" id="seatAdd">Invite</button></div>
     <div id="seatForm" hidden class="set-card"><label class="set-field"><span>Full name</span><input id="seatName" maxlength="200"></label><label class="set-field"><span>Email</span><input id="seatEmail" type="email" maxlength="200"></label>
       <label class="set-field"><span>Role</span><select id="seatRole">${SEAT_ROLES.map(([id, label]) => `<option value="${id}">${esc(label)}</option>`).join('')}</select><p class="set-note" id="seatHint"></p></label>
       <button type="button" class="set-save" id="seatSend">Save invite</button> <button type="button" class="set-ghost" id="seatCancel">Cancel</button><p class="set-ok" id="seatErr" hidden></p></div>
@@ -1122,7 +1243,7 @@ async function init() {
   const rail = document.getElementById('rail');
   const navLink = s => `<a data-v="${s.views[0]}" data-sec="${s.key}" title="${esc(s.label)}">${svg(s.icon)}<span class="lbl">${esc(s.label)}</span>${s.badge ? '<span class="badge" id="badge" hidden></span>' : ''}</a>`;
   const navGroups = [['command', 'overview'], ['inventory_position', 'in_transit_overdue', 'inventory_risk'], ['reporting', 'governance']];
-  rail.innerHTML = `<div class="rail-head"><a class="logo" href="#command" data-v="command" title="Pulse"><img class="logo-img" src="/static/pulse-logo.png" alt="Pulse"><div class="logo-text">Pulse</div></a>
+  rail.innerHTML = `<div class="rail-head"><a class="logo" href="#command" data-v="command" title="Manufacturing Intelligence Platform"><img class="logo-img" src="/static/mip-logo.png" alt=""><div class="logo-text">Manufacturing<small>Intelligence Platform</small></div></a>
     <button class="toggle" id="railToggle" type="button" title="Collapse sidebar" aria-label="Collapse sidebar">${I.side}</button></div>
     <div class="scroll">
       ${navGroups.map(keys => `<div class="nav-block">${keys.map(k => navLink(SECTIONS.find(s => s.key === k))).join('')}</div>`).join('<div class="nav-break"></div>')}
@@ -1167,6 +1288,7 @@ async function init() {
   syncRail();
   S.chats = loadChats();
   paintChats();
+  bindAssist();
   document.getElementById('menuBtn').onclick = () => { rail.classList.add('open'); document.body.classList.add('menu-open'); };
   document.getElementById('scrim').onclick = closeMenu;
   document.getElementById('topAvatar').innerHTML = markInner(storedImage('pulse-org-logo'), initials(S.meta.notes.company));
@@ -1267,24 +1389,14 @@ function paintCockpit(decks, step, animate) {
 }
 function renderCommand() {
   const name = displayName();
-  const chatting = S.thread.length > 0;
-  document.getElementById('content').innerHTML = `<section class="hero ${chatting ? 'chatting' : ''}" id="hero">
+  document.getElementById('content').innerHTML = `<section class="hero" id="hero">
     <h1>${greeting()}${name ? `, <span>${esc(name)}</span>.` : ''}</h1>
     <div class="hero-rule"></div>
-    <div class="thread" id="thread"></div>
-    <div class="askbox">${I.spark}<input id="q" placeholder="Ask Pulse anything..." autocomplete="off"><button class="send" id="send" title="Ask" disabled>${I.up}</button></div>
     <div class="cockpit-wave" id="cockpitWave"></div>
     <button type="button" class="flow-toggle" id="flowToggle">Inventory flow <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
     </section>`;
-  const thread = document.getElementById('thread');
-  S.thread.forEach(el => thread.appendChild(el));
-  const q = document.getElementById('q'), send = document.getElementById('send');
-  const armSend = () => { const on = !!q.value.trim(); send.classList.toggle('ready', on); send.disabled = !on; };
-  q.oninput = armSend;
-  send.onclick = () => { if (!send.disabled) ask(q.value.trim()); };
-  q.onkeydown = e => { if (e.key === 'Enter' && q.value.trim()) ask(q.value.trim()); };
   document.getElementById('flowToggle').onclick = () => go('trends');
-  if (!chatting) loadCockpit(); else q.focus();
+  loadCockpit();
 }
 async function loadCockpit() {
   const wave = document.getElementById('cockpitWave');
@@ -1329,15 +1441,15 @@ async function loadInsights() {
 
 async function ask(text, playbook) {
   if (!text) return;
-  const hero = document.getElementById('hero'), thread = document.getElementById('thread'), q = document.getElementById('q');
-  hero.classList.add('chatting');
-  const wrap = document.getElementById('insightsWrap'); if (wrap) wrap.style.display = 'none';
-  q.value = ''; document.getElementById('send').classList.remove('ready');
+  openAssist();
+  const thread = document.getElementById('assistThread'), q = document.getElementById('q'), send = document.getElementById('send');
+  q.value = ''; send.classList.remove('ready'); send.disabled = true;
   const u = document.createElement('div'); u.className = 'msg user'; u.textContent = text;
   const a = document.createElement('div'); a.className = 'msg';
   a.innerHTML = `<div class="steps live"><div class="step"><span class="thinking"><i></i><i></i><i></i></span> ${playbook ? 'Agent is planning and working…' : 'Planning and querying the supply chain model…'}</div></div>`;
   thread.append(u, a); S.thread.push(u, a);
-  a.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  syncAssist();
+  thread.scrollTop = thread.scrollHeight;
   const r = playbook
     ? await api('/api/playbook/' + playbook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
     : await api('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, history: S.history }) });
@@ -1345,12 +1457,13 @@ async function ask(text, playbook) {
   persistChat();
   renderAgentResult(a, r);
   updateBadge();
+  thread.scrollTop = thread.scrollHeight;
   q.focus();
 }
 
 function renderAgentResult(el, r) {
   const steps = r.steps || [];
-  const by = r.mode === 'azure' ? `Azure OpenAI agent${S.meta.ai_model ? ' (' + S.meta.ai_model + ')' : ''}` : r.mode === 'claude' ? 'Claude agent' : r.mode === 'agent' ? 'Pulse agent playbook' : 'Offline router';
+  const by = r.mode === 'azure' ? `Azure OpenAI agent${S.meta.ai_model ? ' (' + S.meta.ai_model + ')' : ''}` : r.mode === 'claude' ? 'Claude agent' : r.mode === 'agent' ? 'Agent playbook' : 'Offline router';
   el.innerHTML = `${steps.length ? `<details class="steps" ${r.actions && r.actions.length ? 'open' : ''}><summary>${svg('check', 14)} ${steps.length} step${steps.length > 1 ? 's' : ''} completed · ${esc(by)}</summary>
       ${steps.map((s, i) => `<div class="step"><span class="n">${i + 1}</span><div><b>${esc(s.label)}</b>${s.detail ? `<div class="muted">${esc(s.detail)}</div>` : ''}</div></div>`).join('')}</details>` : ''}
     <div class="answer">${marked.parse(r.answer || '')}</div>
@@ -3321,7 +3434,7 @@ async function renderDataRefresh() {
             ${DAYS.map((d, i) => `<label class="chk"><input type="checkbox" class="rf_d" value="${i}" ${rf.days.includes(i) ? 'checked' : ''}> ${d}</label>`).join('')}</div>
           <button class="btn primary" id="rf_save">Save schedule</button> <span id="rf_msg" class="muted"></span></div></section>
       <section class="card inv-card"><div class="inv-ch-head"><div><h3>Connection</h3><p>Read-only Business Central</p></div></div>
-        <div class="inv-pad"><dl><dt>Source</dt><dd>${esc(n.company)} · ${esc(n.environment)}</dd><dt>Access</dt><dd>Read-only (Entra ID app, client credentials). Pulse never posts, edits or deletes Business Central records.</dd>
+        <div class="inv-pad"><dl><dt>Source</dt><dd>${esc(n.company)} · ${esc(n.environment)}</dd><dt>Access</dt><dd>Read-only (Entra ID app, client credentials). Manufacturing Intelligence Platform never posts, edits or deletes Business Central records.</dd>
           <dt>Tables</dt><dd>Item Ledger Entries, Purchase Lines, Items, Locations, Vendors, Production BOM header &amp; lines</dd></dl></div></section>
     </div>
     <div class="card tablecard inv-table" id="rlog"></div></div>`;
@@ -3449,7 +3562,7 @@ function renderDefinitions() {
   document.getElementById('pdfThis').onclick = () => window.print();
   document.getElementById('exportInv').onclick = () => exportCsv(defs);
   if (r && r.mismatches.length) renderTable(document.getElementById('recon'), { title: 'Reconciliation mismatches', total_rows: r.mismatches.length, drill: 'item_no',
-    columns: [{ field: 'item_no', label: 'Item', kind: 'text' }, { field: 'bc', label: 'BC inventory', kind: 'qty' }, { field: 'pulse', label: 'Pulse stock', kind: 'qty' }], rows: r.mismatches }, { variant: 'inventory', size: 10, search: 'Search item…' });
+    columns: [{ field: 'item_no', label: 'Item', kind: 'text' }, { field: 'bc', label: 'BC inventory', kind: 'qty' }, { field: 'pulse', label: 'Platform stock', kind: 'qty' }], rows: r.mismatches }, { variant: 'inventory', size: 10, search: 'Search item…' });
 }
 
 init();
