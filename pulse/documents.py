@@ -247,27 +247,65 @@ def extract(name, data):
     raise ValueError("Upload an Excel, CSV, text, Word, or PowerPoint file.")
 
 
-def _workbook_flow(name, data):
-    """Deeper sheet/formula/flow summary for the agent (not inventory numbers)."""
+def _workbook_flow_fast(name, data):
+    """
+    Capped, read_only sheet/formula summary for chat context.
+    Must stay cheap — never full openpyxl load (that 504s large planning files on upload).
+    """
+    unsupported = []
     try:
         import sys
         from .bc_client import ROOT
         if str(ROOT) not in sys.path:
             sys.path.insert(0, str(ROOT))
-        from excel_engine.extract import extract_workbook
-        info = extract_workbook(data, name)
-        summary = (info.get("summary") or "").strip()
-        if not summary:
-            return None, info.get("unsupported") or []
-        # Cap so chat context stays usable.
-        if len(summary) > 8000:
-            summary = summary[:8000] + "\n…(workbook flow truncated)"
-        return summary, info.get("unsupported") or []
+        from excel_engine.extract import _zip_feature_flags
+        unsupported = _zip_feature_flags(data)
+    except Exception:
+        pass
+    lines = [f"Workbook: {name}"]
+    try:
+        book = load_workbook(io.BytesIO(data), read_only=True, data_only=False, keep_links=False)
     except Exception as e:
-        return f"(Workbook flow extract limited: {type(e).__name__}.)", []
+        text, _ = _xlsx_zip_fallback(data)
+        return (text or f"(Could not open workbook: {type(e).__name__})"), unsupported
+    try:
+        sheets = book.worksheets[:25]
+        lines.append("Sheets (" + str(len(book.worksheets)) + "): " + ", ".join(ws.title for ws in sheets))
+        if len(book.worksheets) > 25:
+            lines.append(f"…and {len(book.worksheets) - 25} more sheets")
+        for ws in sheets:
+            try:
+                headers, formulas = [], []
+                for i, row in enumerate(ws.iter_rows(max_row=40, max_col=30, values_only=False)):
+                    for cell in row:
+                        value = cell.value
+                        if isinstance(value, str) and value.strip() and not _is_formula(value) and i < 15:
+                            if len(headers) < 20 and value.strip() not in headers:
+                                headers.append(value.strip())
+                        if _is_formula(value) and len(formulas) < 8:
+                            formulas.append(f"{cell.coordinate}={str(value)[:120]}")
+                    if i >= 39:
+                        break
+                bit = f"  {ws.title}"
+                if headers:
+                    bit += " headers: " + ", ".join(headers[:12])
+                if formulas:
+                    bit += " | formulas: " + "; ".join(formulas[:6])
+                lines.append(bit)
+            except Exception:
+                lines.append(f"  {getattr(ws, 'title', 'Sheet')}: (skipped)")
+    finally:
+        book.close()
+    if unsupported:
+        lines.append("Unsupported / caution: " + "; ".join(unsupported[:8]))
+    summary = "\n".join(lines)
+    if len(summary) > 8000:
+        summary = summary[:8000] + "\n…(workbook flow truncated)"
+    return summary, unsupported
 
 
 def save(name, data):
+    """Attach path must stay under gateway timeouts — light describe + store bytes only."""
     from . import excel_blob
     ext = _ext(name)
     try:
@@ -283,11 +321,6 @@ def save(name, data):
             text, headers = _xlsx_zip_fallback(data)
         else:
             raise ValueError("No text could be read from that file.")
-    flow, unsupported = None, []
-    if ext in ("xlsx", "xlsm") and _looks_like_xlsx(data):
-        flow, unsupported = _workbook_flow(name, data)
-        if flow:
-            text = _trim(text + "\n\n# Workbook flow (sheets, formulas, structure)\n" + flow)
     now = datetime.now()
     stale = [k for k, v in _STORE.items() if v["at"] < now - timedelta(hours=12)]
     for k in stale:
@@ -298,13 +331,13 @@ def save(name, data):
     tenant = excel_blob.tenant_prefix()
     blob_key = f"{tenant}/originals/{doc_id}/{name[:120]}"
     stored = excel_blob.put_bytes(blob_key, data)
-    # Bytes stay off the hot path once stored; get() rehydrates from Blob/local disk.
+    # Keep bytes in memory for this process so ask/rebuild need not re-download immediately.
     _STORE[doc_id] = {"id": doc_id, "name": name[:180], "text": text, "headers": headers[:30],
                       "blob_key": stored["key"], "uri": stored["uri"], "backend": stored["backend"],
-                      "ext": ext, "at": now, "size": len(data), "unsupported": unsupported[:20],
-                      "has_flow": bool(flow)}
+                      "ext": ext, "at": now, "size": len(data), "unsupported": [],
+                      "has_flow": False, "bytes": data}
     return {"id": doc_id, "name": name[:180], "headers": headers[:30], "chars": len(text),
-            "storage": stored["backend"], "size": len(data), "has_flow": bool(flow)}
+            "storage": stored["backend"], "size": len(data), "has_flow": False}
 
 
 def cache_bytes(doc_id, data):
@@ -336,13 +369,17 @@ def context_block(ids):
         doc = get(doc_id)
         if not doc:
             continue
-        # Lazy flow extract if upload summary was light (e.g. older docs in memory).
+        # Lazy, capped flow for the agent — never blocks the upload HTTP request.
         if doc.get("ext") in ("xlsx", "xlsm") and not doc.get("has_flow") and doc.get("bytes"):
-            flow, unsupported = _workbook_flow(doc.get("name") or "workbook.xlsx", doc["bytes"])
-            if flow:
-                doc["text"] = _trim((doc.get("text") or "") + "\n\n# Workbook flow (sheets, formulas, structure)\n" + flow)
-                doc["has_flow"] = True
-                doc["unsupported"] = unsupported[:20]
+            try:
+                flow, unsupported = _workbook_flow_fast(doc.get("name") or "workbook.xlsx", doc["bytes"])
+                if flow:
+                    doc["text"] = _trim((doc.get("text") or "") + "\n\n# Workbook flow (sheets, formulas, structure)\n" + flow)
+                    doc["has_flow"] = True
+                    doc["unsupported"] = (unsupported or [])[:20]
+            except Exception as e:
+                doc["has_flow"] = True  # do not retry every ask
+                doc["text"] = _trim((doc.get("text") or "") + f"\n\n(Workbook flow skipped: {type(e).__name__}.)")
         parts.append(
             f"UPLOADED DOCUMENT {doc['name']} (id {doc['id']}; layout, sheets, formulas, and workbook flow only; "
             f"its numbers are not inventory figures):\n{doc['text']}")
