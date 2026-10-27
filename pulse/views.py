@@ -28,6 +28,8 @@ VIEWS = [
      "What can be produced from available/incoming RM and WIP, and which components constrain production?"),
     ("11", "exceptions", "Supply Chain Exceptions",
      "What needs management attention across stockouts, low cover, overdue receipts, locations and production?"),
+    ("12", "rm_planning", "Raw Material Planning",
+     "What should we order, from the same sheets and formulas as the raw-material planning workbook?"),
 ]
 VIEW_IDS = {v[1] for v in VIEWS}
 
@@ -63,6 +65,17 @@ DEFINITIONS = {
                             "Components shared by several products are counted fully for each product.",
     "Exceptions": "One ranked list (High → Low severity, then value at stake) of stockouts, stockout exposure, "
                   "low cover, overdue receipts, location risks and production constraints.",
+    "RM planning inventory": "The workbook's SUM RM: on-hand quantity at SHIP1RM, SHIP2RM, SHIP3RM, SHIP4RM, "
+                             "SHIP5BOND and SHIP5RM. This is not stock at every location, and it is not the "
+                             "90-day cover used on the Inventory pages.",
+    "RM planning average consumption": "Absolute quantity of Consumption, Negative Adjmt. and Positive Adjmt. "
+                                       "by month. Average = the sum of months with movement divided by how many "
+                                       "such months there are. Max = the largest of those months.",
+    "RM planning cover days": "SUM RM inventory ÷ average monthly consumption × 26. Critical when that is "
+                              "29 days or less. SLOB when average consumption is zero.",
+    "RM planning order quantity": "ROUNDUP((absolute purchase gap + opening November) / 25,500, 0) × 25,500. "
+                                  "Purchase gap = anticipated December opening − the recipe's January requirement "
+                                  "from RM MATRIX row 134. In transit is the open purchase-order quantity.",
 }
 
 CLS = ["RM", "WIP", "FG"]
@@ -880,6 +893,9 @@ def overview(m, f):
 
 
 def render(m, view_id, filters):
+    if view_id == "rm_planning":
+        from . import rm_planning
+        return rm_planning.render(m, filters or {})
     fn = globals()[view_id]
     out = fn(m, filters or {})
     out.setdefault("insights", [])

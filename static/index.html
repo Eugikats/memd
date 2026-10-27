@@ -488,6 +488,8 @@ body.page-inv #topAvatar { display: none; }
 .sec-tabs button { border: 0; background: transparent; color: #64748b; font: inherit; font-size: 12px; font-weight: 500; line-height: 1.2; padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
 .sec-tabs button.on { background: rgba(23, 105, 255, .12); color: #1769FF; box-shadow: 0 0 0 1px rgba(23, 105, 255, .35), 0 0 12px rgba(23, 105, 255, .25); }
 .sec-tabs button:hover:not(.on) { background: #f8fafc; color: #334155; }
+.rm-sheets { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.rm-sheets .sec-tabs { width: 100%; max-width: 100%; }
 .inv-head .sec-tabs { flex: 0 1 auto; width: max-content; max-width: calc(100% - 280px); }
 .inv-head .inv-actions { margin-left: auto; flex: none; }
 .set-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(15, 23, 42, .3); display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -852,6 +854,7 @@ const SECTIONS = [
   { key: 'command', label: 'Command Center', icon: 'monitor', views: ['command'] },
   { key: 'overview', label: 'Overview', icon: 'grid', views: ['overview'] },
   ...GROUPS.map(([label, views]) => ({ key: views[0], label, icon: VIEW_ICON[views[0]] || 'grid', views })),
+  { key: 'rm_planning', label: 'Raw Materials', icon: 'gauge', views: ['rm_planning'] },
   { key: 'reporting', label: 'Reporting', icon: 'doc', views: ['reports', 'builder', 'schedules', 'trends'] },
   { key: 'governance', label: 'Governance', icon: 'shield', views: ['datarefresh', 'audit', 'definitions'] },
 ];
@@ -1428,7 +1431,7 @@ async function init() {
   }
   const rail = document.getElementById('rail');
   const navLink = s => `<a data-v="${s.views[0]}" data-sec="${s.key}" title="${esc(s.label)}">${svg(s.icon)}<span class="lbl">${esc(s.label)}</span>${s.badge ? '<span class="badge" id="badge" hidden></span>' : ''}</a>`;
-  const navGroups = [['command', 'overview'], ['inventory_position', 'in_transit_overdue', 'inventory_risk'], ['reporting', 'governance']];
+  const navGroups = [['command', 'overview'], ['inventory_position', 'in_transit_overdue', 'inventory_risk'], ['rm_planning'], ['reporting', 'governance']];
   rail.innerHTML = `<div class="rail-head"><a class="logo" href="#command" data-v="command" title="Manufacturing Intelligence Platform"><img class="logo-img" src="/static/mip-logo.png" alt=""><div class="logo-text">Manufacturing<small>Intelligence Platform</small></div></a>
     <button class="toggle" id="railToggle" type="button" title="Collapse sidebar" aria-label="Collapse sidebar">${I.side}</button></div>
     <div class="scroll">
@@ -1529,7 +1532,7 @@ function go(v, force) {
   if (isMobile()) closeMenu();
   if (v === S.view && !force) return;
   S.view = v;
-  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview', reports: 'Report library', builder: 'Report builder', schedules: 'Schedules & history', trends: 'Trends', command: 'Command Center' };
+  const INV_SHELL = { inventory_position: 'Inventory Position', inventory_by_location: 'Inventory by Location', rm_consumption_cover: 'Raw Material Consumption & Cover', wip_cover: 'WIP Cover', fg_cover: 'Finished Goods Cover', in_transit_overdue: 'In-Transit & Overdue Inventory', projection_stockout: 'Projected Inventory & Stockout Exposure', inventory_risk: 'Inventory Risk', location_risk: 'Location Supply Risk & Rebalancing', bom_readiness: 'BOM / Production Readiness', exceptions: 'Supply Chain Exceptions', rm_planning: 'Raw Material Planning', datarefresh: 'Data refresh', audit: 'Audit log', definitions: 'Definitions & data notes', overview: 'Overview', reports: 'Report library', builder: 'Report builder', schedules: 'Schedules & history', trends: 'Trends', command: 'Command Center' };
   const invShell = Object.prototype.hasOwnProperty.call(INV_SHELL, v);
   document.body.classList.toggle('page-inv', invShell);
   renderWhen();
@@ -1969,6 +1972,7 @@ function drawPosting(host, items, mode, subject) {
 let invDonutMode = 'value';
 let invTrendMetric = 'total';
 let invTrendMonths = 12;
+let rmSheet = 'MRP';
 function invFilters() {
   const f = S.filters, m = S.meta;
   const locs = m.locations || [];
@@ -2894,9 +2898,75 @@ async function mountInventoryTrend() {
   draw();
 }
 
+function renderRmPlanning(c, d) {
+  const faces = {
+    'RM stock (SUM RM)': { icon: 'box', fg: '#2563EB' },
+    'Cover ≤ 29 days': { icon: 'alert', fg: '#d03b3b' },
+    'SLOB': { icon: 'idle', fg: '#e07a12' },
+    'Open PO quantity': { icon: 'truck', fg: '#7c5cf0' },
+    'Suggested order qty': { icon: 'gauge', fg: '#16a34a' },
+  };
+  const kpis = (d.kpis || []).map(k => {
+    const face = faces[k.label] || { icon: 'chart', fg: '#475569' };
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
+      <div class="inv-kpi-row"><p class="inv-kpi-v">${esc(String(fmt(k.value, k.kind)))}</p>${cipSpark(k.spark, face.fg, k.label)}</div>
+      ${k.note ? `<p class="muted" style="margin:6px 0 0;font-size:12px">${esc(k.note)}</p>` : ''}</article>`;
+  }).join('');
+  const groups = [];
+  (d.rm_sheets || []).forEach(s => {
+    let g = groups.find(x => x.name === s.group);
+    if (!g) { g = { name: s.group, sheets: [] }; groups.push(g); }
+    g.sheets.push(s);
+  });
+  const tabs = groups.map(g => `<div class="sec-tabs" role="tablist" aria-label="${esc(g.name)}">${g.sheets.map(s => `<button type="button" role="tab" data-sheet="${esc(s.id)}" class="${s.id === d.sheet ? 'on' : ''}" aria-selected="${s.id === d.sheet}" title="${esc(g.name)}">${esc(s.title)}</button>`).join('')}</div>`).join('');
+  const charts = d.charts || [];
+  const card = (ch, id, wide) => ch ? `<section class="card inv-card${wide ? ' span-2' : ''}"><div class="inv-ch-head"><div><h3>${esc(ch.title)}</h3>${ch.subtitle ? `<p>${esc(ch.subtitle)}</p>` : ''}</div></div><div class="chartbox" style="height:${ch.height || 280}px"><canvas id="${id}"></canvas></div></section>` : '';
+  const byTitle = re => charts.find(ch => re.test(ch.title));
+  const cons = byTitle(/monthly consumption/i);
+  const cover = byTitle(/cover position/i);
+  const orders = byTitle(/suggested orders/i);
+  const locs = byTitle(/SUM RM locations/i);
+  c.innerHTML = `<div class="inv-page">
+    <div class="inv-head"><div class="sec-tabs" role="tablist"><button type="button" class="on" aria-selected="true">Raw Material Planning</button></div>
+      <div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
+      <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
+      <button class="btn primary" id="exportRm">${svg('download', 14)} Export</button></div></div>
+    <p class="muted" style="margin:4px 0 0">${esc(d.question || '')}</p>
+    ${insightsHTML(d.insights)}
+    <div class="inv-kpis">${kpis}</div>
+    <div class="inv-topcharts">${card(cons, 'chRmCons', true)}${card(cover, 'chRmCover')}</div>
+    <div class="inv-charts2">${card(orders, 'chRmOrders', true)}${card(locs, 'chRmLocs')}</div>
+    <div class="rm-sheets">${tabs}</div>
+    ${(d.tables || []).map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
+  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Summarise raw material planning: what should we order and which items are critical?'), 50); };
+  document.getElementById('pdfThis').onclick = () => window.print();
+  c.querySelectorAll('[data-sheet]').forEach(b => b.onclick = () => { rmSheet = b.dataset.sheet; go('rm_planning', true); });
+  S.charts.forEach(ch => ch.destroy()); S.charts = [];
+  const glass = { palette: INV_PALETTE, quiet: true, glassy: true };
+  const put = (id, ch) => {
+    const el = document.getElementById(id); if (!el || !ch) return;
+    try { const chart = drawChart(el, Object.assign({}, ch, glass)); if (chart) S.charts.push(chart); }
+    catch (e) { el.parentElement.innerHTML = `<div class="muted">Chart unavailable (${esc(e.message)})</div>`; }
+  };
+  put('chRmCons', cons); put('chRmCover', cover); put('chRmOrders', orders); put('chRmLocs', locs);
+  (d.tables || []).forEach((t, i) => {
+    const host = document.getElementById('tb' + i);
+    if (t.subtitle) {
+      const note = document.createElement('p');
+      note.className = 'muted';
+      note.style.cssText = 'margin:0 0 8px;font-size:12.5px';
+      note.textContent = t.subtitle;
+      host.before(note);
+    }
+    renderTable(host, t, { variant: 'inventory', size: 10, search: 'Search item, description, location…' });
+  });
+  if (d.tables && d.tables[0]) document.getElementById('exportRm').onclick = () => exportCsv(d.tables[0]);
+}
+
 async function loadView() {
   const view = S.view;
   const qs = new URLSearchParams(Object.entries(S.filters).filter(([, v]) => v));
+  if (view === 'rm_planning') qs.set('sheet', rmSheet);
   const c = document.getElementById('content');
   if (!c.querySelector('.vhead') && !c.querySelector('.inv-page')) c.innerHTML = `<div class="loading"><span class="thinking"><i></i><i></i><i></i></span> Loading view…</div>`;
   const d = await api(`/api/view/${view}?${qs}`);
@@ -2912,6 +2982,7 @@ async function loadView() {
   if (view === 'location_risk') { renderLocRisk(c, d); return; }
   if (view === 'bom_readiness') { renderBom(c, d); return; }
   if (view === 'exceptions') { renderExceptions(c, d); return; }
+  if (view === 'rm_planning') { renderRmPlanning(c, d); return; }
   if (view === 'overview') { renderOverview(c, d); return; }
   c.innerHTML = `<div class="vhead"><div><h1>${d.no ? `<span class="no">${d.no}</span> · ` : ''}${esc(d.title)}</h1><p>${esc(d.question)}</p></div>
       <div class="page-tools">${sectionTabs(view)}<div class="rbtns"><button class="btn" id="askThis">${I.spark.replace('class="spark"', 'width="14" height="14" style="vertical-align:-2px"')} Ask about this view</button>
@@ -3310,7 +3381,7 @@ function renderTable(el, t, opts = {}) {
     const pager = inv
       ? `<div class="pager inv-pager"><button type="button" class="btn" data-p="-1" ${st.page === 0 ? 'disabled' : ''}>‹ Prev</button>${pgBtns.join('')}<button type="button" class="btn" data-p="1" ${st.page >= pages - 1 ? 'disabled' : ''}>Next ›</button><label class="rpp">Rows per page <select data-size>${[10, 25, 50].map(n => `<option value="${n}" ${st.size === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>`
       : (pages > 1 ? `<div class="pager"><button class="btn" data-p="-1">‹ Prev</button> Page ${st.page + 1} of ${pages} · ${rows.length.toLocaleString()} rows <button class="btn" data-p="1">Next ›</button></div>` : '');
-    el.innerHTML = `${head}<div class="tablewrap"><table><thead><tr>${cols.map(c => `<th class="${num(c.kind) ? 'num' : ''}" data-f="${c.field}"><span>${esc(c.label)}${st.sort === c.field ? (st.dir > 0 ? ' ▲' : ' ▼') : ''}</span>${repeated.has(c.field) ? `<select class="colf" data-cf="${esc(c.field)}"><option value="">All</option>${valuesOf(c.field, c.field).map(v => `<option value="${esc(v)}" ${st.colFilter[c.field] === v ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>` : ''}</th>`).join('')}</tr></thead>
+    el.innerHTML = `${head}<div class="tablewrap"><table><thead><tr>${cols.map(c => `<th class="${num(c.kind) ? 'num' : ''}" data-f="${c.field}"${c.formula ? ` title="${esc(c.formula)}"` : ''}><span>${esc(c.label)}${st.sort === c.field ? (st.dir > 0 ? ' ▲' : ' ▼') : ''}</span>${repeated.has(c.field) ? `<select class="colf" data-cf="${esc(c.field)}"><option value="">All</option>${valuesOf(c.field, c.field).map(v => `<option value="${esc(v)}" ${st.colFilter[c.field] === v ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>` : ''}</th>`).join('')}</tr></thead>
       <tbody>${slice.map(r => `<tr class="${t.drill === 'item_no' && r.item_no ? 'click' : ''}" data-i="${esc(r.item_no || '')}">${cols.map(c => `<td class="${num(c.kind) ? 'num' : ''}"${bg(r, c)} title="${esc(r[c.field])}">${cell(r, c)}</td>`).join('')}</tr>`).join('') || `<tr><td colspan="${cols.length}" class="muted">No rows match.</td></tr>`}</tbody></table></div>${pager}`;
     el.querySelectorAll('th').forEach(th => th.onclick = ev => { if (ev.target.closest('.colf')) return; const f = th.dataset.f; if (!f) return; st.dir = st.sort === f ? -st.dir : (num(t.columns.find(c => c.field === f).kind) ? -1 : 1); st.sort = f; draw(); });
     el.querySelectorAll('.colf').forEach(sel => { sel.onclick = ev => ev.stopPropagation(); sel.onchange = () => { st.colFilter[sel.dataset.cf] = sel.value; st.page = 0; draw(); }; });

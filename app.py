@@ -52,8 +52,11 @@ def _model_busy():
 
 def filters():
     a = request.args
-    return {"item_class": a.get("item_class") or None, "site": a.get("site") or None,
-            "location": a.get("location") or None, "q": a.get("q") or None}
+    out = {"item_class": a.get("item_class") or None, "site": a.get("site") or None,
+           "location": a.get("location") or None, "q": a.get("q") or None}
+    if a.get("sheet"):
+        out["sheet"] = a.get("sheet")
+    return out
 
 
 def current_user():
