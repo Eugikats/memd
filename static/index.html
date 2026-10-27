@@ -573,6 +573,7 @@ body.page-inv #topAvatar { display: none; }
 .inv-filterpop select { height: 36px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0 8px; font: inherit; color: #14213D; background: #fff; }
 .inv-filters .inv-seg { flex: none; }
 .rm-sheetpop { display: flex; flex-direction: column; gap: 2px; max-height: 320px; overflow: auto; min-width: 240px; padding: 8px; }
+.rm-sheetpop[hidden] { display: none; }
 .rm-sheetpop button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; text-align: left; padding: 7px 8px; border-radius: 8px; font: inherit; color: #14213D; cursor: pointer; }
 .rm-sheetpop button.on, .rm-sheetpop button:hover { background: color-mix(in srgb, var(--tone, #64748b) 14%, #fff); }
 .rm-sheetpop button i { width: 8px; height: 8px; border-radius: 50%; background: var(--tone, #64748b); flex: none; }
@@ -3107,7 +3108,8 @@ function bindFilters() {
     loadView();
   };
   f_class.onchange = upd; f_site.onchange = upd;
-  const loc = document.getElementById('f_loc'); if (loc) loc.onchange = upd;
+  const loc = document.getElementById('f_loc');
+  if (loc) loc.onchange = () => { const p = document.getElementById('f_pop'); if (p) p.hidden = true; upd(); };
   let t; f_q.oninput = () => { clearTimeout(t); t = setTimeout(upd, 400); };
   f_clear.onclick = () => { S.filters = { item_class: '', site: '', location: '', q: '' }; pageMeasure = 'value'; loadView(); };
   const fb = document.getElementById('f_filters'), pop = document.getElementById('f_pop');
@@ -3117,7 +3119,7 @@ function bindFilters() {
   if (sb && sp) {
     sb.onclick = e => { e.stopPropagation(); if (pop) pop.hidden = true; sp.hidden = !sp.hidden; };
     sp.onclick = e => e.stopPropagation();
-    sp.querySelectorAll('[data-sheet]').forEach(b => b.onclick = () => { rmSheet = b.dataset.sheet; sp.hidden = true; go('rm_planning', true); });
+    sp.querySelectorAll('[data-sheet]').forEach(b => b.onclick = e => { e.stopPropagation(); rmSheet = b.dataset.sheet; sp.hidden = true; go('rm_planning', true); });
   }
   if (!bindFilters.outside) {
     bindFilters.outside = () => {
