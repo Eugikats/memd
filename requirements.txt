@@ -9,3 +9,8 @@ openpyxl>=3.1
 python-docx>=1.1
 python-pptx>=1.0
 tzdata>=2024.1
+# Excel Intelligence Engine (Blob / Service Bus / AI Search / Key Vault) — safe to install on App Service
+azure-storage-blob>=12.19
+azure-servicebus>=7.12
+azure-search-documents>=11.4
+azure-keyvault-secrets>=4.8

@@ -112,12 +112,21 @@ def _tools():
                               "recipients": {"type": "array", "items": {"type": "string"}},
                               "item_class": {"type": "string", "enum": ["RM", "WIP", "FG"]}, "site": {"type": "string"}}}},
         {"name": "rebuild_from_upload",
-         "description": "ACTION: rebuild the attached file in its own sheets, tables, or slides. "
+         "description": "ACTION: start an async Excel Intelligence job to rebuild the attached file in its own sheets, tables, or slides. "
                         "Keep calculated columns as formulas and write system figures only where a header matches a view. "
                         "Use this when the user wants a report in the shape of an upload. Pass document_id from the upload context. "
-                        "Never copy numbers out of the upload.",
+                        "Never copy numbers out of the upload. Returns a job_id; poll excel_job_status until ready.",
          "input_schema": {"type": "object", "additionalProperties": False, "required": ["document_id"],
-                          "properties": {"document_id": {"type": "string"}, "view": {"type": "string"}}}},
+                          "properties": {"document_id": {"type": "string"}, "view": {"type": "string"},
+                                         "instruction": {"type": "string"}}}},
+        {"name": "excel_job_status",
+         "description": "Check progress of an Excel Intelligence Engine job started by rebuild_from_upload.",
+         "input_schema": {"type": "object", "additionalProperties": False, "required": ["job_id"],
+                          "properties": {"job_id": {"type": "string"}}}},
+        {"name": "excel_download",
+         "description": "Return the download path for a completed Excel job (status ready).",
+         "input_schema": {"type": "object", "additionalProperties": False, "required": ["job_id"],
+                          "properties": {"job_id": {"type": "string"}}}},
         {"name": "get_definitions",
          "description": "Return the documented definition of every measure and the data notes for this load.",
          "input_schema": {"type": "object", "additionalProperties": False, "properties": {}}},
@@ -178,24 +187,33 @@ def run_tool(m, name, args):
                                  {k: args.get(k) for k in ("item_class", "site") if args.get(k)})
     if name == "rebuild_from_upload":
         from . import documents
-        from . import reports as R
-        built = documents.fill_layout(m, args.get("document_id"), args.get("view") or None)
-        if built.get("error"):
-            return built
-        hid = __import__("uuid").uuid4().hex[:10]
-        ext = built.get("ext") or "xlsx"
-        R.FILES.mkdir(parents=True, exist_ok=True)
-        (R.FILES / f"{hid}.{ext}").write_bytes(built["bytes"])
-        entry = {"id": hid, "report_id": "upload", "name": built.get("name") or "Upload layout", "ext": ext,
-                 "params": {"view": args.get("view")}, "generated_at": R.now().isoformat(timespec="seconds"),
-                 "by": "Pulse agent", "trigger": "upload", "rows": built["rows"], "data_loaded": ""}
-        hist = R._read(R.HISTORY, [])
-        R._write(R.HISTORY, ([entry] + hist)[:500])
-        return {"history_id": hid, "name": built.get("name") or "Upload layout", "matched": built["matched"],
-                "unmatched": built["unmatched"], "view": built["view"], "rows": built["rows"],
-                "sheets": built.get("sheets"), "formulas_kept": built.get("formulas_kept"),
-                "note": "Each sheet, table, or slide was kept. Formula columns were kept as formulas. "
-                        "Blank columns had no matching system field. No upload number was copied."}
+        from . import excel_jobs
+        doc_id = args.get("document_id")
+        if not documents.get(doc_id):
+            return {"error": "That upload is no longer available. Attach it again."}
+        job = excel_jobs.create(doc_id, args.get("instruction") or "rebuild from upload",
+                                user="Pulse agent", view=args.get("view") or None)
+        return {"job_id": job["id"], "status": job["status"], "progress": job["progress"],
+                "message": job["message"], "async": True,
+                "note": "Excel rebuild runs asynchronously. Poll excel_job_status with this job_id."}
+    if name == "excel_job_status":
+        from . import excel_jobs
+        job = excel_jobs.get(args.get("job_id"))
+        if not job:
+            return {"error": "Unknown Excel job"}
+        return {k: job.get(k) for k in (
+            "id", "status", "progress", "message", "history_id", "matched", "unmatched", "sheets",
+            "unsupported", "validation", "error", "rows", "name", "recalculated", "output_uri")}
+    if name == "excel_download":
+        from . import excel_jobs
+        job = excel_jobs.get(args.get("job_id"))
+        if not job:
+            return {"error": "Unknown Excel job"}
+        if job.get("status") != "ready" or not job.get("history_id"):
+            return {"error": "Job is not ready yet", "status": job.get("status"), "progress": job.get("progress")}
+        return {"history_id": job["history_id"],
+                "download": f"/api/reports/history/{job['history_id']}/download",
+                "name": job.get("name"), "unsupported": job.get("unsupported") or []}
     if name == "get_definitions":
         n = dict(m["notes"])
         n.pop("reconciliation", None)
@@ -225,8 +243,9 @@ def _system(m):
             "An uploaded document is layout, sheets, and formulas. Inventory, cover, value, and order figures come only from your tools. "
             "If a number in the document disagrees with a tool result, say so and use the tool result. Cached formula results are not "
             "inventory figures. When the user wants a report in the shape of an attached file, call rebuild_from_upload with that "
-            "document id. It keeps every sheet, table, or slide and keeps calculated columns as formulas. Use generate_report only "
-            "when there is no uploaded template.\n\n" + GLOSSARY)
+            "document id (starts an async Excel Intelligence job). Poll excel_job_status and use excel_download when ready; "
+            "never invent formulas. The job keeps every sheet, table, or slide and keeps calculated columns as formulas. "
+            "Use generate_report only when there is no uploaded template.\n\n" + GLOSSARY)
 
 
 def _audit(rec):
@@ -271,42 +290,75 @@ _TEMPLATE_ASK = re.compile(
     re.I)
 
 
-def _rebuild_answer(built):
-    if built.get("error"):
-        return {"mode": "agent", "answer": built["error"], "tool_calls": [{"tool": "rebuild_from_upload", "input": {}}],
-                "table": None, "steps": [{"label": "Could not rebuild from the upload", "detail": built["error"]}],
-                "actions": [], "ui": {"view": "reports", "filters": {}}}
-    sheets = built.get("sheets") or []
+def _job_started_answer(job, document_id=None):
+    lines = [
+        "I started the **Excel Intelligence Engine** to recreate your template with system figures.",
+        f"- Job: `{job['id']}`",
+        f"- Status: {job.get('status')} ({job.get('progress', 0)}%)",
+        job.get("message") or "Queued.",
+        "This runs in the background so large workbooks are not cut off by chat timeouts. "
+        "I will keep the job id so you can check progress; the UI also polls until the file is ready.",
+        "No upload numbers will be copied — only matching system columns are filled, and formulas stay formulas.",
+    ]
+    return {"mode": "agent", "answer": "\n".join(lines),
+            "tool_calls": [{"tool": "rebuild_from_upload", "input": {"document_id": document_id}}],
+            "table": None,
+            "steps": [{"label": "Queued Excel rebuild job", "detail": f"job_id={job['id']}"}],
+            "actions": [], "ui": {"view": "reports", "filters": {}},
+            "excel_job": {"id": job["id"], "status": job.get("status"), "progress": job.get("progress", 0),
+                          "message": job.get("message")}}
+
+
+def _job_finished_answer(job):
+    if job.get("status") == "failed" or job.get("error"):
+        err = job.get("error") or "Excel job failed."
+        return {"mode": "agent", "answer": err,
+                "tool_calls": [{"tool": "excel_job_status", "input": {"job_id": job.get("id")}}],
+                "table": None, "steps": [{"label": "Excel job failed", "detail": err}],
+                "actions": [], "ui": {"view": "reports", "filters": {}},
+                "excel_job": {"id": job.get("id"), "status": "failed", "progress": 100, "error": err}}
+    sheets = job.get("sheets") or []
     filled = [s for s in sheets if s.get("role") == "filled"]
     kept = [s for s in sheets if s.get("role") == "kept"]
     lines = [
-        f"I rebuilt **{built.get('name') or 'the upload'}** in the same layout using system figures.",
-        f"- Rows filled: {built.get('rows', 0):,}",
+        f"I rebuilt **{job.get('name') or 'the upload'}** in the same layout using system figures.",
+        f"- Rows filled: {job.get('rows', 0):,}",
         f"- Sheets/tables filled: {len(filled)}" + (f" ({', '.join(s.get('name', '') for s in filled[:8])})" if filled else ""),
     ]
     if kept:
         lines.append(f"- Kept as formulas/layout: {', '.join(s.get('name', '') for s in kept[:8])}")
-    if built.get("matched"):
-        lines.append("- Matched columns: " + ", ".join(built["matched"][:12]))
-    if built.get("unmatched"):
-        lines.append("- Left blank (no system field): " + ", ".join(built["unmatched"][:12]))
-    lines.append(built.get("note") or "No upload number was copied.")
-    lines.append(f"Download: [/api/reports/history/{built['history_id']}/download](/api/reports/history/{built['history_id']}/download)")
+    if job.get("matched"):
+        lines.append("- Matched columns: " + ", ".join(job["matched"][:12]))
+    if job.get("unmatched"):
+        lines.append("- Left blank (no system field): " + ", ".join(job["unmatched"][:12]))
+    if job.get("unsupported"):
+        lines.append("- Flags: " + "; ".join(job["unsupported"][:8]))
+    lines.append("No upload number was copied.")
+    if job.get("history_id"):
+        lines.append(f"Download: [/api/reports/history/{job['history_id']}/download](/api/reports/history/{job['history_id']}/download)")
     return {"mode": "agent", "answer": "\n".join(lines),
-            "tool_calls": [{"tool": "rebuild_from_upload", "input": {"document_id": built.get("document_id")}}],
+            "tool_calls": [{"tool": "excel_job_status", "input": {"job_id": job.get("id")}}],
             "table": None,
-            "steps": [{"label": "Rebuilt a report from the upload",
-                       "detail": f"history_id={built.get('history_id')}, rows={built.get('rows')}"}],
-            "actions": [], "ui": {"view": "reports", "filters": {}}}
+            "steps": [{"label": "Excel rebuild ready",
+                       "detail": f"history_id={job.get('history_id')}, rows={job.get('rows')}"}],
+            "actions": [], "ui": {"view": "reports", "filters": {}},
+            "excel_job": {"id": job.get("id"), "status": "ready", "progress": 100,
+                          "history_id": job.get("history_id"), "message": job.get("message")}}
 
 
 def _try_rebuild(m, documents, question):
     ids = [d for d in (documents or []) if d]
     if not ids or not _TEMPLATE_ASK.search(question or ""):
         return None
-    out = run_tool(m, "rebuild_from_upload", {"document_id": ids[0]})
-    out["document_id"] = ids[0]
-    return _rebuild_answer(out)
+    out = run_tool(m, "rebuild_from_upload", {"document_id": ids[0], "instruction": question})
+    if out.get("error"):
+        return {"mode": "agent", "answer": out["error"],
+                "tool_calls": [{"tool": "rebuild_from_upload", "input": {"document_id": ids[0]}}],
+                "table": None, "steps": [{"label": "Could not start Excel job", "detail": out["error"]}],
+                "actions": [], "ui": {"view": "reports", "filters": {}}}
+    from . import excel_jobs
+    job = excel_jobs.get(out["job_id"]) or out
+    return _job_started_answer(job, document_id=ids[0])
 
 
 def _prompt_question(question, documents=None, emails=None):
@@ -318,6 +370,16 @@ def _prompt_question(question, documents=None, emails=None):
     block = docs.context_block(documents)
     if block:
         bits.append(block)
+    # Azure AI Search retrieval for workbook intelligence (Foundry/OpenAI context).
+    try:
+        from excel_engine import search_index
+        hits = search_index.search(question or "", top=5)
+        if hits:
+            bits.append("WORKBOOK INTELLIGENCE (from Azure AI Search; structure/formulas only):\n" +
+                        "\n".join(f"- [{h.get('kind')}] {h.get('workbook_name')} {h.get('sheet')}: {(h.get('content') or '')[:400]}"
+                                  for h in hits))
+    except Exception:
+        pass
     if not bits:
         return question
     return question + "\n\n" + "\n\n".join(bits)
@@ -412,7 +474,8 @@ STEP_LABELS = {"query_view": "Queried view", "get_item": "Looked up item", "find
                "create_alert": "Proposed alert rule", "watch_items": "Updated watchlist",
                "generate_briefing": "Wrote management briefing", "generate_report": "Generated Excel report",
                "send_report": "Emailed a report", "schedule_report": "Scheduled a report",
-               "rebuild_from_upload": "Rebuilt a report from the upload"}
+               "rebuild_from_upload": "Queued Excel rebuild job",
+               "excel_job_status": "Checked Excel job status", "excel_download": "Prepared Excel download"}
 
 
 def _ask_claude(m, question, history, documents=None, emails=None):

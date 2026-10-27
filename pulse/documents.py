@@ -248,6 +248,7 @@ def extract(name, data):
 
 
 def save(name, data):
+    from . import excel_blob
     ext = _ext(name)
     try:
         text, headers = extract(name, data)
@@ -269,13 +270,38 @@ def save(name, data):
     while len(_STORE) >= _LIMIT:
         _STORE.pop(next(iter(_STORE)))
     doc_id = uuid.uuid4().hex[:10]
+    tenant = excel_blob.tenant_prefix()
+    blob_key = f"{tenant}/originals/{doc_id}/{name[:120]}"
+    stored = excel_blob.put_bytes(blob_key, data)
+    # Bytes stay off the hot path once stored; get() rehydrates from Blob/local disk.
     _STORE[doc_id] = {"id": doc_id, "name": name[:180], "text": text, "headers": headers[:30],
-                      "bytes": data, "ext": ext, "at": now}
-    return {"id": doc_id, "name": name[:180], "headers": headers[:30], "chars": len(text)}
+                      "blob_key": stored["key"], "uri": stored["uri"], "backend": stored["backend"],
+                      "ext": ext, "at": now, "size": len(data)}
+    return {"id": doc_id, "name": name[:180], "headers": headers[:30], "chars": len(text),
+            "storage": stored["backend"], "size": len(data)}
+
+
+def cache_bytes(doc_id, data):
+    doc = _STORE.get(doc_id)
+    if doc is not None:
+        doc["bytes"] = data
 
 
 def get(doc_id):
-    return _STORE.get(doc_id)
+    doc = _STORE.get(doc_id)
+    if not doc:
+        return None
+    if doc.get("bytes"):
+        return doc
+    key = doc.get("blob_key") or doc.get("uri")
+    if not key:
+        return doc
+    try:
+        from . import excel_blob
+        doc["bytes"] = excel_blob.get_bytes(key)
+    except Exception:
+        pass
+    return doc
 
 
 def context_block(ids):

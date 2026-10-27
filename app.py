@@ -1,5 +1,6 @@
 """Pulse – Supply Chain POC web app.   Run:  python app.py   then open http://localhost:8050"""
 import json
+import sys
 import threading
 from datetime import datetime
 
@@ -7,6 +8,7 @@ from flask import Flask, Response, jsonify, request, send_file, send_from_direct
 
 from pulse import agent as A
 from pulse import command, documents, extract, model
+from pulse import excel_jobs
 from pulse import mail
 from pulse import reports as R
 from pulse import scheduler
@@ -14,11 +16,15 @@ from pulse import views as V
 from pulse.bc_client import DATA_DIR, ROOT, load_env
 
 load_env()
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 app = Flask(__name__, static_folder="static")
 # Load the model in the background so gunicorn can bind and serve the page while the
 # supply-chain cache is opening. A full rebuild from raw files can take minutes after a restart.
 STATE = {"model": None, "refreshing": False, "last_error": None, "loading": True, "load_error": None}
 REFRESH_LOG = DATA_DIR / "refresh_log.jsonl"
+excel_jobs.set_model_getter(lambda: STATE["model"])
+
 
 
 def _boot_model():
@@ -96,13 +102,22 @@ def meta():
                     "pending_actions": sum(a["status"] == "proposed" for a in A.list_actions()),
                     "user_name": display_name(), "user_email": current_user() if current_user() != "demo" else "",
                     "command_mode": command.provider(),
-                    "ai_model": __import__("os").environ.get("AZURE_OPENAI_DEPLOYMENT", "") if command.provider() == "azure" else ""})
+                    "ai_model": __import__("os").environ.get("AZURE_OPENAI_DEPLOYMENT", "") if command.provider() == "azure" else "",
+                    "excel_engine": {
+                        "blob": __import__("pulse.excel_blob", fromlist=["x"]).configured(),
+                        "servicebus": excel_jobs.servicebus_configured(),
+                        "search": bool(__import__("os").environ.get("PULSE_EXCEL_SEARCH_ENDPOINT")),
+                        "keyvault": bool(__import__("os").environ.get("PULSE_KEY_VAULT_URI") or __import__("os").environ.get("AZURE_KEY_VAULT_URI")),
+                    }})
 
 
 @app.before_request
 def _gate_until_model():
     path = request.path or ""
     if path == "/" or path.startswith("/static/") or path in ("/api/meta", "/api/mail/status"):
+        return None
+    # Upload + Excel job status do not need the model in-process (rebuild worker waits for it).
+    if path == "/api/documents" or path.startswith("/api/excel/"):
         return None
     if path.startswith("/api/"):
         return _model_busy()
@@ -423,6 +438,50 @@ def document_upload():
     return _json(saved)
 
 
+@app.post("/api/excel/jobs")
+def excel_job_create():
+    body = request.get_json(force=True) or {}
+    doc_id = body.get("document_id")
+    if not doc_id or not documents.get(doc_id):
+        return _json({"error": "Attach a workbook first."}, 400)
+    job = excel_jobs.create(doc_id, body.get("instruction") or body.get("question") or "rebuild from upload",
+                            user=current_user(), view=body.get("view"))
+    return _json(job)
+
+
+@app.get("/api/excel/jobs")
+def excel_jobs_list():
+    return _json({"jobs": excel_jobs.list_recent(40)})
+
+
+@app.get("/api/excel/jobs/<job_id>")
+def excel_job_get(job_id):
+    job = excel_jobs.get(job_id)
+    if not job:
+        return _json({"error": "Unknown Excel job"}, 404)
+    out = dict(job)
+    if out.get("history_id"):
+        out["download"] = f"/api/reports/history/{out['history_id']}/download"
+    return _json(out)
+
+
+@app.post("/api/excel/jobs/<job_id>/deliver")
+def excel_job_deliver(job_id):
+    """Email or webhook-deliver a ready job (Logic Apps URL used when no recipients)."""
+    job = excel_jobs.get(job_id)
+    if not job:
+        return _json({"error": "Unknown Excel job"}, 404)
+    if job.get("status") != "ready":
+        return _json({"error": "Job is not ready", "status": job.get("status")}, 400)
+    body = request.get_json(silent=True) or {}
+    recipients = body.get("recipients") or []
+    if recipients:
+        from excel_engine import delivery
+        return _json(delivery.email_history(job["history_id"], recipients))
+    from excel_engine import delivery
+    return _json(delivery.notify_ready(job))
+
+
 @app.get("/api/schedules")
 def schedules_get():
     s = R.schedules()
@@ -522,6 +581,10 @@ def audit():
     for h in R.history():
         rows.append({"at": h["generated_at"], "user": h["by"], "type": "report",
                      "event": f"Report generated ({h['trigger']}): {h['name']}", "detail": f"{h['rows']:,} rows"})
+    for e in excel_jobs.audit_rows(200):
+        rows.append({"at": e.get("at"), "user": e.get("user") or "system", "type": "excel_engine",
+                     "event": f"{e.get('type')}: job {e.get('job_id')}",
+                     "detail": e.get("error") or f"history={e.get('history_id') or '–'} tenant={e.get('tenant') or '–'}"})
     rows.sort(key=lambda r: str(r["at"] or ""), reverse=True)
     return _json(rows[:1000])
 

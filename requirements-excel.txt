@@ -1,0 +1,5 @@
+# Optional Azure Excel Intelligence Engine dependencies (App Service + worker image).
+azure-storage-blob>=12.19
+azure-servicebus>=7.12
+azure-search-documents>=11.4
+azure-keyvault-secrets>=4.8

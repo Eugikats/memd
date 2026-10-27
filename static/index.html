@@ -1633,6 +1633,45 @@ async function loadInsights() {
   box.onclick = e => { const b = e.target.closest('.insight'); if (b) ask(cards[+b.dataset.i].question); };
 }
 
+function excelJobAnswer(job) {
+  if (!job) return 'Excel job missing.';
+  if (job.status === 'failed' || job.error) return job.error || 'Excel job failed.';
+  const sheets = job.sheets || [];
+  const filled = sheets.filter(s => s.role === 'filled');
+  const kept = sheets.filter(s => s.role === 'kept');
+  const lines = [
+    `I rebuilt **${job.name || 'the upload'}** in the same layout using system figures.`,
+    `- Rows filled: ${(job.rows || 0).toLocaleString()}`,
+    `- Sheets/tables filled: ${filled.length}` + (filled.length ? ` (${filled.slice(0, 8).map(s => s.name).join(', ')})` : ''),
+  ];
+  if (kept.length) lines.push(`- Kept as formulas/layout: ${kept.slice(0, 8).map(s => s.name).join(', ')}`);
+  if (job.matched && job.matched.length) lines.push('- Matched columns: ' + job.matched.slice(0, 12).join(', '));
+  if (job.unmatched && job.unmatched.length) lines.push('- Left blank (no system field): ' + job.unmatched.slice(0, 12).join(', '));
+  if (job.unsupported && job.unsupported.length) lines.push('- Flags: ' + job.unsupported.slice(0, 8).join('; '));
+  lines.push('No upload number was copied.');
+  if (job.history_id) lines.push(`Download: [/api/reports/history/${job.history_id}/download](/api/reports/history/${job.history_id}/download)`);
+  return lines.join('\n');
+}
+
+async function pollExcelJob(jobId, pending, hosts) {
+  const started = Date.now();
+  const maxMs = 15 * 60 * 1000;
+  while (Date.now() - started < maxMs) {
+    await new Promise(r => setTimeout(r, 1500));
+    let job;
+    try { job = await api('/api/excel/jobs/' + jobId); } catch (e) { continue; }
+    if (!job || job.error) continue;
+    const pct = job.progress != null ? job.progress : 0;
+    const label = job.message || job.status || 'Working…';
+    pending.forEach(a => {
+      a.innerHTML = `<div class="steps live"><div class="step"><span class="thinking"><i></i><i></i><i></i></span> Excel engine: ${esc(label)} (${pct}%)</div></div>`;
+    });
+    hosts.forEach(thread => { thread.scrollTop = thread.scrollHeight; });
+    if (job.status === 'ready' || job.status === 'failed') return job;
+  }
+  return { status: 'failed', error: 'Excel job timed out after 15 minutes. Check Reports history or try again.' };
+}
+
 async function ask(text, playbook, origin) {
   if (!text) return;
   const fromPopup = origin === 'popup' || (origin !== 'hero' && document.body.classList.contains('assist-open'));
@@ -1657,16 +1696,36 @@ async function ask(text, playbook, origin) {
   syncAssist();
   let r;
   try {
+    const isTemplateAsk = !playbook && /same\s+(format|template|layout)|this\s+(format|template|layout)|rebuild|from\s+(the\s+)?upload|from\s+(this|the)\s+(file|document|excel|spreadsheet|workbook)|fill\s+(this|the)\s+template/i.test(text)
+      && readyUploads().length;
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 120000);
+    // Template rebuilds return a job immediately; ordinary ask keeps the 120s guard.
+    const timer = isTemplateAsk ? null : setTimeout(() => ctrl.abort(), 120000);
     try {
       r = playbook
         ? await api('/api/playbook/' + playbook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: ctrl.signal })
         : await api('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, history: S.history, documents: readyUploads().map(d => d.id), emails: knownEmails() }), signal: ctrl.signal });
     } finally {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
     }
     if (!r || r.error) throw new Error((r && r.error) || 'The agent did not return an answer.');
+    if (r.excel_job && r.excel_job.id && r.excel_job.status !== 'ready' && r.excel_job.status !== 'failed') {
+      pending.forEach(a => {
+        a.innerHTML = `<div class="steps live"><div class="step"><span class="thinking"><i></i><i></i><i></i></span> Excel engine queued…</div></div>`;
+      });
+      const job = await pollExcelJob(r.excel_job.id, pending, hosts);
+      r = {
+        mode: 'agent',
+        answer: excelJobAnswer(job),
+        steps: [{ label: job.status === 'ready' ? 'Excel rebuild ready' : 'Excel job failed',
+                  detail: job.history_id ? ('history_id=' + job.history_id) : (job.error || job.status) }],
+        actions: [],
+        tool_calls: [{ tool: 'excel_job_status', input: { job_id: job.id || r.excel_job.id } }],
+        table: null,
+        ui: { view: 'reports', filters: {} },
+        excel_job: job,
+      };
+    }
   } catch (err) {
     const msg = err && err.name === 'AbortError'
       ? 'That request took too long and was stopped. Try again, or attach a smaller template.'
