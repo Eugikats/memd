@@ -191,9 +191,9 @@ def run_tool(m, name, args):
                  "by": "Pulse agent", "trigger": "upload", "rows": built["rows"], "data_loaded": ""}
         hist = R._read(R.HISTORY, [])
         R._write(R.HISTORY, ([entry] + hist)[:500])
-        return {"history_id": hid, "matched": built["matched"], "unmatched": built["unmatched"],
-                "view": built["view"], "rows": built["rows"], "sheets": built.get("sheets"),
-                "formulas_kept": built.get("formulas_kept"),
+        return {"history_id": hid, "name": built.get("name") or "Upload layout", "matched": built["matched"],
+                "unmatched": built["unmatched"], "view": built["view"], "rows": built["rows"],
+                "sheets": built.get("sheets"), "formulas_kept": built.get("formulas_kept"),
                 "note": "Each sheet, table, or slide was kept. Formula columns were kept as formulas. "
                         "Blank columns had no matching system field. No upload number was copied."}
     if name == "get_definitions":
@@ -252,7 +252,8 @@ def _azure():
     if _azure_client is None:
         from openai import AzureOpenAI
         kw = {"azure_endpoint": os.environ["AZURE_OPENAI_ENDPOINT"],
-              "api_version": os.environ.get("AZURE_OPENAI_API_VERSION", "2025-04-01-preview")}
+              "api_version": os.environ.get("AZURE_OPENAI_API_VERSION", "2025-04-01-preview"),
+              "timeout": 60.0, "max_retries": 1}
         if os.environ.get("AZURE_OPENAI_API_KEY"):
             kw["api_key"] = os.environ["AZURE_OPENAI_API_KEY"]
         else:
@@ -261,6 +262,51 @@ def _azure():
                 DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default")
         _azure_client = AzureOpenAI(**kw)
     return _azure_client
+
+
+_TEMPLATE_ASK = re.compile(
+    r"same\s+(format|template|layout)|this\s+(format|template|layout)|"
+    r"rebuild|from\s+(the\s+)?upload|from\s+(this|the)\s+(file|document|excel|spreadsheet|workbook)|"
+    r"using\s+(this|the)\s+(file|template|upload)|fill\s+(this|the)\s+template",
+    re.I)
+
+
+def _rebuild_answer(built):
+    if built.get("error"):
+        return {"mode": "agent", "answer": built["error"], "tool_calls": [{"tool": "rebuild_from_upload", "input": {}}],
+                "table": None, "steps": [{"label": "Could not rebuild from the upload", "detail": built["error"]}],
+                "actions": [], "ui": {"view": "reports", "filters": {}}}
+    sheets = built.get("sheets") or []
+    filled = [s for s in sheets if s.get("role") == "filled"]
+    kept = [s for s in sheets if s.get("role") == "kept"]
+    lines = [
+        f"I rebuilt **{built.get('name') or 'the upload'}** in the same layout using system figures.",
+        f"- Rows filled: {built.get('rows', 0):,}",
+        f"- Sheets/tables filled: {len(filled)}" + (f" ({', '.join(s.get('name', '') for s in filled[:8])})" if filled else ""),
+    ]
+    if kept:
+        lines.append(f"- Kept as formulas/layout: {', '.join(s.get('name', '') for s in kept[:8])}")
+    if built.get("matched"):
+        lines.append("- Matched columns: " + ", ".join(built["matched"][:12]))
+    if built.get("unmatched"):
+        lines.append("- Left blank (no system field): " + ", ".join(built["unmatched"][:12]))
+    lines.append(built.get("note") or "No upload number was copied.")
+    lines.append(f"Download: [/api/reports/history/{built['history_id']}/download](/api/reports/history/{built['history_id']}/download)")
+    return {"mode": "agent", "answer": "\n".join(lines),
+            "tool_calls": [{"tool": "rebuild_from_upload", "input": {"document_id": built.get("document_id")}}],
+            "table": None,
+            "steps": [{"label": "Rebuilt a report from the upload",
+                       "detail": f"history_id={built.get('history_id')}, rows={built.get('rows')}"}],
+            "actions": [], "ui": {"view": "reports", "filters": {}}}
+
+
+def _try_rebuild(m, documents, question):
+    ids = [d for d in (documents or []) if d]
+    if not ids or not _TEMPLATE_ASK.search(question or ""):
+        return None
+    out = run_tool(m, "rebuild_from_upload", {"document_id": ids[0]})
+    out["document_id"] = ids[0]
+    return _rebuild_answer(out)
 
 
 def _prompt_question(question, documents=None, emails=None):
@@ -323,21 +369,23 @@ def _ask_azure(m, question, history, documents=None, emails=None):
 
 def ask(m, question, user="demo", history=None, documents=None, emails=None):
     rec = {"at": datetime.now().isoformat(timespec="seconds"), "user": user, "question": question}
-    if provider() == "azure":
-        try:
-            res = _ask_azure(m, question, history or [], documents, emails)
-        except Exception as e:  # network/auth/quota: fall back so the user still gets an answer
-            res = _ask_offline(m, question, emails)
-            res["answer"] = f"_Azure OpenAI unavailable ({type(e).__name__}: {str(e)[:160]}); offline answer:_\n\n" + res["answer"]
-    elif os.environ.get("ANTHROPIC_API_KEY"):
-        try:
-            res = _ask_claude(m, question, history or [], documents, emails)
-        except anthropic.APIError as e:
-            res = _ask_offline(m, question, emails)
-            res["answer"] = f"_Claude unavailable ({type(e).__name__}); offline answer:_\n\n" + res["answer"]
-    else:
-        res = _ask_offline(m, question, emails)
-    if documents and res.get("mode") in ("offline", "agent"):
+    res = _try_rebuild(m, documents, question)
+    if res is None:
+        if provider() == "azure":
+            try:
+                res = _ask_azure(m, question, history or [], documents, emails)
+            except Exception as e:  # network/auth/quota: fall back so the user still gets an answer
+                res = _ask_offline(m, question, emails, documents)
+                res["answer"] = f"_Azure OpenAI unavailable ({type(e).__name__}: {str(e)[:160]}); offline answer:_\n\n" + res["answer"]
+        elif os.environ.get("ANTHROPIC_API_KEY"):
+            try:
+                res = _ask_claude(m, question, history or [], documents, emails)
+            except anthropic.APIError as e:
+                res = _ask_offline(m, question, emails, documents)
+                res["answer"] = f"_Claude unavailable ({type(e).__name__}); offline answer:_\n\n" + res["answer"]
+        else:
+            res = _ask_offline(m, question, emails, documents)
+    if documents and res.get("mode") in ("offline", "agent") and "No upload number was copied" not in (res.get("answer") or ""):
         res["answer"] += ("\n\nAny numbers in the uploaded file were not used. "
                           "The figures above come from the system.")
     res.setdefault("steps", [{"label": STEP_LABELS.get(c["tool"], c["tool"]), "detail": _brief(c.get("input"))}
@@ -457,7 +505,10 @@ def _schedule_hint(question, emails):
             "time": clock.group(1) if clock else "07:00"}
 
 
-def _ask_offline(m, question, emails=None):
+def _ask_offline(m, question, emails=None, documents=None):
+    rebuilt = _try_rebuild(m, documents, question)
+    if rebuilt is not None:
+        return rebuilt
     q = question.lower()
     for pat, pb in INTENTS:
         if re.search(pat, q):

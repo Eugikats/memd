@@ -298,8 +298,15 @@ def _column_index(columns):
     return by
 
 
+_CATALOG_CACHE = None
+_FILL_ROW_CAP = 2000
+
+
 def _catalog(model):
-    """Column labels only, so choosing a sheet's view does not export every row of every view."""
+    """Column labels only, cached for the process so each rebuild does not re-render every view."""
+    global _CATALOG_CACHE
+    if _CATALOG_CACHE is not None:
+        return _CATALOG_CACHE
     from . import views as V
     token = V.ROW_LIMIT.set(1)
     try:
@@ -309,6 +316,7 @@ def _catalog(model):
             table = (rendered.get("tables") or [None])[0]
             if table:
                 out[view] = {"title": rendered.get("title") or view, "columns": table["columns"]}
+        _CATALOG_CACHE = out
         return out
     finally:
         V.ROW_LIMIT.reset(token)
@@ -318,7 +326,7 @@ def _materialise(model, view, cache):
     if view in cache:
         return cache[view]
     from . import views as V
-    token = V.ROW_LIMIT.set(1_000_000)
+    token = V.ROW_LIMIT.set(_FILL_ROW_CAP)
     try:
         rendered = V.render(model, view, {})
         table = (rendered.get("tables") or [None])[0]
@@ -328,11 +336,26 @@ def _materialise(model, view, cache):
     return cache[view]
 
 
-def _choose_view(catalog, headers, preferred):
+def _hint_view(doc, headers):
+    """Prefer RM / inventory views when the file name or headers point at planning."""
+    blob = " ".join([str(doc.get("name") or ""), *[str(h) for h in (headers or [])]]).lower()
+    if re.search(r"\brm\b|raw.?material|planning|cover", blob):
+        return "rm_consumption_cover"
+    if re.search(r"inventory|stock|item", blob):
+        return "inventory_position"
+    return None
+
+
+def _choose_view(catalog, headers, preferred, doc=None):
     from . import views as V
     names = [h.strip().lower() for h in headers if h and str(h).strip()]
     if preferred and preferred in catalog:
         return preferred
+    hinted = _hint_view(doc or {}, headers)
+    if hinted and hinted in catalog:
+        keys = _column_index(catalog[hinted]["columns"])
+        if sum(1 for name in names if name in keys) >= 1:
+            return hinted
     order = {row[1]: i for i, row in enumerate(V.VIEWS)}
     best, score = None, 0
     for view, info in catalog.items():
@@ -374,67 +397,72 @@ def _fill_xlsx(model, doc, view):
     total = 0
     titles = []
     for ws in book.worksheets:
-        header_row, labels = _header_row(ws)
-        role, inputs, formulas = _sheet_role(ws, header_row, labels)
-        formula_notes = [f"{header}: {sample}" for _, header, sample in formulas if sample]
-        if role == "keep":
-            sheets.append({"name": ws.title, "role": "kept", "formulas_kept": formula_notes})
+        try:
+            header_row, labels = _header_row(ws)
+            role, inputs, formulas = _sheet_role(ws, header_row, labels)
+            formula_notes = [f"{header}: {sample}" for _, header, sample in formulas if sample]
+            if role == "keep":
+                sheets.append({"name": ws.title, "role": "kept", "formulas_kept": formula_notes})
+                kept.extend(formula_notes)
+                continue
+            headers = [h for _, h in labels]
+            chosen = _choose_view(catalog, headers, view, doc)
+            info = _materialise(model, chosen, loaded) if chosen else None
+            by = _column_index(info["table"]["columns"]) if info and info.get("table") else {}
+            used = [h for h in headers if h.strip().lower() in by]
+            skipped = [h for h in headers if h.strip().lower() not in by]
+            if not used:
+                sheets.append({"name": ws.title, "role": "kept", "formulas_kept": formula_notes, "unmatched": skipped})
+                kept.extend(formula_notes)
+                continue
+            rows = (info["table"]["rows"] or [])[:_FILL_ROW_CAP]
+            cols = [c for c, _h in labels]
+            last = header_row
+            blank = 0
+            scan_to = min(ws.max_row or header_row, header_row + _FILL_ROW_CAP + 2)
+            for r in range(header_row + 1, scan_to + 1):
+                if any(ws.cell(r, c).value not in (None, "") for c in cols):
+                    last, blank = r, 0
+                else:
+                    blank += 1
+                    if blank >= 2 and last > header_row:
+                        break
+            samples = {}
+            for col, _header, sample in formulas:
+                src = header_row + 1
+                for r in range(header_row + 1, max(last, header_row + 1) + 1):
+                    value = ws.cell(r, col).value
+                    if _is_formula(value):
+                        src, sample = r, value
+                        break
+                if sample:
+                    samples[col] = (src, sample)
+            for i, row in enumerate(rows):
+                r = header_row + 1 + i
+                for col, header in inputs:
+                    key = header.strip().lower()
+                    _write_cell(ws, r, col, row.get(by[key]["field"]) if key in by else None)
+                for col, (src, sample) in samples.items():
+                    if r == src:
+                        continue
+                    existing = ws.cell(r, col).value
+                    if _is_formula(existing):
+                        continue
+                    _write_cell(ws, r, col, _translate(sample, col, src, r))
+            end = header_row + len(rows)
+            for r in range(end + 1, last + 1):
+                for col in cols:
+                    _write_cell(ws, r, col, None)
+            matched.extend(used)
+            unmatched.extend(skipped)
             kept.extend(formula_notes)
-            continue
-        headers = [h for _, h in labels]
-        chosen = _choose_view(catalog, headers, view)
-        info = _materialise(model, chosen, loaded) if chosen else None
-        by = _column_index(info["table"]["columns"]) if info and info.get("table") else {}
-        used = [h for h in headers if h.strip().lower() in by]
-        skipped = [h for h in headers if h.strip().lower() not in by]
-        if not used:
-            sheets.append({"name": ws.title, "role": "kept", "formulas_kept": formula_notes, "unmatched": skipped})
-            kept.extend(formula_notes)
-            continue
-        rows = info["table"]["rows"]
-        cols = [c for c, _h in labels]
-        last = header_row
-        blank = 0
-        for r in range(header_row + 1, min(ws.max_row or header_row, header_row + 5000) + 1):
-            if any(ws.cell(r, c).value not in (None, "") for c in cols):
-                last, blank = r, 0
-            else:
-                blank += 1
-                if blank >= 2 and last > header_row:
-                    break
-        samples = {}
-        for col, _header, sample in formulas:
-            src = header_row + 1
-            for r in range(header_row + 1, max(last, header_row + 1) + 1):
-                value = ws.cell(r, col).value
-                if _is_formula(value):
-                    src, sample = r, value
-                    break
-            if sample:
-                samples[col] = (src, sample)
-        for i, row in enumerate(rows):
-            r = header_row + 1 + i
-            for col, header in inputs:
-                key = header.strip().lower()
-                _write_cell(ws, r, col, row.get(by[key]["field"]) if key in by else None)
-            for col, (src, sample) in samples.items():
-                if r == src:
-                    continue
-                existing = ws.cell(r, col).value
-                if _is_formula(existing):
-                    continue
-                _write_cell(ws, r, col, _translate(sample, col, src, r))
-        end = header_row + len(rows)
-        for r in range(end + 1, last + 1):
-            for col in cols:
-                _write_cell(ws, r, col, None)
-        matched.extend(used)
-        unmatched.extend(skipped)
-        kept.extend(formula_notes)
-        total += len(rows)
-        titles.append(info["title"])
-        sheets.append({"name": ws.title, "role": "filled", "view": info["title"], "rows": len(rows),
-                       "matched": used, "unmatched": skipped, "formulas_kept": formula_notes})
+            total += len(rows)
+            titles.append(info["title"])
+            sheets.append({"name": ws.title, "role": "filled", "view": info["title"], "rows": len(rows),
+                           "matched": used, "unmatched": skipped, "formulas_kept": formula_notes})
+        except Exception:
+            sheets.append({"name": getattr(ws, "title", "Sheet"), "role": "kept",
+                           "formulas_kept": ["sheet skipped: could not read layout"]})
     buf = io.BytesIO()
     book.save(buf)
     book.close()
@@ -458,14 +486,14 @@ def _fill_docx(model, doc, view):
         if not table.rows:
             continue
         headers = [c.text.strip() for c in table.rows[0].cells]
-        chosen = _choose_view(catalog, [h for h in headers if h], view)
+        chosen = _choose_view(catalog, [h for h in headers if h], view, doc)
         info = _materialise(model, chosen, loaded) if chosen else None
         by = _column_index(info["table"]["columns"]) if info and info.get("table") else {}
         used = [h for h in headers if h.strip().lower() in by]
         if not used:
             sheets.append({"name": f"Table {i}", "role": "kept"})
             continue
-        data = info["table"]["rows"]
+        data = (info["table"]["rows"] or [])[:_FILL_ROW_CAP]
         while len(table.rows) - 1 < len(data):
             table.add_row()
         body = list(table.rows)[1:]
@@ -508,14 +536,14 @@ def _fill_pptx(model, doc, view):
             seen += 1
             table = shape.table
             headers = [c.text.strip() for c in table.rows[0].cells]
-            chosen = _choose_view(catalog, [h for h in headers if h], view)
+            chosen = _choose_view(catalog, [h for h in headers if h], view, doc)
             info = _materialise(model, chosen, loaded) if chosen else None
             by = _column_index(info["table"]["columns"]) if info and info.get("table") else {}
             used = [h for h in headers if h.strip().lower() in by]
             if not used:
                 sheets.append({"name": f"Slide table {seen}", "role": "kept"})
                 continue
-            data = info["table"]["rows"]
+            data = (info["table"]["rows"] or [])[:_FILL_ROW_CAP]
             capacity = max(0, len(table.rows) - 1)
             for n in range(capacity):
                 source = data[n] if n < len(data) else None
@@ -546,7 +574,7 @@ def _fill_flat(model, doc, view):
     headers = doc.get("headers") or []
     if not headers:
         return {"error": "That upload has no header row to follow."}
-    chosen = _choose_view(catalog, headers, view)
+    chosen = _choose_view(catalog, headers, view, doc)
     info = _materialise(model, chosen, {}) if chosen else None
     if not info:
         return {"error": "No system column matches that header row."}
@@ -555,18 +583,19 @@ def _fill_flat(model, doc, view):
     skipped = [h for h in headers if h.strip().lower() not in by]
     if not used:
         return {"error": "No system column matches that header row."}
+    rows = (info["table"]["rows"] or [])[:_FILL_ROW_CAP]
     book = Workbook()
     sheet = book.active
     sheet.title = "Report"
     sheet.append(headers)
-    for row in info["table"]["rows"]:
+    for row in rows:
         sheet.append([row.get(by[h.strip().lower()]["field"]) if h.strip().lower() in by else None for h in headers])
     buf = io.BytesIO()
     book.save(buf)
     return {"bytes": buf.getvalue(), "ext": "xlsx", "name": doc["name"], "matched": used, "unmatched": skipped,
-            "sheets": [{"name": "Report", "role": "filled", "view": info["title"], "rows": len(info["table"]["rows"]),
+            "sheets": [{"name": "Report", "role": "filled", "view": info["title"], "rows": len(rows),
                         "matched": used, "unmatched": skipped, "formulas_kept": []}],
-            "formulas_kept": [], "view": info["title"], "rows": len(info["table"]["rows"])}
+            "formulas_kept": [], "view": info["title"], "rows": len(rows)}
 
 
 def fill_layout(model, doc_id, view=None):

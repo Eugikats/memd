@@ -1655,9 +1655,26 @@ async function ask(text, playbook, origin) {
     return a;
   });
   syncAssist();
-  const r = playbook
-    ? await api('/api/playbook/' + playbook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-    : await api('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, history: S.history, documents: readyUploads().map(d => d.id), emails: knownEmails() }) });
+  let r;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 120000);
+    try {
+      r = playbook
+        ? await api('/api/playbook/' + playbook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: ctrl.signal })
+        : await api('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, history: S.history, documents: readyUploads().map(d => d.id), emails: knownEmails() }), signal: ctrl.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!r || r.error) throw new Error((r && r.error) || 'The agent did not return an answer.');
+  } catch (err) {
+    const msg = err && err.name === 'AbortError'
+      ? 'That request took too long and was stopped. Try again, or attach a smaller template.'
+      : (err && err.message) || 'Could not reach the agent.';
+    pending.forEach(a => { a.innerHTML = `<div class="answer">${esc(msg)}</div>`; });
+    hosts.forEach(thread => { thread.scrollTop = thread.scrollHeight; });
+    return;
+  }
   S.history.push({ role: 'user', content: text }, { role: 'assistant', content: r.answer });
   persistChat();
   pending.forEach(a => renderAgentResult(a, r));
