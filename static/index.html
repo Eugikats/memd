@@ -3520,7 +3520,6 @@ function openPointCard(detail) {
   const base = (ch.series && ch.series[0] && ch.series[0].data) || [];
   const total = base.reduce((a, b) => a + (Number(b) || 0), 0);
   const share = total ? Math.round(100 * (Number(value) || 0) / total) : null;
-  const siblings = (ch.labels || []).map((lb, i) => ({ lb, v: base[i] })).filter(x => x.v != null).sort((a, b) => (Number(b.v) || 0) - (Number(a.v) || 0)).slice(0, 8);
   const rows = [];
   const needle = String(label || '').toLowerCase();
   (S.pageTables || []).forEach(t => (t.rows || []).forEach(r => {
@@ -3528,20 +3527,53 @@ function openPointCard(detail) {
     const hit = Object.values(r).some(v => { const s = String(v ?? '').toLowerCase(); return s && (s === needle || (needle.length > 2 && s.includes(needle))); });
     if (hit) rows.push({ cols: t.columns || [], row: r });
   }));
+  const title = detail.title || ch.title || 'Chart';
+  const col = css('--accent');
+  const sharePct = share == null ? 0 : Math.max(0, Math.min(100, share));
+  const counted = base.filter(v => v != null).length;
+  const rank = counted ? base.filter(v => (Number(v) || 0) > (Number(value) || 0)).length + 1 : null;
+  const tiles = [];
+  series.forEach(s => tiles.push([s.name || 'Series', shown(s.value)]));
+  if (share != null) tiles.push(['Share of series', share + '%']);
+  if (rank != null) tiles.push(['Rank in chart', `${rank} of ${counted}`]);
+  if (counted) tiles.push(['Series total', shown(total)]);
+  const first = rows[0];
+  if (first) {
+    const bits = (first.cols.length ? first.cols : Object.keys(first.row).slice(0, 6).map(field => ({ field, label: field, kind: 'text' }))).slice(0, 6);
+    bits.forEach(c => { if (tiles.length < 6) tiles.push([c.label, String(tableFmt(first.row[c.field], c.kind))]); });
+  }
   const dr = document.getElementById('drawer');
   dr.classList.add('open');
-  const rowHtml = rows.map(({ cols, row }) => {
-    const bits = cols.length ? cols.slice(0, 4) : Object.keys(row).slice(0, 4).map(field => ({ field, label: field, kind: 'text' }));
-    return `<div class="d-tiles" style="margin-top:8px">${bits.map(c => `<div><span>${esc(c.label)}</span><b>${esc(String(tableFmt(row[c.field], c.kind)))}</b></div>`).join('')}</div>`;
-  }).join('');
-  dr.innerHTML = `<div class="d-head"><div><div class="d-tags"><span class="cls">${esc(detail.title || ch.title || 'Chart')}</span></div><h2>${esc(String(label))}</h2></div>
-    <div class="rbtns"><button class="btn" id="dclose">${svg('x', 14)}</button></div></div>
-    <div class="d-hero"><div class="d-cover"><div class="muted">This point</div><div class="d-big">${esc(shown(value))}</div>
-      ${share != null ? `<div class="muted">${share}% of this series</div>` : ''}</div>
-      ${series.length ? `<div class="d-tiles">${series.map(s => `<div><span>${esc(s.name || 'Value')}</span><b>${esc(shown(s.value))}</b></div>`).join('')}</div>` : ''}</div>
-    ${siblings.length ? `<div style="padding:0 16px 12px"><div class="muted" style="margin-bottom:8px">In this chart</div><div class="d-tiles">${siblings.map(s => `<div><span>${esc(String(s.lb))}</span><b>${esc(shown(s.v))}</b></div>`).join('')}</div></div>` : ''}
-    ${rowHtml ? `<div style="padding:0 16px 16px"><div class="muted" style="margin-bottom:8px">Matching rows</div>${rowHtml}</div>` : ''}`;
+  dr.innerHTML = `<div class="d-head" style="--c:${col}"><div><div class="d-tags"><span class="cls" style="--c:${col}">${esc(title)}</span></div>
+      <h2>${esc(String(label))}</h2><div class="muted">${esc(title)}${share != null ? ` · ${share}% of this series` : ''}</div></div>
+      <div class="rbtns"><button class="btn" id="dask">${I.spark.replace('class="spark"', 'width="14" height="14" style="vertical-align:-2px"')} Ask</button><button class="btn" id="dclose">${svg('x', 14)}</button></div></div>
+    <div class="d-hero">
+      <div class="d-cover"><div class="muted">${esc((series[0] && series[0].name) || (money ? 'Value' : 'Quantity'))}</div><div class="d-big" style="color:${col}">${esc(shown(value))}</div>
+        <div class="kbar big"><span style="width:${sharePct}%;background:${col}"></span></div><div class="d-scale"><span>0</span><span>25</span><span>50</span><span>75</span><span>100%</span></div>
+        <div class="muted">${share != null ? `${share}% of this series` : 'Selected point'}${rank != null ? ` · rank ${rank} of ${counted}` : ''}</div></div>
+      <div class="d-tiles">${tiles.slice(0, 6).map(([a, b]) => `<div><span>${esc(a)}</span><b>${esc(String(b))}</b></div>`).join('')}</div></div>
+    <div class="card tablecard" id="d_chart"></div>
+    <div class="card tablecard" id="d_rows"></div>`;
   document.getElementById('dclose').onclick = () => dr.classList.remove('open');
+  document.getElementById('dask').onclick = () => { dr.classList.remove('open'); go('command'); setTimeout(() => ask(`Explain ${label} on ${title}: what does this point represent and what should we do?`), 50); };
+  const kind = money ? 'money' : 'qty';
+  const chartRows = (ch.labels || []).map((lb, i) => {
+    const v = base[i];
+    return { label: String(lb), value: v, share: total ? Math.round(100 * (Number(v) || 0) / total) : null, item_no: pointItem(lb, ch.extra, i) };
+  }).filter(r => r.value != null);
+  if (chartRows.length) renderTable(document.getElementById('d_chart'), {
+    title: 'In this chart', total_rows: chartRows.length, drill: 'item_no',
+    columns: [{ field: 'label', label: 'Segment', kind: 'text' }, { field: 'value', label: money ? 'Value (UGX)' : 'Amount', kind }, { field: 'share', label: 'Share %', kind: 'qty' }],
+    rows: chartRows,
+  }, { size: 8 });
+  else document.getElementById('d_chart').remove();
+  if (rows.length) {
+    const cols = rows[0].cols.length ? rows[0].cols : Object.keys(rows[0].row).slice(0, 8).map(field => ({ field, label: field, kind: 'text' }));
+    renderTable(document.getElementById('d_rows'), {
+      title: 'Matching rows', total_rows: rows.length, drill: cols.some(c => c.field === 'item_no') ? 'item_no' : null,
+      columns: cols, rows: rows.map(r => r.row),
+    }, { size: 8 });
+  } else document.getElementById('d_rows').remove();
 }
 async function openItem(no) {
   const dr = document.getElementById('drawer');
