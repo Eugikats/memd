@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from excel_engine import delivery, extract, graph_excel, rebuild, search_index, validate
 from excel_engine import keyvault as kv
@@ -36,9 +35,9 @@ def run_job(job_id: str, model=None) -> dict:
         except Exception as e:
             return bump("failed", 100, "Could not load workbook", error=str(e)[:300])
 
-    bump("extracting", 10, "Extracting worksheets, formulas, and layout")
-    extracted = extract.extract_workbook(doc["bytes"], doc.get("name") or "workbook.xlsx")
-    # Store extract artifact
+    bump("extracting", 10, "Extracting worksheets, formulas, and layout (fast scan)")
+    # Always fast — full openpyxl extract hangs large RM planning files at 10%.
+    extracted = extract.extract_workbook(doc["bytes"], doc.get("name") or "workbook.xlsx", fast=True)
     extract_key = f"{job.get('tenant', 'default')}/extracts/{job_id}.json"
     excel_blob.put_bytes(extract_key, json.dumps(extracted).encode("utf-8"), "application/json")
     bump("extracting", 25, "Extraction complete", extract=extracted.get("summary"),
@@ -56,7 +55,12 @@ def run_job(job_id: str, model=None) -> dict:
             return bump("failed", 100, "Model unavailable", error=f"Could not load supply chain model: {e}"[:300])
 
     bump("rebuilding", 55, "Rebuilding template with system figures (deterministic)")
-    filled = rebuild.rebuild_from_document(model, job["document_id"], job.get("view"))
+
+    def on_progress(i, n, sheet_name):
+        pct = 55 + int(20 * (i / max(n, 1)))
+        bump("rebuilding", min(pct, 74), f"Filling sheet {i}/{n}: {sheet_name}")
+
+    filled = rebuild.rebuild_from_document(model, job["document_id"], job.get("view"), on_progress=on_progress)
     if filled.get("error"):
         return bump("failed", 100, "Rebuild failed", error=filled["error"],
                     unmatched=filled.get("unmatched") or [], sheets=filled.get("sheets") or [])
@@ -67,7 +71,6 @@ def run_job(job_id: str, model=None) -> dict:
         return bump("failed", 100, "Validation failed", error="; ".join(report["errors"])[:400],
                     validation=report, unsupported=report.get("unsupported") or [])
 
-    # Optional Graph Excel recalc
     recalc = graph_excel.recalculate(filled["bytes"], filename=(doc.get("name") or "report.xlsx")[:120])
     filled["bytes"] = recalc.get("bytes") or filled["bytes"]
     unsupported = list(report.get("unsupported") or [])
@@ -92,6 +95,7 @@ def run_job(job_id: str, model=None) -> dict:
         name=filled.get("name"),
         view=filled.get("view"),
         index=indexed,
+        lightweight=bool(filled.get("lightweight")),
     )
     delivery.notify_ready(ready)
     excel_jobs._audit({"at": excel_jobs._now(), "type": "excel_job_ready", "job_id": job_id,

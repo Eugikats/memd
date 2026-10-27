@@ -11,8 +11,13 @@ def _is_formula(value):
     return isinstance(value, str) and value.startswith("=")
 
 
-def extract_workbook(data: bytes, name: str = "workbook.xlsx") -> dict:
-    """Return a structure summary suitable for search indexing and validation."""
+def extract_workbook(data: bytes, name: str = "workbook.xlsx", fast: bool = False) -> dict:
+    """Return a structure summary suitable for search indexing and validation.
+
+    fast=True uses read_only + hard caps so large planning files do not hang the job at 10%.
+    """
+    if fast:
+        return _extract_fast(data, name)
     unsupported = []
     sheets = []
     named_ranges = []
@@ -43,11 +48,9 @@ def extract_workbook(data: bytes, name: str = "workbook.xlsx") -> dict:
                     header_row, labels = r, found
                     break
             sheet_formulas = []
-            sample_cells = 0
             for row in ws.iter_rows(min_row=1, max_row=min(ws.max_row or 1, 80),
                                     max_col=min(ws.max_column or 1, 40)):
                 for cell in row:
-                    sample_cells += 1
                     if _is_formula(cell.value):
                         entry = {"sheet": ws.title, "cell": cell.coordinate, "formula": str(cell.value)[:500]}
                         sheet_formulas.append(entry)
@@ -70,7 +73,6 @@ def extract_workbook(data: bytes, name: str = "workbook.xlsx") -> dict:
             })
         if charts:
             unsupported.append(f"{charts} chart(s) detected — chart recreation is best-effort / may be preserved as-is")
-        # Pivot / vba hints via zip
         extras = _zip_feature_flags(data)
         unsupported.extend(extras)
     finally:
@@ -84,6 +86,69 @@ def extract_workbook(data: bytes, name: str = "workbook.xlsx") -> dict:
         "formula_count": len(formulas),
         "unsupported": list(dict.fromkeys(unsupported)),
         "summary": _summary_text(name, sheets, named_ranges, formulas, unsupported),
+        "fast": False,
+    }
+
+
+def _extract_fast(data: bytes, name: str) -> dict:
+    """read_only, capped extract for rebuild jobs and chat context."""
+    unsupported = _zip_feature_flags(data)
+    sheets = []
+    formulas = []
+    try:
+        from openpyxl import load_workbook
+        book = load_workbook(io.BytesIO(data), read_only=True, data_only=False, keep_links=False)
+    except Exception as e:
+        return _zip_extract(data, name, note=f"openpyxl fast failed: {type(e).__name__}")
+
+    try:
+        all_sheets = list(book.worksheets)
+        for ws in all_sheets[:25]:
+            headers, header_map, header_row = [], [], None
+            sheet_formulas = []
+            try:
+                for i, row in enumerate(ws.iter_rows(max_row=40, max_col=30, values_only=False)):
+                    found = []
+                    for cell in row:
+                        value = cell.value
+                        if isinstance(value, str) and value.strip() and not _is_formula(value) and i < 15:
+                            found.append({"col": cell.column, "header": value.strip()})
+                        if _is_formula(value) and len(sheet_formulas) < 8:
+                            entry = {"sheet": ws.title, "cell": cell.coordinate, "formula": str(value)[:200]}
+                            sheet_formulas.append(entry)
+                            formulas.append(entry)
+                    if header_row is None and len(found) >= 2:
+                        header_row = i + 1
+                        header_map = found
+                        headers = [h["header"] for h in found]
+                    if i >= 39:
+                        break
+            except Exception:
+                pass
+            sheets.append({
+                "name": ws.title,
+                "header_row": header_row,
+                "headers": headers,
+                "header_map": header_map,
+                "max_row": None,
+                "max_col": None,
+                "formula_count": len(sheet_formulas),
+                "formula_samples": sheet_formulas[:20],
+            })
+        if len(all_sheets) > 25:
+            unsupported.append(f"Fast extract scanned 25 of {len(all_sheets)} sheets")
+    finally:
+        book.close()
+
+    return {
+        "name": name,
+        "sheets": sheets,
+        "named_ranges": [],
+        "formulas": formulas[:200],
+        "formula_count": len(formulas),
+        "unsupported": list(dict.fromkeys(unsupported)),
+        "summary": _summary_text(name, sheets, [], formulas, unsupported),
+        "fast": True,
     }
 
 
@@ -128,6 +193,7 @@ def _zip_extract(data: bytes, name: str, note: str = "") -> dict:
         "formula_count": 0,
         "unsupported": unsupported,
         "summary": _summary_text(name, sheets, [], [], unsupported),
+        "fast": True,
     }
 
 

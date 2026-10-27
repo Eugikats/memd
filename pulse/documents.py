@@ -398,6 +398,8 @@ def _column_index(columns):
 
 _CATALOG_CACHE = None
 _FILL_ROW_CAP = 2000
+# Full openpyxl clone hangs on large planning workbooks — use lightweight rebuild above this size.
+_LIGHTWEIGHT_BYTES = 2 * 1024 * 1024
 
 
 def _catalog(model):
@@ -481,11 +483,125 @@ def _write_cell(ws, row, col, value):
         pass
 
 
-def _fill_xlsx(model, doc, view):
+def _scan_sheets_readonly(data):
+    """Discover sheet names, headers, and fill vs keep role without a full workbook load."""
+    book = load_workbook(io.BytesIO(data), read_only=True, data_only=False, keep_links=False)
+    scanned = []
     try:
-        book = load_workbook(io.BytesIO(doc["bytes"]), data_only=False, keep_links=False)
+        for ws in book.worksheets[:40]:
+            headers, header_map, header_row = [], [], None
+            formula_n, value_n = 0, 0
+            try:
+                for i, row in enumerate(ws.iter_rows(max_row=20, max_col=30, values_only=False)):
+                    found = []
+                    for cell in row:
+                        value = cell.value
+                        if isinstance(value, str) and value.strip() and not _is_formula(value) and i < 15:
+                            found.append((cell.column, value.strip()))
+                        if i >= 1:
+                            if _is_formula(value):
+                                formula_n += 1
+                            elif value not in (None, ""):
+                                value_n += 1
+                    if header_row is None and len(found) >= 2:
+                        header_row = i + 1
+                        header_map = found
+                        headers = [h for _, h in found]
+                    if i >= 19:
+                        break
+            except Exception:
+                pass
+            role = "keep"
+            if headers and value_n >= formula_n:
+                role = "fill"
+            elif headers and formula_n and not value_n:
+                role = "keep"
+            elif headers:
+                role = "fill"
+            scanned.append({"name": ws.title, "headers": headers, "header_map": header_map,
+                            "header_row": header_row, "role": role})
+    finally:
+        book.close()
+    return scanned
+
+
+def _fill_xlsx_lightweight(model, doc, view, on_progress=None):
+    """Rebuild large templates as a new data workbook (sheet names + headers), no full clone."""
+    catalog = _catalog(model)
+    if view and view not in catalog:
+        return {"error": "Unknown view"}
+    try:
+        scanned = _scan_sheets_readonly(doc["bytes"])
     except Exception as e:
-        return {"error": f"That Excel template could not be opened for refill ({type(e).__name__})."}
+        return {"error": f"That Excel template could not be scanned ({type(e).__name__})."}
+    if not scanned:
+        return {"error": "No sheets found in that workbook."}
+
+    out = Workbook()
+    out.remove(out.active)
+    loaded = {}
+    sheets, matched, unmatched, kept = [], [], [], []
+    total, titles = 0, []
+    flag = ("Large template: rebuilt as a data workbook preserving sheet names and headers; "
+            "original formatting, charts, and formula cells were not cloned.")
+
+    for i, meta in enumerate(scanned):
+        if on_progress:
+            try:
+                on_progress(i + 1, len(scanned), meta["name"])
+            except Exception:
+                pass
+        title = (meta["name"] or f"Sheet{i + 1}")[:31]
+        ws = out.create_sheet(title=title)
+        headers = meta.get("headers") or []
+        if meta.get("role") != "fill" or not headers:
+            ws.append(["Note"])
+            ws.append(["Kept as layout/formulas in the original; not cloned for size."])
+            sheets.append({"name": title, "role": "kept",
+                           "formulas_kept": ["layout not cloned (lightweight rebuild)"]})
+            kept.append("layout not cloned (lightweight rebuild)")
+            continue
+        chosen = _choose_view(catalog, headers, view, doc)
+        info = _materialise(model, chosen, loaded) if chosen else None
+        by = _column_index(info["table"]["columns"]) if info and info.get("table") else {}
+        used = [h for h in headers if h.strip().lower() in by]
+        skipped = [h for h in headers if h.strip().lower() not in by]
+        if not used:
+            ws.append(headers)
+            sheets.append({"name": title, "role": "kept", "unmatched": skipped,
+                           "formulas_kept": []})
+            continue
+        rows = (info["table"]["rows"] or [])[:_FILL_ROW_CAP]
+        ws.append(headers)
+        for row in rows:
+            ws.append([row.get(by[h.strip().lower()]["field"]) if h.strip().lower() in by else None
+                       for h in headers])
+        matched.extend(used)
+        unmatched.extend(skipped)
+        total += len(rows)
+        titles.append(info["title"])
+        sheets.append({"name": title, "role": "filled", "view": info["title"], "rows": len(rows),
+                       "matched": used, "unmatched": skipped, "formulas_kept": []})
+
+    if not any(s["role"] == "filled" for s in sheets):
+        return {"error": "No sheet in that file had a header matching a system column."}
+    buf = io.BytesIO()
+    out.save(buf)
+    return {"bytes": buf.getvalue(), "ext": "xlsx", "name": doc["name"],
+            "matched": list(dict.fromkeys(matched)), "unmatched": list(dict.fromkeys(unmatched)),
+            "sheets": sheets, "formulas_kept": kept, "view": ", ".join(dict.fromkeys(titles)),
+            "rows": total, "lightweight": True, "unsupported": [flag]}
+
+
+def _fill_xlsx(model, doc, view, on_progress=None):
+    data = doc.get("bytes") or b""
+    if len(data) >= _LIGHTWEIGHT_BYTES:
+        return _fill_xlsx_lightweight(model, doc, view, on_progress=on_progress)
+    try:
+        book = load_workbook(io.BytesIO(data), data_only=False, keep_links=False)
+    except Exception as e:
+        # Fall back to lightweight if full open fails (complex / huge books).
+        return _fill_xlsx_lightweight(model, doc, view, on_progress=on_progress)
     catalog = _catalog(model)
     loaded = {}
     if view and view not in catalog:
@@ -494,7 +610,13 @@ def _fill_xlsx(model, doc, view):
     sheets, matched, unmatched, kept = [], [], [], []
     total = 0
     titles = []
-    for ws in book.worksheets:
+    work_sheets = list(book.worksheets)
+    for idx, ws in enumerate(work_sheets):
+        if on_progress:
+            try:
+                on_progress(idx + 1, len(work_sheets), ws.title)
+            except Exception:
+                pass
         try:
             header_row, labels = _header_row(ws)
             role, inputs, formulas = _sheet_role(ws, header_row, labels)
@@ -696,14 +818,14 @@ def _fill_flat(model, doc, view):
             "formulas_kept": [], "view": info["title"], "rows": len(rows)}
 
 
-def fill_layout(model, doc_id, view=None):
+def fill_layout(model, doc_id, view=None, on_progress=None):
     """Copy the uploaded file and fill matching columns from system views. Formula cells stay formulas."""
     doc = get(doc_id)
     if not doc or "bytes" not in doc:
         return {"error": "That upload is no longer available. Attach it again."}
     ext = doc.get("ext")
     if ext in ("xlsx", "xlsm"):
-        return _fill_xlsx(model, doc, view)
+        return _fill_xlsx(model, doc, view, on_progress=on_progress)
     if ext == "docx":
         return _fill_docx(model, doc, view)
     if ext == "pptx":
