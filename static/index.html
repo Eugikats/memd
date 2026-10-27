@@ -1408,7 +1408,24 @@ function paintOrg(body) {
 }
 
 async function init() {
-  S.meta = await api('/api/meta');
+  const content = document.getElementById('content');
+  content.innerHTML = `<div class="loading"><span class="thinking"><i></i><i></i><i></i></span> Opening Manufacturing Intelligence Platform…</div>`;
+  for (;;) {
+    try {
+      S.meta = await api('/api/meta');
+    } catch (err) {
+      content.innerHTML = `<div class="loading">Could not reach the app. Retrying…</div>`;
+      await new Promise(r => setTimeout(r, 2000));
+      continue;
+    }
+    if (S.meta && S.meta.load_error) {
+      content.innerHTML = `<div class="loading">Could not load the supply chain model.<br><span class="muted">${esc(S.meta.load_error)}</span></div>`;
+      return;
+    }
+    if (S.meta && !S.meta.loading) break;
+    content.innerHTML = `<div class="loading"><span class="thinking"><i></i><i></i><i></i></span> Loading the supply chain model… This can take a minute after a restart.</div>`;
+    await new Promise(r => setTimeout(r, 1500));
+  }
   const rail = document.getElementById('rail');
   const navLink = s => `<a data-v="${s.views[0]}" data-sec="${s.key}" title="${esc(s.label)}">${svg(s.icon)}<span class="lbl">${esc(s.label)}</span>${s.badge ? '<span class="badge" id="badge" hidden></span>' : ''}</a>`;
   const navGroups = [['command', 'overview'], ['inventory_position', 'in_transit_overdue', 'inventory_risk'], ['reporting', 'governance']];

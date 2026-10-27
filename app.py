@@ -15,8 +15,33 @@ from pulse.bc_client import DATA_DIR, ROOT, load_env
 
 load_env()
 app = Flask(__name__, static_folder="static")
-STATE = {"model": model.load(), "refreshing": False, "last_error": None}
+# Load the model in the background so gunicorn can bind and serve the page while the
+# supply-chain cache is opening. A full rebuild from raw files can take minutes after a restart.
+STATE = {"model": None, "refreshing": False, "last_error": None, "loading": True, "load_error": None}
 REFRESH_LOG = DATA_DIR / "refresh_log.jsonl"
+
+
+def _boot_model():
+    try:
+        print("pulse: loading supply chain model…", flush=True)
+        STATE["model"] = model.load()
+        STATE["loading"] = False
+        print("pulse: model ready", flush=True)
+    except Exception as e:
+        STATE["load_error"] = f"{type(e).__name__}: {e}"[:400]
+        STATE["loading"] = False
+        print(f"pulse: model load failed: {STATE['load_error']}", flush=True)
+
+
+threading.Thread(target=_boot_model, daemon=True, name="pulse-model").start()
+
+
+def _model_busy():
+    if STATE["model"] is not None:
+        return None
+    if STATE.get("load_error"):
+        return jsonify({"error": STATE["load_error"], "loading": False}), 503
+    return jsonify({"error": "The supply chain model is still loading.", "loading": True}), 503
 
 
 def filters():
@@ -51,9 +76,18 @@ def index():
 
 @app.get("/api/meta")
 def meta():
+    if STATE["model"] is None:
+        return jsonify({"loading": True, "load_error": STATE.get("load_error"),
+                        "views": [], "notes": {}, "definitions": {}, "sites": [], "locations": [],
+                        "refreshing": False, "last_error": STATE.get("last_error"),
+                        "playbooks": [], "alert_metrics": {}, "pending_actions": 0,
+                        "user_name": display_name(),
+                        "user_email": current_user() if current_user() != "demo" else "",
+                        "command_mode": command.provider(), "ai_model": ""})
     m = STATE["model"]
     sl = m["stock_loc"]
-    return jsonify({"views": [{"no": n, "id": i, "title": t, "question": q} for n, i, t, q in V.VIEWS],
+    return jsonify({"loading": False, "load_error": None,
+                    "views": [{"no": n, "id": i, "title": t, "question": q} for n, i, t, q in V.VIEWS],
                     "notes": m["notes"], "definitions": V.DEFINITIONS,
                     "sites": sorted(sl.site.dropna().unique().tolist()),
                     "locations": sorted(sl.location.dropna().unique().tolist()),
@@ -63,6 +97,16 @@ def meta():
                     "user_name": display_name(), "user_email": current_user() if current_user() != "demo" else "",
                     "command_mode": command.provider(),
                     "ai_model": __import__("os").environ.get("AZURE_OPENAI_DEPLOYMENT", "") if command.provider() == "azure" else ""})
+
+
+@app.before_request
+def _gate_until_model():
+    path = request.path or ""
+    if path == "/" or path.startswith("/static/") or path in ("/api/meta", "/api/mail/status"):
+        return None
+    if path.startswith("/api/"):
+        return _model_busy()
+    return None
 
 
 @app.get("/api/cockpit")

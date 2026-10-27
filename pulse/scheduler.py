@@ -33,6 +33,8 @@ def tick(state, refresh_fn):
         R.save_schedules(s)
         state["refreshing"] = True
         refresh_fn(90, "schedule", "scheduler")   # runs in this thread; logs its own result
+    if not state.get("model"):
+        return
     s = R.schedules()
     changed = False
     for sch in s["reports"]:
