@@ -385,6 +385,9 @@ def compute(model):
     by_item, by_desc = _index(mrp)
     names = model["items"].set_index("item_no").description.to_dict()
     classes = model["items"].set_index("item_no").item_class.to_dict()
+    costs = {}
+    if "unit_cost" in model["items"].columns:
+        costs = model["items"].set_index("item_no").unit_cost.fillna(0).astype(float).to_dict()
     sl = model["stock_loc"]
     at_site, at_loc = {}, {}
     if len(sl):
@@ -393,7 +396,7 @@ def compute(model):
             at_loc.setdefault(item_no, set()).add(str(loc).strip())
     built = {"pack": pack, "mrp": mrp, "by_item": by_item, "by_desc": by_desc, "months": months,
              "by_item_m": by_item_m, "by_desc_m": by_desc_m, "stock": stock, "names": names,
-             "classes": classes, "at_site": at_site, "at_loc": at_loc}
+             "classes": classes, "at_site": at_site, "at_loc": at_loc, "costs": costs}
     _CACHE.clear()
     _CACHE[key] = built
     return built
@@ -636,53 +639,163 @@ def sheet_table(built, sheet):
     return _table(sheet, [], [_col("note", "Note", "text")])
 
 
-def _headline(built):
+def _valued(qty, item, costs):
+    return float(qty or 0) * float(costs.get(item) or 0)
+
+
+def _headline(built, rows, sheet):
     from . import views as V
-    rows = built["mrp"]
-    critical = sum(1 for r in rows if r["cover_flag"] == "CRITICAL" and r["status"] == "ACTIVE")
-    slob = sum(1 for r in rows if r["status"] == "SLOB")
-    stock = sum(r["inventory"] or 0 for r in rows)
-    transit = sum(r["in_transit"] or 0 for r in rows)
-    order = sum(r["order_qty"] or 0 for r in rows)
+    costs = built.get("costs") or {}
+    planning = [r for r in rows if r.get("item_no") and ("inventory" in r or "order_qty" in r or "cover_flag" in r)]
+    if planning:
+        return _planning_headline(built, planning, costs, V)
+    stock_rows = [r for r in rows if r.get("item_no") and "sum_rm" in r]
+    if stock_rows:
+        return _stock_headline(built, stock_rows, costs, V, sheet)
+    return _grid_headline(rows, sheet, V)
+
+
+def _planning_headline(built, rows, costs, V):
+    critical_rows = [r for r in rows if r.get("cover_flag") == "CRITICAL" and r.get("status") == "ACTIVE"]
+    slob_rows = [r for r in rows if r.get("status") == "SLOB"]
+    okay = sum(1 for r in rows if r.get("status") == "ACTIVE" and r.get("cover_flag") == "OKAY")
+    stock_qty = sum(r.get("inventory") or 0 for r in rows)
+    stock_val = sum(_valued(r.get("inventory"), r.get("item_no"), costs) for r in rows)
+    transit_qty = sum(r.get("in_transit") or 0 for r in rows)
+    transit_val = sum(_valued(r.get("in_transit"), r.get("item_no"), costs) for r in rows)
+    order_qty = sum(r.get("order_qty") or 0 for r in rows)
+    order_val = sum(_valued(r.get("order_qty"), r.get("item_no"), costs) for r in rows)
+    ids = {r["item_no"] for r in rows}
     frame = built["by_item_m"]
     months = built["months"]
-    planning = set(built["by_item"])
     monthly = []
-    if not frame.empty and months:
-        sub = frame[frame.item_no.isin(planning)]
+    monthly_val = []
+    if not frame.empty and months and ids:
+        sub = frame[frame.item_no.isin(ids)]
         totals = sub.groupby("month").abs_qty.sum()
         monthly = [float(totals.get(m, 0) or 0) for m in months]
+        valued = sub.assign(_v=sub.abs_qty * sub.item_no.map(lambda i: float(costs.get(i) or 0)))
+        by_m = valued.groupby("month")._v.sum()
+        monthly_val = [float(by_m.get(m, 0) or 0) for m in months]
     labels = months or ["—"]
     loc_qty = {name: 0.0 for name in SUM_RM}
-    for row in built["stock"].values():
+    loc_val = {name: 0.0 for name in SUM_RM}
+    for item in ids:
+        row = built["stock"].get(item) or {}
+        cost = float(costs.get(item) or 0)
         for name in SUM_RM:
-            loc_qty[name] += float(row.get(name, 0) or 0)
+            qty = float(row.get(name, 0) or 0)
+            loc_qty[name] += qty
+            loc_val[name] += qty * cost
     cover_labels = ["Critical (≤ 29 days)", "Okay", "SLOB"]
-    okay = sum(1 for r in rows if r["status"] == "ACTIVE" and r["cover_flag"] == "OKAY")
-    top = sorted(rows, key=lambda r: r["order_qty"] or 0, reverse=True)[:12]
-    top = [r for r in top if (r["order_qty"] or 0) > 0]
+    cover_qty = [len(critical_rows), okay, len(slob_rows)]
+    cover_val = [
+        sum(_valued(r.get("inventory"), r.get("item_no"), costs) for r in critical_rows),
+        sum(_valued(r.get("inventory"), r.get("item_no"), costs) for r in rows if r.get("status") == "ACTIVE" and r.get("cover_flag") == "OKAY"),
+        sum(_valued(r.get("inventory"), r.get("item_no"), costs) for r in slob_rows),
+    ]
+    top = sorted(rows, key=lambda r: r.get("order_qty") or 0, reverse=True)[:12]
+    top = [r for r in top if (r.get("order_qty") or 0) > 0]
     kpis = [
-        V.kpi("RM stock (SUM RM)", stock, "qty", "SHIP1RM through SHIP5RM, the workbook's inventory column",
-              spark=monthly[-6:] or None),
-        V.kpi("Cover ≤ 29 days", critical, "qty", f"of {len(rows)} MRP items", status="critical",
-              pct=V.pct(critical, len(rows))),
-        V.kpi("SLOB", slob, "qty", "Average consumption is zero", status="serious", pct=V.pct(slob, len(rows))),
-        V.kpi("Open PO quantity", transit, "qty", "IN TRANSIT QTY, from open purchase orders"),
-        V.kpi("Suggested order qty", order, "qty", "Rounded up to 25,500, the workbook's order multiple"),
+        V.kpi("RM stock (SUM RM)", stock_val, "money", f"{len(rows)} items in this filter",
+              spark=monthly_val[-6:] or monthly[-6:] or None, qty=stock_qty),
+        V.kpi("Cover ≤ 29 days", len(critical_rows), "qty", f"of {len(rows)} items", status="critical",
+              pct=V.pct(len(critical_rows), len(rows))),
+        V.kpi("SLOB", len(slob_rows), "qty", "Average consumption is zero", status="serious",
+              pct=V.pct(len(slob_rows), len(rows))),
+        V.kpi("Open PO quantity", transit_val, "money", "IN TRANSIT QTY, from open purchase orders", qty=transit_qty),
+        V.kpi("Suggested order qty", order_val, "money", "Rounded up to 25,500, the workbook's order multiple", qty=order_qty),
     ]
     charts = [
-        V.chart("area", "Monthly consumption of MRP items", labels, [("Absolute qty", "seq", monthly or [0])],
-                "qty", span=2, subtitle="Consumption, positive and negative adjustments"),
+        V.chart("area", "Monthly consumption of MRP items", labels,
+                [("Value", "seq", monthly_val or [0])], "UGX", span=2,
+                extra={"quantity": monthly or [0]}),
         V.chart("doughnut", "MRP cover position", cover_labels,
-                [("Items", "seq", [critical, okay, slob])], "items", colors=["crit", "good", "warning"]),
+                [("Value", "seq", cover_val)], "UGX", colors=["crit", "good", "warning"],
+                extra={"quantity": cover_qty}),
         V.chart("hbar", "Largest suggested orders",
-                [f"{r['item_no']} · {str(r['description'] or '')[:28]}" for r in top] or ["—"],
-                [("Order qty", "serious", [r["order_qty"] for r in top] or [0])], "qty", span=2, height=360,
-                extra={"item_nos": [r["item_no"] for r in top]}),
+                [f"{r['item_no']} · {str(r.get('description') or '')[:28]}" for r in top] or ["—"],
+                [("Value", "serious", [_valued(r.get("order_qty"), r.get("item_no"), costs) for r in top] or [0])],
+                "UGX", span=2, height=360,
+                extra={"quantity": [r.get("order_qty") or 0 for r in top] or [0],
+                       "item_nos": [r["item_no"] for r in top]}),
         V.chart("bar", "Stock on the SUM RM locations", list(loc_qty),
-                [("On hand", "RM", list(loc_qty.values()))], "qty"),
+                [("Value", "RM", list(loc_val.values()))], "UGX",
+                extra={"quantity": list(loc_qty.values())}),
     ]
     return kpis, charts
+
+
+def _stock_headline(built, rows, costs, V, sheet):
+    qty = sum(r.get("sum_rm") or 0 for r in rows)
+    val = sum(_valued(r.get("sum_rm"), r.get("item_no"), costs) for r in rows)
+    top = sorted(rows, key=lambda r: r.get("sum_rm") or 0, reverse=True)[:12]
+    kpis = [
+        V.kpi("RM stock (SUM RM)", val, "money", f"{len(rows)} items on {sheet}", qty=qty),
+        V.kpi("Cover ≤ 29 days", 0, "qty", "Cover is calculated on the MRP sheet"),
+        V.kpi("SLOB", 0, "qty", "Cover is calculated on the MRP sheet"),
+        V.kpi("Open PO quantity", 0, "money", "Open PO quantity is on the MRP sheet", qty=0),
+        V.kpi("Suggested order qty", 0, "money", "Order quantity is on the MRP sheet", qty=0),
+    ]
+    charts = [
+        V.chart("hbar", f"Largest SUM RM on {sheet}",
+                [f"{r['item_no']} · {str(r.get('description') or '')[:28]}" for r in top] or ["—"],
+                [("Value", "RM", [_valued(r.get("sum_rm"), r.get("item_no"), costs) for r in top] or [0])],
+                "UGX", span=2, height=360,
+                extra={"quantity": [r.get("sum_rm") or 0 for r in top] or [0],
+                       "item_nos": [r["item_no"] for r in top]}),
+    ]
+    return kpis, charts
+
+
+def _grid_headline(rows, sheet, V):
+    numeric = []
+    sample = rows[:40]
+    for row in sample:
+        for key, val in row.items():
+            if key in numeric or key == "item_no":
+                continue
+            if isinstance(val, (int, float)):
+                numeric.append(key)
+    sums = []
+    for key in numeric[:8]:
+        total = sum(float(r.get(key) or 0) for r in rows)
+        if total:
+            sums.append((key, total))
+    kpis = [V.kpi("RM stock (SUM RM)", len(rows), "qty", f"{len(rows)} rows on {sheet}")]
+    for key, total in sums[:4]:
+        kpis.append(V.kpi(key, total, "qty", sheet))
+    while len(kpis) < 5:
+        kpis.append(V.kpi("Rows", len(rows), "qty", sheet))
+    labels = [k for k, _ in sums] or ["Rows"]
+    data = [v for _, v in sums] or [len(rows)]
+    charts = [V.chart("bar", sheet, labels, [("Quantity", "seq", data)], "qty", span=2)]
+    return kpis[:5], charts
+
+
+def _filtered_rows(built, rows, filters):
+    cls = filters.get("item_class")
+    site = filters.get("site")
+    loc = (filters.get("location") or "").strip()
+    q = (filters.get("q") or "").strip().lower()
+    if not (cls or site or loc or q):
+        return rows
+    kept = []
+    for r in rows:
+        item = r.get("item_no")
+        if cls or site or loc:
+            if not item:
+                continue
+            if cls and built["classes"].get(item) != cls:
+                continue
+            if site and site not in built["at_site"].get(item, ()):
+                continue
+            if loc and loc not in built["at_loc"].get(item, ()):
+                continue
+        if q and not any(q in str(v).lower() for v in r.values() if v not in (None, "")):
+            continue
+        kept.append(r)
+    return kept
 
 
 def render(model, filters=None):
@@ -692,29 +805,9 @@ def render(model, filters=None):
     known = {sid for _g, _title, sid in SHEETS}
     if sheet not in known:
         sheet = "MRP"
-    kpis, charts = _headline(built)
     table = sheet_table(built, sheet)
-    classes = built["classes"]
-    rows = table["rows"]
-    cls = filters.get("item_class")
-    site = filters.get("site")
-    loc = (filters.get("location") or "").strip()
-    q = (filters.get("q") or "").strip().lower()
-    if cls or site or loc or q:
-        kept = []
-        for r in rows:
-            item = r.get("item_no")
-            if item:
-                if cls and classes.get(item) not in (None, cls):
-                    continue
-                if site and site not in built["at_site"].get(item, ()):
-                    continue
-                if loc and loc not in built["at_loc"].get(item, ()):
-                    continue
-            if q and not any(q in str(v).lower() for v in r.values() if v not in (None, "")):
-                continue
-            kept.append(r)
-        rows = kept
+    rows = _filtered_rows(built, table["rows"], filters)
+    kpis, charts = _headline(built, rows, sheet)
     table = dict(table)
     table["rows"] = rows
     table["total_rows"] = len(rows)

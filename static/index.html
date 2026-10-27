@@ -1691,6 +1691,22 @@ async function pollExcelJob(jobId, pending, hosts) {
   return { status: 'failed', error: 'Excel job timed out after 15 minutes. Check Reports history or try again.' };
 }
 
+function pageContext(extra) {
+  const d = S.pageData || {};
+  const kpis = (d.kpis || []).slice(0, 8).map(k => `${k.label}: ${k.value}${k.qty != null ? ` (quantity ${k.qty})` : ''}`).join('; ');
+  const charts = (d.charts || []).slice(0, 4).map(ch => {
+    const labels = (ch.labels || []).slice(0, 8).join(', ');
+    const series = (ch.series || []).slice(0, 2).map(s => `${s.name}: ${(s.data || []).slice(0, 8).join(', ')}`).join(' | ');
+    return `${ch.title} [${labels}] ${series}`;
+  }).join('\n');
+  const f = S.filters || {};
+  return `Page: ${d.title || S.view}. Sheet: ${S.view === 'rm_planning' ? rmSheet : 'n/a'}. Measure: ${pageMeasure}. Filters: class=${f.item_class || 'all'}, site=${f.site || 'all'}, location=${f.location || 'all'}, search=${f.q || 'none'}.\nKPIs: ${kpis}\nCharts:\n${charts}${extra ? `\nClicked point: ${extra}` : ''}`;
+}
+function askOnPage(text, extra) {
+  S.askExtra = extra || '';
+  openAssist();
+  ask(text, null, 'popup');
+}
 async function ask(text, playbook, origin) {
   if (!text) return;
   const fromPopup = origin === 'popup' || (origin !== 'hero' && document.body.classList.contains('assist-open'));
@@ -1723,7 +1739,7 @@ async function ask(text, playbook, origin) {
     try {
       r = playbook
         ? await api('/api/playbook/' + playbook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: ctrl.signal })
-        : await api('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, history: S.history, documents: readyUploads().map(d => d.id), emails: knownEmails() }), signal: ctrl.signal });
+        : await api('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, history: S.history, documents: readyUploads().map(d => d.id), emails: knownEmails(), context: fromPopup ? pageContext(S.askExtra) : '' }), signal: ctrl.signal });
     } finally {
       if (timer) clearTimeout(timer);
     }
@@ -1862,7 +1878,7 @@ async function renderActions() {
     list.forEach(a => box.appendChild(actionCard(a)));
   };
   document.getElementById('af').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { S.actFilter = b.dataset.f; renderActions(); } };
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Which proposed agent actions, alerts and watched items need a decision?'), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage('Which proposed agent actions, alerts and watched items need a decision?'); };
   document.getElementById('newRun').onclick = () => go('command');
   draw();
   const al = document.getElementById('alerts');
@@ -2080,7 +2096,7 @@ function renderInventory(c, d) {
     ${top ? `<div class="inv-wide">${card(top, 'chTop')}</div>` : ''}
     ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage(`Summarise the ${d.title} view: what needs attention and why?`); };
   document.getElementById('pdfThis').onclick = () => window.print();
   if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
@@ -2198,7 +2214,7 @@ function renderLocation(c, d) {
     </div>
     ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage(`Summarise the ${d.title} view: what needs attention and why?`); };
   document.getElementById('pdfThis').onclick = () => window.print();
   if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
@@ -2284,7 +2300,7 @@ function renderRm(c, d) {
     ${top ? `<div class="inv-wide">${card(top, `<div class="chartbox" style="height:${top.height || 400}px"><canvas id="chRmTop"></canvas></div>`)}</div>` : ''}
     ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage(`Summarise the ${d.title} view: what needs attention and why?`); };
   document.getElementById('pdfThis').onclick = () => window.print();
   if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
@@ -2367,7 +2383,7 @@ function renderWip(c, d) {
     </div>
     ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage(`Summarise the ${d.title} view: what needs attention and why?`); };
   document.getElementById('pdfThis').onclick = () => window.print();
   if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
@@ -2448,7 +2464,7 @@ function renderFg(c, d) {
     ${top ? `<div class="inv-wide">${card(top, `<div class="chartbox" style="height:${top.height || 400}px"><canvas id="chFgTop"></canvas></div>`)}</div>` : ''}
     ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage(`Summarise the ${d.title} view: what needs attention and why?`); };
   document.getElementById('pdfThis').onclick = () => window.print();
   if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
@@ -2529,7 +2545,7 @@ function renderTransit(c, d) {
     ${flow ? `<div class="inv-wide">${card(flow, `<div class="chartbox" style="height:360px"><canvas id="chFlow"></canvas></div>`)}</div>` : ''}
     ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage(`Summarise the ${d.title} view: what needs attention and why?`); };
   document.getElementById('pdfThis').onclick = () => window.print();
   if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
@@ -2606,7 +2622,7 @@ function renderProjection(c, d) {
     ${top ? `<div class="inv-wide">${card(top, `<div class="chartbox" style="height:${top.height || 400}px"><canvas id="chSoon"></canvas></div>`)}</div>` : ''}
     ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage(`Summarise the ${d.title} view: what needs attention and why?`); };
   document.getElementById('pdfThis').onclick = () => window.print();
   if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
@@ -2673,7 +2689,7 @@ function renderRisk(c, d) {
     ${top ? `<div class="inv-wide">${card(top, `<div class="chartbox" style="height:${top.height || 400}px"><canvas id="chRiskTop"></canvas></div>`)}</div>` : ''}
     ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage(`Summarise the ${d.title} view: what needs attention and why?`); };
   document.getElementById('pdfThis').onclick = () => window.print();
   if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
@@ -2754,7 +2770,7 @@ function renderLocRisk(c, d) {
     ${top ? `<div class="inv-wide">${card(top, `<div class="chartbox" style="height:${top.height || 400}px"><canvas id="chLocTop"></canvas></div>`)}</div>` : ''}
     ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage(`Summarise the ${d.title} view: what needs attention and why?`); };
   document.getElementById('pdfThis').onclick = () => window.print();
   if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
@@ -2821,7 +2837,7 @@ function renderBom(c, d) {
     ${top ? `<div class="inv-wide">${card(top, `<div class="chartbox" style="height:${top.height || 430}px"><canvas id="chBomTop"></canvas></div>`)}</div>` : ''}
     ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage(`Summarise the ${d.title} view: what needs attention and why?`); };
   document.getElementById('pdfThis').onclick = () => window.print();
   if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
@@ -2896,7 +2912,7 @@ function renderExceptions(c, d) {
     ${stake ? `<div class="inv-wide">${card(stake, `<div class="chartbox" style="height:${Math.max(stake.height || 300, (stake.labels || []).length * 32 + 36)}px"><canvas id="chExStake"></canvas></div>`)}</div>` : ''}
     ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage(`Summarise the ${d.title} view: what needs attention and why?`); };
   document.getElementById('pdfThis').onclick = () => window.print();
   if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
@@ -2988,7 +3004,7 @@ function renderRmPlanning(c, d) {
     <div class="inv-charts2">${card(orders, 'chRmOrders', true)}${card(locs, 'chRmLocs')}</div>
     ${(d.tables || []).map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Summarise raw material planning: what should we order and which items are critical?'), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage('Summarise raw material planning: what should we order and which items are critical?'); };
   document.getElementById('pdfThis').onclick = () => window.print();
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
   const glass = { palette: INV_PALETTE, quiet: true, glassy: true };
@@ -3008,7 +3024,9 @@ async function loadView() {
   if (view === 'rm_planning') qs.set('sheet', rmSheet);
   const c = document.getElementById('content');
   if (!c.querySelector('.vhead') && !c.querySelector('.inv-page')) c.innerHTML = `<div class="loading"><span class="thinking"><i></i><i></i><i></i></span> Loading view…</div>`;
-  const d = shownView(await api(`/api/view/${view}?${qs}`));
+  const raw = await api(`/api/view/${view}?${qs}`);
+  const d = shownView(raw);
+  S.pageData = d;
   if (S.view !== view) return;
   if (view === 'inventory_position') { renderInventory(c, d); return; }
   if (view === 'inventory_by_location') { renderLocation(c, d); return; }
@@ -3035,7 +3053,7 @@ async function loadView() {
     ${d.tables.map((t, i) => `<div class="card tablecard" id="tb${i}"></div>`).join('')}`;
   bindFilters();
   bindKpiLinks(c);
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${d.title} view: what needs attention and why?`), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage(`Summarise the ${d.title} view: what needs attention and why?`); };
   document.getElementById('pdfThis').onclick = () => window.print();
   mountCharts(d.charts, 'ch');
   d.tables.forEach((t, i) => renderTable(document.getElementById('tb' + i), t));
@@ -3062,7 +3080,7 @@ function renderOverview(c, d) {
     <div id="ovx"></div>
     ${d.tables.map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Summarise overview health, weekly flow, stock by class, and the top exceptions.'), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage('Summarise overview health, weekly flow, stock by class, and the top exceptions.'); };
   document.getElementById('pdfThis').onclick = () => window.print();
   if (d.tables[0]) document.getElementById('exportInv').onclick = () => exportCsv(d.tables[0]);
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
@@ -3555,7 +3573,10 @@ function openPointCard(detail) {
     <div class="card tablecard" id="d_chart"></div>
     <div class="card tablecard" id="d_rows"></div>`;
   document.getElementById('dclose').onclick = () => dr.classList.remove('open');
-  document.getElementById('dask').onclick = () => { dr.classList.remove('open'); go('command'); setTimeout(() => ask(`Explain ${label} on ${title}: what does this point represent and what should we do?`), 50); };
+  document.getElementById('dask').onclick = () => {
+    const point = `${title} / ${label} = ${shown(value)}${share != null ? `, ${share}% of the series` : ''}. Other points: ${chartRows.slice(0, 8).map(r => `${r.label} ${r.value}`).join('; ')}`;
+    askOnPage(`Explain ${label} on ${title}. What does this point represent, and what should we do?`, point);
+  };
   const kind = money ? 'money' : 'qty';
   const chartRows = (ch.labels || []).map((lb, i) => {
     const v = base[i];
@@ -3598,7 +3619,7 @@ async function openItem(no) {
     ${d.charts.length ? `<div class="d-charts">${d.charts.map((ch, i) => `<div class="card chart-card"><div class="ch-head"><h3>${esc(ch.title)}</h3></div><div class="chartbox" style="height:220px"><canvas id="dch${i}"></canvas></div></div>`).join('')}</div>` : ''}
     ${sections.map(k => d[k].total_rows ? `<div class="card tablecard" id="d_${k}"></div>` : '').join('')}`;
   document.getElementById('dclose').onclick = () => dr.classList.remove('open');
-  document.getElementById('dask').onclick = () => { dr.classList.remove('open'); go('command'); setTimeout(() => ask(`What is the position, cover and supply situation for ${no}, and what should we do?`), 50); };
+  document.getElementById('dask').onclick = () => { dr.classList.remove('open'); askOnPage(`What is the position, cover and supply situation for ${no}, and what should we do?`); };
   document.getElementById('dwatch').onclick = async e => { await api('/api/watchlist/' + encodeURIComponent(no), { method: 'POST' });
     e.currentTarget.innerHTML = `${svg('check', 14)} Watching`; };
   drawerCharts.forEach(c => c && c.destroy()); drawerCharts = d.charts.map((ch, i) => drawChart(document.getElementById('dch' + i), ch));
@@ -3646,7 +3667,7 @@ async function renderReports() {
     <div id="repGroups">${cats.map(cat => `<section class="card inv-card rgroup" data-cat="${esc(cat)}"><div class="inv-ch-head"><div><h3>${esc(cat)}</h3><p>${d.catalogue.filter(c => c.category === cat).length} reports</p></div></div>
       <div class="inv-pad rcards">${d.catalogue.filter(c => c.category === cat).map(c => `<button class="rcard" data-r="${esc(c.id)}" data-find="${esc((c.name + ' ' + c.description).toLowerCase())}"><div class="rc-ic">${svg(CAT_ICON[cat] || 'doc', 18)}</div><div><b>${esc(c.name)}</b><div class="muted">${esc(c.description)}</div></div>${svg('arrow', 14)}</button>`).join('')}</div></section>`).join('')}</div></div>`;
   document.querySelectorAll('.rcard').forEach(b => b.onclick = () => go('report:' + b.dataset.r));
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Which standard reports should I open for stock, cover, overdue purchase orders, and exceptions?'), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage('Which standard reports should I open for stock, cover, overdue purchase orders, and exceptions?'); };
   document.getElementById('toBuilder').onclick = () => go('builder');
   document.getElementById('toSched').onclick = () => go('schedules');
   document.getElementById('repQ').oninput = e => {
@@ -3687,7 +3708,7 @@ async function renderReport(rid) {
   document.getElementById('save').onclick = async e => { const b = e.currentTarget; b.disabled = true; b.textContent = 'Saving…';
     const h = await api('/api/reports/generate/' + encodeURIComponent(rid), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(S.rFilters) });
     b.innerHTML = `${svg('check', 14)} Saved (${h.rows.toLocaleString()} rows)`; };
-  document.getElementById('askR').onclick = () => { go('command'); setTimeout(() => ask(`Summarise the ${meta.name}${S.rFilters.item_class ? ' for ' + S.rFilters.item_class : ''}${S.rFilters.site ? ' at ' + S.rFilters.site : ''}: key findings and what to act on.`), 50); };
+  document.getElementById('askR').onclick = () => { askOnPage(`Summarise the ${meta.name}${S.rFilters.item_class ? ' for ' + S.rFilters.item_class : ''}${S.rFilters.site ? ' at ' + S.rFilters.site : ''}: key findings and what to act on.`); };
   const r = await api(`/api/reports/run/${encodeURIComponent(rid)}?${qs}`);
   if (S.view !== 'report:' + rid) return;
   document.getElementById('pdf').onclick = () => printReport(r);
@@ -3830,7 +3851,7 @@ async function renderBuilder() {
     if (r.error) { b_msg.textContent = r.error; return; }
     drawReportBody(document.getElementById('b_out'), { ...r, name: D[b.dataset].label });
   };
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Help me build a report: which dataset, columns and conditions should I use for the question I have?'), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage('Help me build a report: which dataset, columns and conditions should I use for the question I have?'); };
   b_run.onclick = run;
   b_xl.onclick = async () => { read(); const res = await fetch('/api/reports/custom/export', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ spec: spec(), name: D[b.dataset].label }) });
     const a = document.createElement('a'); a.href = URL.createObjectURL(await res.blob()); a.download = D[b.dataset].label.replace(/\W+/g, '_') + '.xlsx'; a.click(); };
@@ -3892,7 +3913,7 @@ async function renderSchedules() {
     const orig = document.getElementById('ns_f');
     new MutationObserver(() => { if (orig.textContent.includes('Scheduled —')) setTimeout(renderSchedules, 900); }).observe(orig, { childList: true, subtree: true });
   };
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Which reports are scheduled, and what has been generated recently?'), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage('Which reports are scheduled, and what has been generated recently?'); };
   document.querySelectorAll('[data-tog]').forEach(x => x.onclick = async () => { await api('/api/schedules/report/' + x.dataset.tog, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: x.dataset.en === '1' }) }); renderSchedules(); });
   document.querySelectorAll('[data-del]').forEach(x => x.onclick = async () => { if (confirm('Delete this schedule?')) { await fetch('/api/schedules/report/' + x.dataset.del, { method: 'DELETE' }); renderSchedules(); } });
   renderTable(document.getElementById('hist'), { title: 'Report history', total_rows: h.length, drill: null,
@@ -3942,7 +3963,7 @@ async function renderTrends() {
       ${card('Stock value by class per data load', esc(loadNote), 't3')}
       ${card('Risk measures per data load', 'Out of stock, short cover, overdue lines and constrained products', 't4')}
     </div></div>`;
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('How are weekly consumption, output, sales and receipts moving, and what changed in stock and risk at the last data load?'), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage('How are weekly consumption, output, sales and receipts moving, and what changed in stock and risk at the last data load?'); };
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
   const ser = (name, key, data) => ({ name, key, data });
   const glass = { quiet: true, glassy: true };
@@ -4004,7 +4025,7 @@ async function renderDataRefresh() {
           <dt>Tables</dt><dd>Item Ledger Entries, Purchase Lines, Items, Locations, Vendors, Production BOM header &amp; lines</dd></dl></div></section>
     </div>
     <div class="card tablecard inv-table" id="rlog"></div></div>`;
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Summarise the data refresh: when did Business Central last load, did it reconcile, and is the schedule healthy?'), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage('Summarise the data refresh: when did Business Central last load, did it reconcile, and is the schedule healthy?'); };
   document.getElementById('pdfThis').onclick = () => window.print();
   document.getElementById('rnow').onclick = async () => {
     await api('/api/refresh', { method: 'POST' });
@@ -4073,7 +4094,7 @@ async function renderAudit() {
     renderTable(document.getElementById('alog'), spec, { variant: 'inventory', size: 30, search: 'Search user, event, detail…' });
     document.getElementById('exportInv').onclick = () => exportCsv(spec);
   };
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Summarise the audit log: who did what, and which questions, decisions, reports and refreshes need attention?'), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage('Summarise the audit log: who did what, and which questions, decisions, reports and refreshes need attention?'); };
   document.getElementById('pdfThis').onclick = () => window.print();
   document.getElementById('a_t').onchange = draw;
   document.getElementById('a_clear').onclick = () => { document.getElementById('a_t').value = ''; draw(); };
@@ -4124,7 +4145,7 @@ function renderDefinitions() {
         </dl></div></section>
     </div>
     ${r && r.mismatches.length ? '<div class="card tablecard inv-table" id="recon"></div>' : ''}</div>`;
-  document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Summarise the definitions and data notes: how are the measures calculated, and what did this Business Central load find?'), 50); };
+  document.getElementById('askThis').onclick = () => { askOnPage('Summarise the definitions and data notes: how are the measures calculated, and what did this Business Central load find?'); };
   document.getElementById('pdfThis').onclick = () => window.print();
   document.getElementById('exportInv').onclick = () => exportCsv(defs);
   if (r && r.mismatches.length) renderTable(document.getElementById('recon'), { title: 'Reconciliation mismatches', total_rows: r.mismatches.length, drill: 'item_no',

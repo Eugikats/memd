@@ -231,8 +231,11 @@ def _system(m):
     return (f"You are the Pulse Supply Chain Command Centre for {n['company']} (Business Central environment "
             f"{n['environment']}). Reporting date {n['reporting_date']}; usage rates use the last "
             f"{n['window_days']} days ({n['production_days']} production days). Amounts are in UGX.\n\n"
-            "Answer supply chain questions using ONLY figures returned by your tools - never estimate or invent "
-            "numbers. Your tools are read-only and expose only the approved views. If the question is ambiguous "
+            "Answer supply chain questions using ONLY figures returned by your tools or written in an "
+            "ON-SCREEN CONTEXT block - never estimate or invent numbers. ON-SCREEN CONTEXT is the live page the "
+            "user is looking at. When it is present, answer from those figures and name the chart, point, and "
+            "filters. Do not ask the user to upload a file or to restate the chart. Your tools are read-only and "
+            "expose only the approved views. If the question is ambiguous "
             "(e.g. an item name matching several items) or the data cannot answer it, say so and ask a short "
             "clarifying question instead of guessing. Lead with the direct answer, then the key supporting "
             "figures (a compact markdown table when listing items), then one line starting 'Basis:' naming the "
@@ -351,9 +354,11 @@ def _job_finished_answer(job):
                           "history_id": job.get("history_id"), "message": job.get("message")}}
 
 
-def _prompt_question(question, documents=None, emails=None):
+def _prompt_question(question, documents=None, emails=None, context=None):
     from . import documents as docs
     bits = []
+    if context:
+        bits.append("ON-SCREEN CONTEXT (live page; answer from these figures and do not ask for an upload):\n" + str(context)[:6000])
     known = [e for e in (emails or []) if e]
     if known:
         bits.append("Known email addresses for this user: " + ", ".join(known[:20]) + ". Use one of these when they say to email them, unless they give another address.")
@@ -375,14 +380,14 @@ def _prompt_question(question, documents=None, emails=None):
     return question + "\n\n" + "\n\n".join(bits)
 
 
-def _ask_azure(m, question, history, documents=None, emails=None):
+def _ask_azure(m, question, history, documents=None, emails=None, context=None):
     client = _azure()
     deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "gpt-5.4")
     tools = [{"type": "function", "function": {"name": t["name"], "description": t["description"],
                                                "parameters": t["input_schema"]}} for t in _tools()]
     messages = [{"role": "system", "content": _system(m)}]
     messages += [{"role": h["role"], "content": h["content"]} for h in history[-6:]]
-    messages.append({"role": "user", "content": _prompt_question(question, documents, emails)})
+    messages.append({"role": "user", "content": _prompt_question(question, documents, emails, context)})
     calls, last_view, actions, ui, steps, excel_job = [], None, [], None, [], None
     for _ in range(12):
         resp = client.chat.completions.create(model=deployment, messages=messages, tools=tools,
@@ -468,19 +473,19 @@ def _attach_excel_job(res):
     return res
 
 
-def ask(m, question, user="demo", history=None, documents=None, emails=None):
+def ask(m, question, user="demo", history=None, documents=None, emails=None, context=None):
     rec = {"at": datetime.now().isoformat(timespec="seconds"), "user": user, "question": question}
     # Same-format / rebuild asks go through Azure/Claude so the agent can interpret headers
     # (aliases + optional column_map) before calling rebuild_from_upload — no regex short-circuit.
     if provider() == "azure":
         try:
-            res = _ask_azure(m, question, history or [], documents, emails)
+            res = _ask_azure(m, question, history or [], documents, emails, context)
         except Exception as e:  # network/auth/quota: fall back so the user still gets an answer
             res = _ask_offline(m, question, emails, documents)
             res["answer"] = f"_Azure OpenAI unavailable ({type(e).__name__}: {str(e)[:160]}); offline answer:_\n\n" + res["answer"]
     elif os.environ.get("ANTHROPIC_API_KEY"):
         try:
-            res = _ask_claude(m, question, history or [], documents, emails)
+            res = _ask_claude(m, question, history or [], documents, emails, context)
         except anthropic.APIError as e:
             res = _ask_offline(m, question, emails, documents)
             res["answer"] = f"_Claude unavailable ({type(e).__name__}); offline answer:_\n\n" + res["answer"]
@@ -521,10 +526,10 @@ STEP_LABELS = {"query_view": "Queried view", "get_item": "Looked up item", "find
                "excel_job_status": "Checked Excel job status", "excel_download": "Prepared Excel download"}
 
 
-def _ask_claude(m, question, history, documents=None, emails=None):
+def _ask_claude(m, question, history, documents=None, emails=None, context=None):
     client = anthropic.Anthropic()
     messages = [{"role": h["role"], "content": h["content"]} for h in history[-6:]]
-    messages.append({"role": "user", "content": _prompt_question(question, documents, emails)})
+    messages.append({"role": "user", "content": _prompt_question(question, documents, emails, context)})
     calls, last_view, actions, ui, steps, excel_job = [], None, [], None, [], None
     for _ in range(12):
         resp = client.beta.messages.create(
