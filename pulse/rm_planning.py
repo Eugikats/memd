@@ -397,6 +397,7 @@ def compute(model):
     built = {"pack": pack, "mrp": mrp, "by_item": by_item, "by_desc": by_desc, "months": months,
              "by_item_m": by_item_m, "by_desc_m": by_desc_m, "stock": stock, "names": names,
              "classes": classes, "at_site": at_site, "at_loc": at_loc, "costs": costs}
+    built["tables"] = {sid: sheet_table(built, sid) for _g, _title, sid in SHEETS}
     _CACHE.clear()
     _CACHE[key] = built
     return built
@@ -643,19 +644,38 @@ def _valued(qty, item, costs):
     return float(qty or 0) * float(costs.get(item) or 0)
 
 
+# Planner grids have no item class or site. Class, site and location must not blank them.
+PLANNER_SHEETS = {
+    "All Purchase Plans", "Local Purchase", "RM MATRIX", "Projected Sales ",
+    "Sales FY26", "Sales rev. forecast mar.", "KEY", "Intransit", "my sheet", "Sheet1",
+}
+
+
+def _resolve_sheet(sheet):
+    wanted = (sheet or "MRP").strip()
+    aliases = {}
+    for _g, title, sid in SHEETS:
+        aliases[sid] = sid
+        aliases[sid.strip()] = sid
+        aliases[title] = sid
+        aliases[title.strip()] = sid
+    return aliases.get(sheet or "", aliases.get(wanted, "MRP"))
+
+
 def _headline(built, rows, sheet):
     from . import views as V
     costs = built.get("costs") or {}
+    label = sheet.strip() or sheet
     planning = [r for r in rows if r.get("item_no") and ("inventory" in r or "order_qty" in r or "cover_flag" in r)]
     if planning:
-        return _planning_headline(built, planning, costs, V)
+        return _planning_headline(built, planning, costs, V, label)
     stock_rows = [r for r in rows if r.get("item_no") and "sum_rm" in r]
     if stock_rows:
-        return _stock_headline(built, stock_rows, costs, V, sheet)
-    return _grid_headline(rows, sheet, V)
+        return _stock_headline(built, stock_rows, costs, V, label)
+    return _grid_headline(rows, label, V)
 
 
-def _planning_headline(built, rows, costs, V):
+def _planning_headline(built, rows, costs, V, sheet):
     critical_rows = [r for r in rows if r.get("cover_flag") == "CRITICAL" and r.get("status") == "ACTIVE"]
     slob_rows = [r for r in rows if r.get("status") == "SLOB"]
     okay = sum(1 for r in rows if r.get("status") == "ACTIVE" and r.get("cover_flag") == "OKAY")
@@ -697,9 +717,9 @@ def _planning_headline(built, rows, costs, V):
     top = sorted(rows, key=lambda r: r.get("order_qty") or 0, reverse=True)[:12]
     top = [r for r in top if (r.get("order_qty") or 0) > 0]
     kpis = [
-        V.kpi("RM stock (SUM RM)", stock_val, "money", f"{len(rows)} items in this filter",
+        V.kpi("RM stock (SUM RM)", stock_val, "money", f"{len(rows)} items on {sheet}",
               spark=monthly_val[-6:] or monthly[-6:] or None, qty=stock_qty),
-        V.kpi("Cover ≤ 29 days", len(critical_rows), "qty", f"of {len(rows)} items", status="critical",
+        V.kpi("Cover ≤ 29 days", len(critical_rows), "qty", f"of {len(rows)} items on {sheet}", status="critical",
               pct=V.pct(len(critical_rows), len(rows))),
         V.kpi("SLOB", len(slob_rows), "qty", "Average consumption is zero", status="serious",
               pct=V.pct(len(slob_rows), len(rows))),
@@ -707,19 +727,19 @@ def _planning_headline(built, rows, costs, V):
         V.kpi("Suggested order qty", order_val, "money", "Rounded up to 25,500, the workbook's order multiple", qty=order_qty),
     ]
     charts = [
-        V.chart("area", "Monthly consumption of MRP items", labels,
+        V.chart("area", f"Monthly consumption · {sheet}", labels,
                 [("Value", "seq", monthly_val or [0])], "UGX", span=2,
                 extra={"quantity": monthly or [0]}),
-        V.chart("doughnut", "MRP cover position", cover_labels,
+        V.chart("doughnut", f"Cover position · {sheet}", cover_labels,
                 [("Value", "seq", cover_val)], "UGX", colors=["crit", "good", "warning"],
                 extra={"quantity": cover_qty}),
-        V.chart("hbar", "Largest suggested orders",
+        V.chart("hbar", f"Largest suggested orders · {sheet}",
                 [f"{r['item_no']} · {str(r.get('description') or '')[:28]}" for r in top] or ["—"],
                 [("Value", "serious", [_valued(r.get("order_qty"), r.get("item_no"), costs) for r in top] or [0])],
                 "UGX", span=2, height=360,
                 extra={"quantity": [r.get("order_qty") or 0 for r in top] or [0],
                        "item_nos": [r["item_no"] for r in top]}),
-        V.chart("bar", "Stock on the SUM RM locations", list(loc_qty),
+        V.chart("bar", f"Stock on the SUM RM locations · {sheet}", list(loc_qty),
                 [("Value", "RM", list(loc_val.values()))], "UGX",
                 extra={"quantity": list(loc_qty.values())}),
     ]
@@ -759,10 +779,13 @@ def _grid_headline(rows, sheet, V):
                 numeric.append(key)
     sums = []
     for key in numeric[:8]:
-        total = sum(float(r.get(key) or 0) for r in rows)
+        vals = [r.get(key) for r in rows if isinstance(r.get(key), (int, float)) and not isinstance(r.get(key), bool)]
+        if not vals:
+            continue
+        total = sum(float(v) for v in vals)
         if total:
             sums.append((key, total))
-    kpis = [V.kpi("RM stock (SUM RM)", len(rows), "qty", f"{len(rows)} rows on {sheet}")]
+    kpis = [V.kpi(sheet, len(rows), "qty", f"{len(rows)} rows")]
     for key, total in sums[:4]:
         kpis.append(V.kpi(key, total, "qty", sheet))
     while len(kpis) < 5:
@@ -773,17 +796,18 @@ def _grid_headline(rows, sheet, V):
     return kpis[:5], charts
 
 
-def _filtered_rows(built, rows, filters):
+def _filtered_rows(built, rows, filters, sheet):
     cls = filters.get("item_class")
     site = filters.get("site")
     loc = (filters.get("location") or "").strip()
     q = (filters.get("q") or "").strip().lower()
-    if not (cls or site or loc or q):
+    place = sheet not in PLANNER_SHEETS
+    if not ((place and (cls or site or loc)) or q):
         return rows
     kept = []
     for r in rows:
         item = r.get("item_no")
-        if cls or site or loc:
+        if place and (cls or site or loc):
             if not item:
                 continue
             if cls and built["classes"].get(item) != cls:
@@ -801,12 +825,9 @@ def _filtered_rows(built, rows, filters):
 def render(model, filters=None):
     filters = filters or {}
     built = compute(model)
-    sheet = filters.get("sheet") or "MRP"
-    known = {sid for _g, _title, sid in SHEETS}
-    if sheet not in known:
-        sheet = "MRP"
-    table = sheet_table(built, sheet)
-    rows = _filtered_rows(built, table["rows"], filters)
+    sheet = _resolve_sheet(filters.get("sheet"))
+    table = built["tables"][sheet]
+    rows = _filtered_rows(built, table["rows"], filters, sheet)
     kpis, charts = _headline(built, rows, sheet)
     table = dict(table)
     table["rows"] = rows

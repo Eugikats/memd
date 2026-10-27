@@ -305,9 +305,11 @@ def inventory_position(m, f):
                          extra={"quantity_series": [[_clean(x) for x in hq[s].tolist()]
                                                     for s in COVER_ORDER if hc[s].sum() > 0]}),
                    chart("hbar", "Top 15 items by stock value", [f"{r.item_no} · {str(r.description)[:28]}" for r in top.itertuples()],
-                         [("Value", "class:" + ",".join(top.item_class.tolist()), top.stock_value.tolist())], "UGX",
-                         span=2, height=380,
-                         extra={"quantity": [_clean(x) for x in top.stock_qty.tolist()],
+                         [(C.CLASS_LABELS[c], c, [_clean(v if cls == c else 0) for v, cls in zip(top.stock_value.tolist(), top.item_class.tolist())])
+                          for c in CLS], "UGX",
+                         stacked=True, span=2, height=380,
+                         extra={"quantity_series": [[_clean(v if cls == c else 0) for v, cls in zip(top.stock_qty.tolist(), top.item_class.tolist())]
+                                                    for c in CLS],
                                 "item_nos": top.item_no.tolist()}),
                    chart("bar", "ABC analysis", ["A", "B", "C"],
                          [("% of items", "seq", [pct(x, abc["items"].sum()) for x in abc["items"]]),

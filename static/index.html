@@ -387,14 +387,21 @@ dl dt { font-weight: 600; margin-top: 12px; } dl dd { margin: 2px 0 0; color: va
   .topbar .right { gap: 8px; } #topAvatar { display: none; }
   .d-long, .r-long { display: none; } .d-short, .r-short { display: inline; }
   .topbar .when b { font-size: 13px; } .topbar .when a { font-size: 11.5px; }
-  main { padding: 12px 14px 48px; }
+  main { padding: 12px 14px 88px; }
+  html, body, .app, .shell { overflow-x: hidden; max-width: 100%; }
+  .inv-head { flex-wrap: wrap; align-items: stretch; }
+  .inv-head .sec-tabs { max-width: 100%; width: 100%; }
+  .inv-head .inv-actions, .page-tools { width: 100%; margin-left: 0; flex-wrap: wrap; }
+  .page-tools { flex-direction: column; align-items: stretch; }
+  .inv-filters select { min-width: 0; flex: 1 1 140px; }
+  .inv-tablehead .rbtns, body.page-inv .tablehead.inv-tablehead .rbtns { flex-wrap: wrap; width: 100%; }
   .vhead { gap: 10px; } .vhead h1 { font-size: 23px; } .vhead p { font-size: 14px; }
   .rbtns { gap: 6px; } .rbtns .btn { padding: 6px 10px; }
   .charts { grid-template-columns: 1fr; } .span-2, .span-3 { grid-column: auto; }
   .chartbox { height: 260px !important; }
   .insights { grid-template-columns: 1fr; }
   .hero { padding: 32px 14px 28px; min-height: auto; } .hero:not(.chatting) { height: calc(100vh - 58px); max-height: calc(100vh - 58px); padding: 16px 14px 6px; } .cockpit-metrics { grid-template-columns: 1fr 1fr; row-gap: 18px; } .cockpit-metrics .val { font-size: 26px; }
-  .cockpit-wave, .flow-toggle { width: calc(100% + 28px); margin-left: -14px; margin-right: -14px; }
+  .cockpit-wave, .flow-toggle { width: 100%; margin-left: 0; margin-right: 0; }
   .wave-metric .lab { font-size: 10px; }
   .wave-metric .val { font-size: 15px; }
   .wave-delta .chg, .wave-delta .vs { font-size: 9px; }
@@ -407,8 +414,9 @@ dl dt { font-weight: 600; margin-top: 12px; } dl dd { margin: 2px 0 0; color: va
   .tablehead h3 { font-size: 13.5px; } .tfilter { flex: 1; width: auto; min-width: 0; } .tablehead .rbtns { width: 100%; }
   .tablewrap { max-height: 480px; -webkit-overflow-scrolling: touch; }
   td { max-width: 220px; }
-  .drawer { padding: 14px; width: 100vw; }
+  .drawer { padding: 14px; width: 100%; max-width: 100%; z-index: 45; }
   .d-head { flex-wrap: wrap; } .d-head h2 { font-size: 22px; } .d-big { font-size: 34px; }
+  .d-head .rbtns { width: 100%; justify-content: flex-end; }
   .d-tiles { grid-template-columns: repeat(2, 1fr); }
   .msg.user { max-width: 90%; }
   .thread { gap: 10px; } .msg { padding: 12px 14px; }
@@ -2988,20 +2996,14 @@ function renderRmPlanning(c, d) {
       <div class="inv-kpi-row"><p class="inv-kpi-v">${esc(String(fmt(k.value, k.kind)))}</p>${cipSpark(k.spark, face.fg, k.label)}</div></article>`;
   }).join('');
   const charts = d.charts || [];
-  const card = (ch, id, wide) => ch ? `<section class="card inv-card${wide ? ' span-2' : ''}"><div class="inv-ch-head"><div><h3>${esc(ch.title)}</h3></div></div><div class="chartbox" style="height:${ch.height || 280}px"><canvas id="${id}"></canvas></div></section>` : '';
-  const byTitle = re => charts.find(ch => re.test(ch.title));
-  const cons = byTitle(/monthly consumption/i);
-  const cover = byTitle(/cover position/i);
-  const orders = byTitle(/suggested orders/i);
-  const locs = byTitle(/SUM RM locations/i);
+  const card = (ch, id) => ch ? `<section class="card inv-card${ch.span === 2 ? ' span-2' : ''}"><div class="inv-ch-head"><div><h3>${esc(ch.title)}</h3></div></div><div class="chartbox" style="height:${ch.height || 280}px"><canvas id="${id}"></canvas></div></section>` : '';
   c.innerHTML = `<div class="inv-page">
     <div class="inv-head"><div></div><div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
       <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
       <button class="btn primary" id="exportRm">${svg('download', 14)} Export</button></div></div>
     ${invFilters()}
     <div class="inv-kpis">${kpis}</div>
-    <div class="inv-topcharts">${card(cons, 'chRmCons', true)}${card(cover, 'chRmCover')}</div>
-    <div class="inv-charts2">${card(orders, 'chRmOrders', true)}${card(locs, 'chRmLocs')}</div>
+    <div class="inv-charts2">${charts.map((ch, i) => card(ch, 'chRm' + i)).join('')}</div>
     ${(d.tables || []).map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
   bindFilters();
   document.getElementById('askThis').onclick = () => { askOnPage('Summarise raw material planning: what should we order and which items are critical?'); };
@@ -3013,7 +3015,7 @@ function renderRmPlanning(c, d) {
     try { const chart = drawChart(el, Object.assign({}, ch, glass)); if (chart) S.charts.push(chart); }
     catch (e) { el.parentElement.innerHTML = `<div class="muted">Chart unavailable (${esc(e.message)})</div>`; }
   };
-  put('chRmCons', cons); put('chRmCover', cover); put('chRmOrders', orders); put('chRmLocs', locs);
+  charts.forEach((ch, i) => put('chRm' + i, ch));
   (d.tables || []).forEach((t, i) => renderTable(document.getElementById('tb' + i), t, { variant: 'inventory', size: 10, search: 'Search item, description, location…' }));
   if (d.tables && d.tables[0]) document.getElementById('exportRm').onclick = () => exportCsv(d.tables[0]);
 }
@@ -3696,11 +3698,14 @@ async function renderReport(rid) {
       <button class="btn" id="save">${svg('star', 14)} Save to history</button><button class="btn" id="askR">${I.spark.replace('class="spark"', 'width="14" height="14"')} Ask agent</button></div></div></div>
     <div class="filters"><select id="f_class"><option value="">All classes</option>${['RM', 'WIP', 'FG'].map(x => `<option ${f.item_class === x ? 'selected' : ''}>${x}</option>`).join('')}</select>
       <select id="f_site"><option value="">All sites</option>${S.meta.sites.map(s => `<option ${f.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
-      <input id="f_q" placeholder="Search item, description, vendor, PO…" value="${esc(f.q)}"><button class="btn" id="f_clear">Clear</button></div>
+      <input id="f_q" placeholder="Search item, description, vendor, PO…" value="${esc(f.q)}">
+      <div class="seg" id="f_measure"><button type="button" data-m="value" class="${pageMeasure === 'value' ? 'on' : ''}">Value</button><button type="button" data-m="qty" class="${pageMeasure === 'qty' ? 'on' : ''}">Quantity</button></div>
+      <button class="btn" id="f_clear">Clear</button></div>
     <div id="schedBox"></div><div id="rbody"><div class="empty"><span class="thinking"><i></i><i></i><i></i></span> Building report…</div></div>`;
   const upd = () => { S.rFilters = { item_class: f_class.value, site: f_site.value, q: f_q.value.trim() }; renderReport(rid); };
   f_class.onchange = upd; f_site.onchange = upd; let t; f_q.oninput = () => { clearTimeout(t); t = setTimeout(upd, 500); };
-  f_clear.onclick = () => { S.rFilters = { item_class: '', site: '', q: '' }; renderReport(rid); };
+  f_clear.onclick = () => { S.rFilters = { item_class: '', site: '', q: '' }; pageMeasure = 'value'; renderReport(rid); };
+  document.querySelectorAll('#f_measure button').forEach(b => { b.onclick = ev => { ev.stopPropagation(); pageMeasure = b.dataset.m; if (S.reportRaw) drawReportBody(document.getElementById('rbody'), measuredReport(S.reportRaw)); document.querySelectorAll('#f_measure button').forEach(x => x.classList.toggle('on', x.dataset.m === pageMeasure)); }; });
   const qs = qsOf(S.rFilters);
   document.getElementById('xl').href = `/api/reports/export/${encodeURIComponent(rid)}?${qs}&fmt=xlsx`;
   document.getElementById('csv').href = `/api/reports/export/${encodeURIComponent(rid)}?${qs}&fmt=csv`;
@@ -3711,8 +3716,15 @@ async function renderReport(rid) {
   document.getElementById('askR').onclick = () => { askOnPage(`Summarise the ${meta.name}${S.rFilters.item_class ? ' for ' + S.rFilters.item_class : ''}${S.rFilters.site ? ' at ' + S.rFilters.site : ''}: key findings and what to act on.`); };
   const r = await api(`/api/reports/run/${encodeURIComponent(rid)}?${qs}`);
   if (S.view !== 'report:' + rid) return;
-  document.getElementById('pdf').onclick = () => printReport(r);
-  drawReportBody(document.getElementById('rbody'), r);
+  S.reportRaw = r;
+  document.getElementById('pdf').onclick = () => printReport(measuredReport(S.reportRaw));
+  drawReportBody(document.getElementById('rbody'), measuredReport(r));
+}
+
+function measuredReport(r) {
+  if (!r || pageMeasure !== 'qty') return r;
+  const summary = (r.summary || []).map(k => (k.qty === undefined || k.qty === null) ? k : Object.assign({}, k, { value: k.qty, kind: 'qty' }));
+  return Object.assign({}, r, { summary });
 }
 
 function drawReportBody(el, r, opts = {}) {
