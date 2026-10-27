@@ -60,7 +60,9 @@ def run_job(job_id: str, model=None) -> dict:
         pct = 55 + int(20 * (i / max(n, 1)))
         bump("rebuilding", min(pct, 74), f"Filling sheet {i}/{n}: {sheet_name}")
 
-    filled = rebuild.rebuild_from_document(model, job["document_id"], job.get("view"), on_progress=on_progress)
+    filled = rebuild.rebuild_from_document(
+        model, job["document_id"], job.get("view"), on_progress=on_progress,
+        column_map=job.get("column_map"))
     if filled.get("error"):
         return bump("failed", 100, "Rebuild failed", error=filled["error"],
                     unmatched=filled.get("unmatched") or [], sheets=filled.get("sheets") or [])

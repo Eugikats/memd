@@ -104,14 +104,18 @@ def update(job_id: str, **fields) -> dict | None:
 
 
 def create(document_id: str, instruction: str, user: str = "demo", view: str | None = None,
-           tenant: str | None = None) -> dict:
+           tenant: str | None = None, column_map: dict | None = None) -> dict:
     job_id = uuid.uuid4().hex[:12]
     tenant = excel_blob.tenant_prefix(tenant)
+    cmap = None
+    if isinstance(column_map, dict):
+        cmap = {str(k): str(v) for k, v in column_map.items() if k and v}
     job = {
         "id": job_id,
         "document_id": document_id,
         "instruction": (instruction or "")[:2000],
         "view": view,
+        "column_map": cmap,
         "user": user,
         "tenant": tenant,
         "status": "queued",

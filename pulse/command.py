@@ -115,10 +115,14 @@ def _tools():
          "description": "ACTION: start an async Excel Intelligence job to rebuild the attached file in its own sheets, tables, or slides. "
                         "Keep calculated columns as formulas and write system figures only where a header matches a view. "
                         "Use this when the user wants a report in the shape of an upload. Pass document_id from the upload context. "
+                        "Optionally pass view and column_map (template header → system field, e.g. {\"Item Code\": \"item_no\"}) "
+                        "when workbook flow shows residual header meanings aliases do not cover. "
                         "Never copy numbers out of the upload. Returns a job_id; poll excel_job_status until ready.",
          "input_schema": {"type": "object", "additionalProperties": False, "required": ["document_id"],
                           "properties": {"document_id": {"type": "string"}, "view": {"type": "string"},
-                                         "instruction": {"type": "string"}}}},
+                                         "instruction": {"type": "string"},
+                                         "column_map": {"type": "object", "additionalProperties": {"type": "string"},
+                                                        "description": "Optional map of template header text to view field name"}}}},
         {"name": "excel_job_status",
          "description": "Check progress of an Excel Intelligence Engine job started by rebuild_from_upload.",
          "input_schema": {"type": "object", "additionalProperties": False, "required": ["job_id"],
@@ -191,8 +195,9 @@ def run_tool(m, name, args):
         doc_id = args.get("document_id")
         if not documents.get(doc_id):
             return {"error": "That upload is no longer available. Attach it again."}
+        cmap = args.get("column_map") if isinstance(args.get("column_map"), dict) else None
         job = excel_jobs.create(doc_id, args.get("instruction") or "rebuild from upload",
-                                user="Pulse agent", view=args.get("view") or None)
+                                user="Pulse agent", view=args.get("view") or None, column_map=cmap)
         return {"job_id": job["id"], "status": job["status"], "progress": job["progress"],
                 "message": job["message"], "async": True,
                 "note": "Excel rebuild runs asynchronously. Poll excel_job_status with this job_id."}
@@ -245,10 +250,11 @@ def _system(m):
             "result. Cached formula results are not inventory figures. "
             "When the user asks to explain, analyze, interpret, or describe sheets, formulas, calculations, or document flow, "
             "answer from the UPLOADED DOCUMENT / workbook flow text — do not call rebuild_from_upload. "
-            "Call rebuild_from_upload only when they want the file refilled or recreated in the same template/format/layout "
-            "(async Excel Intelligence job). Then the UI polls; you may also use excel_job_status / excel_download. "
-            "Never invent formulas. The job keeps every sheet, table, or slide and keeps calculated columns as formulas. "
-            "Use generate_report only when there is no uploaded template.\n\n" + GLOSSARY)
+            "Call rebuild_from_upload when they want the file refilled or recreated in the same template/format/layout "
+            "(async Excel Intelligence job). Use workbook flow to interpret column meanings; pass optional view and "
+            "column_map for residual header→field mappings. Never invent numbers. Then the UI polls; you may also use "
+            "excel_job_status / excel_download. Never invent formulas. The job keeps every sheet, table, or slide and "
+            "keeps calculated columns as formulas. Use generate_report only when there is no uploaded template.\n\n" + GLOSSARY)
 
 
 def _audit(rec):
@@ -286,33 +292,6 @@ def _azure():
     return _azure_client
 
 
-# Only clear rebuild / same-template intents — not "explain this excel" analysis asks.
-_TEMPLATE_ASK = re.compile(
-    r"same\s+(format|template|layout)|this\s+(format|template|layout)|"
-    r"\brebuild\b|recreate\s+.+\btemplate\b|fill\s+(this|the)\s+template|"
-    r"report\s+in\s+the\s+same\s+(format|template|layout)",
-    re.I)
-
-
-def _job_started_answer(job, document_id=None):
-    lines = [
-        "I started the **Excel Intelligence Engine** to recreate your template with system figures.",
-        f"- Job: `{job['id']}`",
-        f"- Status: {job.get('status')} ({job.get('progress', 0)}%)",
-        job.get("message") or "Queued.",
-        "This runs in the background so large workbooks are not cut off by chat timeouts. "
-        "I will keep the job id so you can check progress; the UI also polls until the file is ready.",
-        "No upload numbers will be copied — only matching system columns are filled, and formulas stay formulas.",
-    ]
-    return {"mode": "agent", "answer": "\n".join(lines),
-            "tool_calls": [{"tool": "rebuild_from_upload", "input": {"document_id": document_id}}],
-            "table": None,
-            "steps": [{"label": "Queued Excel rebuild job", "detail": f"job_id={job['id']}"}],
-            "actions": [], "ui": {"view": "reports", "filters": {}},
-            "excel_job": {"id": job["id"], "status": job.get("status"), "progress": job.get("progress", 0),
-                          "message": job.get("message")}}
-
-
 def _job_finished_answer(job):
     if job.get("status") == "failed" or job.get("error"):
         err = job.get("error") or "Excel job failed."
@@ -324,17 +303,25 @@ def _job_finished_answer(job):
     sheets = job.get("sheets") or []
     filled = [s for s in sheets if s.get("role") == "filled"]
     kept = [s for s in sheets if s.get("role") == "kept"]
+    matched = job.get("matched") or []
+    unmatched = job.get("unmatched") or []
+    # Descriptive-only matches (e.g. Description) are not a full planning pack
+    planningish = re.compile(
+        r"item|stock|inventory|cover|qty|quantity|usage|cons|status|transit|incoming|order", re.I)
+    has_planning = any(planningish.search(str(h)) for h in matched)
     lines = [
         f"I rebuilt **{job.get('name') or 'the upload'}** in the same layout using system figures.",
-        f"- Rows filled: {job.get('rows', 0):,}",
+        f"- Rows written: {job.get('rows', 0):,} (view row count — blank cells remain where headers did not match)",
+        f"- Columns matched: {len(matched)}" + (f" ({', '.join(matched[:12])})" if matched else ""),
+        f"- Columns left blank: {len(unmatched)}" + (f" ({', '.join(unmatched[:12])})" if unmatched else ""),
         f"- Sheets/tables filled: {len(filled)}" + (f" ({', '.join(s.get('name', '') for s in filled[:8])})" if filled else ""),
     ]
+    if matched and not has_planning:
+        lines.append(
+            "- Note: only descriptive columns matched (e.g. Description). Planning fields like Item Code, "
+            "Inventory, or Cover days were not bound — the file can look empty where those matter.")
     if kept:
         lines.append(f"- Kept as formulas/layout: {', '.join(s.get('name', '') for s in kept[:8])}")
-    if job.get("matched"):
-        lines.append("- Matched columns: " + ", ".join(job["matched"][:12]))
-    if job.get("unmatched"):
-        lines.append("- Left blank (no system field): " + ", ".join(job["unmatched"][:12]))
     if job.get("unsupported"):
         lines.append("- Flags: " + "; ".join(job["unsupported"][:8]))
     lines.append("No upload number was copied.")
@@ -344,25 +331,10 @@ def _job_finished_answer(job):
             "tool_calls": [{"tool": "excel_job_status", "input": {"job_id": job.get("id")}}],
             "table": None,
             "steps": [{"label": "Excel rebuild ready",
-                       "detail": f"history_id={job.get('history_id')}, rows={job.get('rows')}"}],
+                       "detail": f"history_id={job.get('history_id')}, rows={job.get('rows')}, matched={len(matched)}"}],
             "actions": [], "ui": {"view": "reports", "filters": {}},
             "excel_job": {"id": job.get("id"), "status": "ready", "progress": 100,
                           "history_id": job.get("history_id"), "message": job.get("message")}}
-
-
-def _try_rebuild(m, documents, question):
-    ids = [d for d in (documents or []) if d]
-    if not ids or not _TEMPLATE_ASK.search(question or ""):
-        return None
-    out = run_tool(m, "rebuild_from_upload", {"document_id": ids[0], "instruction": question})
-    if out.get("error"):
-        return {"mode": "agent", "answer": out["error"],
-                "tool_calls": [{"tool": "rebuild_from_upload", "input": {"document_id": ids[0]}}],
-                "table": None, "steps": [{"label": "Could not start Excel job", "detail": out["error"]}],
-                "actions": [], "ui": {"view": "reports", "filters": {}}}
-    from . import excel_jobs
-    job = excel_jobs.get(out["job_id"]) or out
-    return _job_started_answer(job, document_id=ids[0])
 
 
 def _prompt_question(question, documents=None, emails=None):
@@ -484,22 +456,22 @@ def _attach_excel_job(res):
 
 def ask(m, question, user="demo", history=None, documents=None, emails=None):
     rec = {"at": datetime.now().isoformat(timespec="seconds"), "user": user, "question": question}
-    res = _try_rebuild(m, documents, question)
-    if res is None:
-        if provider() == "azure":
-            try:
-                res = _ask_azure(m, question, history or [], documents, emails)
-            except Exception as e:  # network/auth/quota: fall back so the user still gets an answer
-                res = _ask_offline(m, question, emails, documents)
-                res["answer"] = f"_Azure OpenAI unavailable ({type(e).__name__}: {str(e)[:160]}); offline answer:_\n\n" + res["answer"]
-        elif os.environ.get("ANTHROPIC_API_KEY"):
-            try:
-                res = _ask_claude(m, question, history or [], documents, emails)
-            except anthropic.APIError as e:
-                res = _ask_offline(m, question, emails, documents)
-                res["answer"] = f"_Claude unavailable ({type(e).__name__}); offline answer:_\n\n" + res["answer"]
-        else:
+    # Same-format / rebuild asks go through Azure/Claude so the agent can interpret headers
+    # (aliases + optional column_map) before calling rebuild_from_upload — no regex short-circuit.
+    if provider() == "azure":
+        try:
+            res = _ask_azure(m, question, history or [], documents, emails)
+        except Exception as e:  # network/auth/quota: fall back so the user still gets an answer
             res = _ask_offline(m, question, emails, documents)
+            res["answer"] = f"_Azure OpenAI unavailable ({type(e).__name__}: {str(e)[:160]}); offline answer:_\n\n" + res["answer"]
+    elif os.environ.get("ANTHROPIC_API_KEY"):
+        try:
+            res = _ask_claude(m, question, history or [], documents, emails)
+        except anthropic.APIError as e:
+            res = _ask_offline(m, question, emails, documents)
+            res["answer"] = f"_Claude unavailable ({type(e).__name__}); offline answer:_\n\n" + res["answer"]
+    else:
+        res = _ask_offline(m, question, emails, documents)
     res = _attach_excel_job(res)
     if documents and res.get("mode") in ("offline", "agent") and "No upload number was copied" not in (res.get("answer") or ""):
         # Skip disclaimer when answering workbook structure from the upload itself.
@@ -635,10 +607,8 @@ def _schedule_hint(question, emails):
 
 
 def _ask_offline(m, question, emails=None, documents=None):
-    rebuilt = _try_rebuild(m, documents, question)
-    if rebuilt is not None:
-        return rebuilt
     # Offline: still surface workbook structure when the user asks about the upload.
+    # Same-format rebuild needs the LLM path (Azure/Claude) for header interpretation — no regex bypass.
     if documents and re.search(r"explain|analy[sz]e|interpret|formula|sheet|layout|structure|flow|what.?is.?in",
                                question or "", re.I):
         from . import documents as docs

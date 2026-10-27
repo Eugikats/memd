@@ -388,12 +388,85 @@ def context_block(ids):
     return "\n\n".join(parts)
 
 
+def _norm_header(text):
+    s = str(text or "").strip().lower()
+    s = re.sub(r"[_\-/]+", " ", s)
+    s = re.sub(r"[^\w\s.]+", "", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+# Template header phrases → conceptual key; resolved to a view field that exists on the chosen view.
+_HEADER_ALIASES = {
+    "item": "item_no", "item code": "item_no", "item no": "item_no", "item no.": "item_no",
+    "item number": "item_no", "itemnumber": "item_no", "sku": "item_no", "items": "item_no",
+    "stock": "stock_qty", "inventory": "stock_qty", "on hand": "stock_qty", "stock on hand": "stock_qty",
+    "qty on hand": "stock_qty", "quantity on hand": "stock_qty", "inventory qty": "stock_qty",
+    "cover days": "cover", "coverdays": "cover", "days of cover": "cover", "cover day": "cover",
+    "production days cover": "cover", "prod days cover": "cover", "coverdays + intransit": "cover",
+    "status": "status", "cover status": "cover_status",
+    "description": "description", "desc": "description",
+    "in transit qty": "incoming_qty", "intransit qty": "incoming_qty", "incoming": "incoming_qty",
+    "incoming po": "incoming_qty", "on order": "incoming_qty",
+    "average cons": "daily_usage", "avg cons": "daily_usage", "max cons": "daily_usage",
+    "daily usage": "daily_usage", "usage / day": "daily_usage", "used / day": "daily_usage",
+}
+
+
 def _column_index(columns):
+    """Exact label/field keys plus alias keys that resolve to fields present on this view."""
     by = {}
+    fields = {str(c["field"]): c for c in columns}
     for col in columns:
         by[str(col["label"]).strip().lower()] = col
         by[str(col["field"]).strip().lower()] = col
+        by[_norm_header(col["label"])] = col
+        by[_norm_header(col["field"])] = col
+    # Conceptual cover → whichever cover field this view exposes
+    cover_col = fields.get("cover_days") or fields.get("cover_prod_days")
+    status_col = fields.get("cover_status") or fields.get("supply_status") or fields.get("risk_level")
+    for alias, concept in _HEADER_ALIASES.items():
+        if concept == "cover" and cover_col:
+            by[alias] = cover_col
+        elif concept == "status" and status_col and alias in ("status",):
+            # Prefer explicit Status label if present, else cover/supply status
+            if "status" in by and by["status"].get("field") == "status":
+                continue
+            by[alias] = fields.get("status") or status_col
+        elif concept == "cover_status" and fields.get("cover_status"):
+            by[alias] = fields["cover_status"]
+        elif concept in fields:
+            by[alias] = fields[concept]
     return by
+
+
+def _resolve_header(header, by, column_map=None):
+    """Return view column dict for a template header, or None."""
+    raw = str(header or "").strip()
+    if not raw:
+        return None
+    if column_map:
+        mapped = column_map.get(raw) or column_map.get(raw.lower()) or column_map.get(_norm_header(raw))
+        if mapped:
+            # column_map values are field names
+            for col in by.values():
+                if col.get("field") == mapped:
+                    return col
+            # direct field key in index
+            if str(mapped).lower() in by:
+                return by[str(mapped).lower()]
+    key = raw.lower()
+    if key in by:
+        return by[key]
+    norm = _norm_header(raw)
+    if norm in by:
+        return by[norm]
+    return None
+
+
+def _match_score(headers, columns):
+    by = _column_index(columns)
+    return sum(1 for h in headers if h and _resolve_header(h, by))
 
 
 _CATALOG_CACHE = None
@@ -437,32 +510,45 @@ def _materialise(model, view, cache):
 
 
 def _hint_view(doc, headers):
-    """Prefer RM / inventory views when the file name or headers point at planning."""
-    blob = " ".join([str(doc.get("name") or ""), *[str(h) for h in (headers or [])]]).lower()
-    if re.search(r"\brm\b|raw.?material|planning|cover", blob):
+    """Prefer RM / inventory views when the file name (or clear header wording) points at that pack.
+
+    Do not treat a lone 'Cover days' header as an RM hint — that label exists on inventory too.
+    """
+    name = str(doc.get("name") or "").lower()
+    hdr = " ".join(str(h) for h in (headers or [])).lower()
+    blob = f"{name} {hdr}"
+    if re.search(r"\brm\b|raw.?material", blob) or re.search(r"planning", name):
         return "rm_consumption_cover"
-    if re.search(r"inventory|stock|item", blob):
+    if re.search(r"inventory|stock\b", blob):
         return "inventory_position"
     return None
 
 
 def _choose_view(catalog, headers, preferred, doc=None):
+    """Pick the view with the best alias-aware header score; RM/inventory hint is a tie-break only."""
     from . import views as V
-    names = [h.strip().lower() for h in headers if h and str(h).strip()]
+    names = [h for h in headers if h and str(h).strip()]
     if preferred and preferred in catalog:
         return preferred
     hinted = _hint_view(doc or {}, headers)
-    if hinted and hinted in catalog:
-        keys = _column_index(catalog[hinted]["columns"])
-        if sum(1 for name in names if name in keys) >= 1:
-            return hinted
     order = {row[1]: i for i, row in enumerate(V.VIEWS)}
     best, score = None, 0
     for view, info in catalog.items():
-        keys = _column_index(info["columns"])
-        sc = sum(1 for name in names if name in keys)
-        if sc > score or (sc == score and sc and (best is None or order.get(view, 99) < order.get(best, 99))):
+        sc = _match_score(names, info["columns"])
+        if sc < 1:
+            continue
+        if sc > score:
             best, score = view, sc
+            continue
+        if sc < score:
+            continue
+        # Tie: prefer filename/header hint, else catalogue order
+        if hinted and view == hinted:
+            best = view
+        elif hinted and best == hinted:
+            pass
+        elif best is None or order.get(view, 99) < order.get(best, 99):
+            best = view
     return best
 
 
@@ -525,7 +611,7 @@ def _scan_sheets_readonly(data):
     return scanned
 
 
-def _fill_xlsx_lightweight(model, doc, view, on_progress=None):
+def _fill_xlsx_lightweight(model, doc, view, on_progress=None, column_map=None):
     """Rebuild large templates as a new data workbook (sheet names + headers), no full clone."""
     catalog = _catalog(model)
     if view and view not in catalog:
@@ -564,8 +650,12 @@ def _fill_xlsx_lightweight(model, doc, view, on_progress=None):
         chosen = _choose_view(catalog, headers, view, doc)
         info = _materialise(model, chosen, loaded) if chosen else None
         by = _column_index(info["table"]["columns"]) if info and info.get("table") else {}
-        used = [h for h in headers if h.strip().lower() in by]
-        skipped = [h for h in headers if h.strip().lower() not in by]
+        used, skipped = [], []
+        for h in headers:
+            if _resolve_header(h, by, column_map):
+                used.append(h)
+            else:
+                skipped.append(h)
         if not used:
             ws.append(headers)
             sheets.append({"name": title, "role": "kept", "unmatched": skipped,
@@ -574,8 +664,11 @@ def _fill_xlsx_lightweight(model, doc, view, on_progress=None):
         rows = (info["table"]["rows"] or [])[:_FILL_ROW_CAP]
         ws.append(headers)
         for row in rows:
-            ws.append([row.get(by[h.strip().lower()]["field"]) if h.strip().lower() in by else None
-                       for h in headers])
+            line = []
+            for h in headers:
+                col = _resolve_header(h, by, column_map)
+                line.append(row.get(col["field"]) if col else None)
+            ws.append(line)
         matched.extend(used)
         unmatched.extend(skipped)
         total += len(rows)
@@ -593,15 +686,15 @@ def _fill_xlsx_lightweight(model, doc, view, on_progress=None):
             "rows": total, "lightweight": True, "unsupported": [flag]}
 
 
-def _fill_xlsx(model, doc, view, on_progress=None):
+def _fill_xlsx(model, doc, view, on_progress=None, column_map=None):
     data = doc.get("bytes") or b""
     if len(data) >= _LIGHTWEIGHT_BYTES:
-        return _fill_xlsx_lightweight(model, doc, view, on_progress=on_progress)
+        return _fill_xlsx_lightweight(model, doc, view, on_progress=on_progress, column_map=column_map)
     try:
         book = load_workbook(io.BytesIO(data), data_only=False, keep_links=False)
     except Exception as e:
         # Fall back to lightweight if full open fails (complex / huge books).
-        return _fill_xlsx_lightweight(model, doc, view, on_progress=on_progress)
+        return _fill_xlsx_lightweight(model, doc, view, on_progress=on_progress, column_map=column_map)
     catalog = _catalog(model)
     loaded = {}
     if view and view not in catalog:
@@ -629,8 +722,12 @@ def _fill_xlsx(model, doc, view, on_progress=None):
             chosen = _choose_view(catalog, headers, view, doc)
             info = _materialise(model, chosen, loaded) if chosen else None
             by = _column_index(info["table"]["columns"]) if info and info.get("table") else {}
-            used = [h for h in headers if h.strip().lower() in by]
-            skipped = [h for h in headers if h.strip().lower() not in by]
+            used, skipped = [], []
+            for h in headers:
+                if _resolve_header(h, by, column_map):
+                    used.append(h)
+                else:
+                    skipped.append(h)
             if not used:
                 sheets.append({"name": ws.title, "role": "kept", "formulas_kept": formula_notes, "unmatched": skipped})
                 kept.extend(formula_notes)
@@ -660,8 +757,8 @@ def _fill_xlsx(model, doc, view, on_progress=None):
             for i, row in enumerate(rows):
                 r = header_row + 1 + i
                 for col, header in inputs:
-                    key = header.strip().lower()
-                    _write_cell(ws, r, col, row.get(by[key]["field"]) if key in by else None)
+                    resolved = _resolve_header(header, by, column_map)
+                    _write_cell(ws, r, col, row.get(resolved["field"]) if resolved else None)
                 for col, (src, sample) in samples.items():
                     if r == src:
                         continue
@@ -709,7 +806,7 @@ def _fill_docx(model, doc, view):
         chosen = _choose_view(catalog, [h for h in headers if h], view, doc)
         info = _materialise(model, chosen, loaded) if chosen else None
         by = _column_index(info["table"]["columns"]) if info and info.get("table") else {}
-        used = [h for h in headers if h.strip().lower() in by]
+        used = [h for h in headers if _resolve_header(h, by)]
         if not used:
             sheets.append({"name": f"Table {i}", "role": "kept"})
             continue
@@ -719,14 +816,14 @@ def _fill_docx(model, doc, view):
         body = list(table.rows)[1:]
         for n, source in enumerate(data):
             for cell, header in zip(body[n].cells, headers):
-                key = header.strip().lower()
-                value = source.get(by[key]["field"]) if key in by else None
+                resolved = _resolve_header(header, by)
+                value = source.get(resolved["field"]) if resolved else None
                 cell.text = "" if value is None else str(value)
         for row in body[len(data):]:
             for cell in row.cells:
                 cell.text = ""
         matched.extend(used)
-        unmatched.extend(h for h in headers if h and h.strip().lower() not in by)
+        unmatched.extend(h for h in headers if h and not _resolve_header(h, by))
         total += len(data)
         titles.append(info["title"])
         sheets.append({"name": f"Table {i}", "role": "filled", "view": info["title"], "rows": len(data), "matched": used})
@@ -759,7 +856,7 @@ def _fill_pptx(model, doc, view):
             chosen = _choose_view(catalog, [h for h in headers if h], view, doc)
             info = _materialise(model, chosen, loaded) if chosen else None
             by = _column_index(info["table"]["columns"]) if info and info.get("table") else {}
-            used = [h for h in headers if h.strip().lower() in by]
+            used = [h for h in headers if _resolve_header(h, by)]
             if not used:
                 sheets.append({"name": f"Slide table {seen}", "role": "kept"})
                 continue
@@ -768,14 +865,14 @@ def _fill_pptx(model, doc, view):
             for n in range(capacity):
                 source = data[n] if n < len(data) else None
                 for c, header in enumerate(headers):
-                    key = header.strip().lower()
-                    if source is None or key not in by or source.get(by[key]["field"]) is None:
+                    resolved = _resolve_header(header, by)
+                    if source is None or not resolved or source.get(resolved["field"]) is None:
                         table.cell(n + 1, c).text = ""
                     else:
-                        table.cell(n + 1, c).text = str(source.get(by[key]["field"]))
+                        table.cell(n + 1, c).text = str(source.get(resolved["field"]))
             written = min(capacity, len(data))
             matched.extend(used)
-            unmatched.extend(h for h in headers if h and h.strip().lower() not in by)
+            unmatched.extend(h for h in headers if h and not _resolve_header(h, by))
             total += written
             titles.append(info["title"])
             sheets.append({"name": f"Slide table {seen}", "role": "filled", "view": info["title"],
@@ -799,8 +896,8 @@ def _fill_flat(model, doc, view):
     if not info:
         return {"error": "No system column matches that header row."}
     by = _column_index(info["table"]["columns"])
-    used = [h for h in headers if h.strip().lower() in by]
-    skipped = [h for h in headers if h.strip().lower() not in by]
+    used = [h for h in headers if _resolve_header(h, by)]
+    skipped = [h for h in headers if h and not _resolve_header(h, by)]
     if not used:
         return {"error": "No system column matches that header row."}
     rows = (info["table"]["rows"] or [])[:_FILL_ROW_CAP]
@@ -809,7 +906,10 @@ def _fill_flat(model, doc, view):
     sheet.title = "Report"
     sheet.append(headers)
     for row in rows:
-        sheet.append([row.get(by[h.strip().lower()]["field"]) if h.strip().lower() in by else None for h in headers])
+        sheet.append([
+            (lambda r: row.get(r["field"]) if r else None)(_resolve_header(h, by))
+            for h in headers
+        ])
     buf = io.BytesIO()
     book.save(buf)
     return {"bytes": buf.getvalue(), "ext": "xlsx", "name": doc["name"], "matched": used, "unmatched": skipped,
@@ -818,14 +918,15 @@ def _fill_flat(model, doc, view):
             "formulas_kept": [], "view": info["title"], "rows": len(rows)}
 
 
-def fill_layout(model, doc_id, view=None, on_progress=None):
+def fill_layout(model, doc_id, view=None, on_progress=None, column_map=None):
     """Copy the uploaded file and fill matching columns from system views. Formula cells stay formulas."""
     doc = get(doc_id)
     if not doc or "bytes" not in doc:
         return {"error": "That upload is no longer available. Attach it again."}
+    cmap = column_map if isinstance(column_map, dict) else None
     ext = doc.get("ext")
     if ext in ("xlsx", "xlsm"):
-        return _fill_xlsx(model, doc, view, on_progress=on_progress)
+        return _fill_xlsx(model, doc, view, on_progress=on_progress, column_map=cmap)
     if ext == "docx":
         return _fill_docx(model, doc, view)
     if ext == "pptx":

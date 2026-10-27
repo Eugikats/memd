@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 
-def rebuild_from_document(model, document_id: str, view: str | None = None, on_progress=None) -> dict:
+def rebuild_from_document(model, document_id: str, view: str | None = None, on_progress=None,
+                           column_map: dict | None = None) -> dict:
     from pulse import documents
-    return documents.fill_layout(model, document_id, view, on_progress=on_progress)
+    return documents.fill_layout(model, document_id, view, on_progress=on_progress, column_map=column_map)
 
 
 def persist_history(built: dict, trigger: str = "excel_engine") -> dict:
