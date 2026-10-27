@@ -247,6 +247,26 @@ def extract(name, data):
     raise ValueError("Upload an Excel, CSV, text, Word, or PowerPoint file.")
 
 
+def _workbook_flow(name, data):
+    """Deeper sheet/formula/flow summary for the agent (not inventory numbers)."""
+    try:
+        import sys
+        from .bc_client import ROOT
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        from excel_engine.extract import extract_workbook
+        info = extract_workbook(data, name)
+        summary = (info.get("summary") or "").strip()
+        if not summary:
+            return None, info.get("unsupported") or []
+        # Cap so chat context stays usable.
+        if len(summary) > 8000:
+            summary = summary[:8000] + "\n…(workbook flow truncated)"
+        return summary, info.get("unsupported") or []
+    except Exception as e:
+        return f"(Workbook flow extract limited: {type(e).__name__}.)", []
+
+
 def save(name, data):
     from . import excel_blob
     ext = _ext(name)
@@ -263,6 +283,11 @@ def save(name, data):
             text, headers = _xlsx_zip_fallback(data)
         else:
             raise ValueError("No text could be read from that file.")
+    flow, unsupported = None, []
+    if ext in ("xlsx", "xlsm") and _looks_like_xlsx(data):
+        flow, unsupported = _workbook_flow(name, data)
+        if flow:
+            text = _trim(text + "\n\n# Workbook flow (sheets, formulas, structure)\n" + flow)
     now = datetime.now()
     stale = [k for k, v in _STORE.items() if v["at"] < now - timedelta(hours=12)]
     for k in stale:
@@ -276,9 +301,10 @@ def save(name, data):
     # Bytes stay off the hot path once stored; get() rehydrates from Blob/local disk.
     _STORE[doc_id] = {"id": doc_id, "name": name[:180], "text": text, "headers": headers[:30],
                       "blob_key": stored["key"], "uri": stored["uri"], "backend": stored["backend"],
-                      "ext": ext, "at": now, "size": len(data)}
+                      "ext": ext, "at": now, "size": len(data), "unsupported": unsupported[:20],
+                      "has_flow": bool(flow)}
     return {"id": doc_id, "name": name[:180], "headers": headers[:30], "chars": len(text),
-            "storage": stored["backend"], "size": len(data)}
+            "storage": stored["backend"], "size": len(data), "has_flow": bool(flow)}
 
 
 def cache_bytes(doc_id, data):
@@ -310,9 +336,18 @@ def context_block(ids):
         doc = get(doc_id)
         if not doc:
             continue
+        # Lazy flow extract if upload summary was light (e.g. older docs in memory).
+        if doc.get("ext") in ("xlsx", "xlsm") and not doc.get("has_flow") and doc.get("bytes"):
+            flow, unsupported = _workbook_flow(doc.get("name") or "workbook.xlsx", doc["bytes"])
+            if flow:
+                doc["text"] = _trim((doc.get("text") or "") + "\n\n# Workbook flow (sheets, formulas, structure)\n" + flow)
+                doc["has_flow"] = True
+                doc["unsupported"] = unsupported[:20]
         parts.append(
-            f"UPLOADED DOCUMENT {doc['name']} (id {doc['id']}; layout, sheets, and formulas only; "
+            f"UPLOADED DOCUMENT {doc['name']} (id {doc['id']}; layout, sheets, formulas, and workbook flow only; "
             f"its numbers are not inventory figures):\n{doc['text']}")
+        if doc.get("unsupported"):
+            parts.append("Unsupported / caution flags: " + "; ".join(doc["unsupported"][:12]))
     return "\n\n".join(parts)
 
 

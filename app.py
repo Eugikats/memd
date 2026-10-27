@@ -456,7 +456,7 @@ def excel_jobs_list():
 
 @app.get("/api/excel/jobs/<job_id>")
 def excel_job_get(job_id):
-    job = excel_jobs.get(job_id)
+    job = excel_jobs.get(job_id, redrive=True)
     if not job:
         return _json({"error": "Unknown Excel job"}, 404)
     out = dict(job)

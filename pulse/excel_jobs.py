@@ -14,11 +14,15 @@ from . import excel_blob
 
 _JOBS: dict[str, dict] = {}
 _LOCK = threading.Lock()
+_RUNNING: set[str] = set()
 _JOB_DIR = Path(os.environ.get("PULSE_EXCEL_JOB_DIR") or (DATA_DIR / "excel" / "jobs"))
 _AUDIT = DATA_DIR / "excel_audit.jsonl"
 _SB_CONN = os.environ.get("PULSE_EXCEL_SERVICEBUS") or os.environ.get("AZURE_SERVICEBUS_CONNECTION_STRING")
 _SB_QUEUE = os.environ.get("PULSE_EXCEL_SERVICEBUS_QUEUE", "excel-jobs")
+# When set, App Service only enqueues to Service Bus (Container Apps Job consumes).
+_EXTERNAL = os.environ.get("PULSE_EXCEL_EXTERNAL_WORKER", "").strip().lower() in ("1", "true", "yes")
 _MODEL_GETTER = None  # set by app: lambda: STATE["model"]
+_STALE_QUEUED_SEC = 5
 
 
 STATES = ("queued", "extracting", "indexing", "rebuilding", "validating", "ready", "failed")
@@ -33,8 +37,21 @@ def servicebus_configured() -> bool:
     return bool(_SB_CONN)
 
 
+def external_worker() -> bool:
+    return _EXTERNAL
+
+
 def _now():
     return datetime.now(timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds")
+
+
+def _parse_ts(value: str | None):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", ""))
+    except ValueError:
+        return None
 
 
 def _persist(job: dict):
@@ -58,12 +75,20 @@ def _audit(event: dict):
         f.write(json.dumps(event, default=str) + "\n")
 
 
-def get(job_id: str) -> dict | None:
+def get(job_id: str, redrive: bool = False) -> dict | None:
     with _LOCK:
         job = _JOBS.get(job_id)
-    if job:
-        return dict(job)
-    return _load_disk(job_id)
+    if not job:
+        job = _load_disk(job_id)
+        if job:
+            with _LOCK:
+                _JOBS[job_id] = job
+    if not job:
+        return None
+    if redrive:
+        _maybe_redrive(job)
+        job = get(job_id, redrive=False) or job
+    return dict(job)
 
 
 def update(job_id: str, **fields) -> dict | None:
@@ -115,16 +140,50 @@ def create(document_id: str, instruction: str, user: str = "demo", view: str | N
 
 
 def _enqueue(job_id: str):
+    """Notify Service Bus when configured; always run in-process unless EXTERNAL_WORKER=1."""
     if servicebus_configured():
         try:
             from azure.servicebus import ServiceBusClient, ServiceBusMessage
             with ServiceBusClient.from_connection_string(_SB_CONN) as client:
                 with client.get_queue_sender(_SB_QUEUE) as sender:
                     sender.send_messages(ServiceBusMessage(json.dumps({"job_id": job_id})))
-            return
         except Exception as e:
             update(job_id, message=f"Service Bus unavailable ({type(e).__name__}); running in-process")
+    if external_worker():
+        return
+    _start_local(job_id)
+
+
+def _start_local(job_id: str):
+    with _LOCK:
+        if job_id in _RUNNING:
+            return
+        job = _JOBS.get(job_id) or _load_disk(job_id)
+        if not job or job.get("status") in ("ready", "failed"):
+            return
+        if job.get("status") not in ("queued",) and job_id in _RUNNING:
+            return
+        _RUNNING.add(job_id)
     threading.Thread(target=_run_local, args=(job_id,), daemon=True, name=f"excel-job-{job_id}").start()
+
+
+def _maybe_redrive(job: dict):
+    """If a job sat in queued with no worker, start one (App Service recycle / missed enqueue)."""
+    if external_worker():
+        return
+    if job.get("status") != "queued":
+        return
+    created = _parse_ts(job.get("created_at")) or _parse_ts(job.get("updated_at"))
+    if created is None:
+        return
+    age = (datetime.now(timezone.utc).replace(tzinfo=None) - created).total_seconds()
+    if age < _STALE_QUEUED_SEC:
+        return
+    with _LOCK:
+        if job["id"] in _RUNNING:
+            return
+    update(job["id"], message="Re-driving queued Excel job in-process")
+    _start_local(job["id"])
 
 
 def _run_local(job_id: str):
@@ -149,6 +208,9 @@ def _run_local(job_id: str):
         update(job_id, status="failed", progress=100, error=f"{type(e).__name__}: {e}"[:400],
                message="Excel job failed")
         _audit({"at": _now(), "type": "excel_job_failed", "job_id": job_id, "error": str(e)[:400]})
+    finally:
+        with _LOCK:
+            _RUNNING.discard(job_id)
 
 
 def list_recent(limit: int = 50) -> list:

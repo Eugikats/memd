@@ -240,11 +240,14 @@ def _system(m):
             "is missing, ask for that one detail and do not invent an address. Do not say you are not allowed to email. If send_report "
             "says the mailbox is not connected, say that plainly. Never say anything was posted or changed in Business Central. "
             "After acting, summarise what you created and what the user should review. Use open_dashboard when showing a view would help.\n\n"
-            "An uploaded document is layout, sheets, and formulas. Inventory, cover, value, and order figures come only from your tools. "
-            "If a number in the document disagrees with a tool result, say so and use the tool result. Cached formula results are not "
-            "inventory figures. When the user wants a report in the shape of an attached file, call rebuild_from_upload with that "
-            "document id (starts an async Excel Intelligence job). Poll excel_job_status and use excel_download when ready; "
-            "never invent formulas. The job keeps every sheet, table, or slide and keeps calculated columns as formulas. "
+            "An uploaded document includes layout, sheets, formulas, and workbook flow text. Inventory, cover, value, and order "
+            "figures come only from your tools. If a number in the document disagrees with a tool result, say so and use the tool "
+            "result. Cached formula results are not inventory figures. "
+            "When the user asks to explain, analyze, interpret, or describe sheets, formulas, calculations, or document flow, "
+            "answer from the UPLOADED DOCUMENT / workbook flow text — do not call rebuild_from_upload. "
+            "Call rebuild_from_upload only when they want the file refilled or recreated in the same template/format/layout "
+            "(async Excel Intelligence job). Then the UI polls; you may also use excel_job_status / excel_download. "
+            "Never invent formulas. The job keeps every sheet, table, or slide and keeps calculated columns as formulas. "
             "Use generate_report only when there is no uploaded template.\n\n" + GLOSSARY)
 
 
@@ -283,10 +286,11 @@ def _azure():
     return _azure_client
 
 
+# Only clear rebuild / same-template intents — not "explain this excel" analysis asks.
 _TEMPLATE_ASK = re.compile(
     r"same\s+(format|template|layout)|this\s+(format|template|layout)|"
-    r"rebuild|from\s+(the\s+)?upload|from\s+(this|the)\s+(file|document|excel|spreadsheet|workbook)|"
-    r"using\s+(this|the)\s+(file|template|upload)|fill\s+(this|the)\s+template",
+    r"\brebuild\b|recreate\s+.+\btemplate\b|fill\s+(this|the)\s+template|"
+    r"report\s+in\s+the\s+same\s+(format|template|layout)",
     re.I)
 
 
@@ -393,14 +397,17 @@ def _ask_azure(m, question, history, documents=None, emails=None):
     messages = [{"role": "system", "content": _system(m)}]
     messages += [{"role": h["role"], "content": h["content"]} for h in history[-6:]]
     messages.append({"role": "user", "content": _prompt_question(question, documents, emails)})
-    calls, last_view, actions, ui, steps = [], None, [], None, []
+    calls, last_view, actions, ui, steps, excel_job = [], None, [], None, [], None
     for _ in range(12):
         resp = client.chat.completions.create(model=deployment, messages=messages, tools=tools,
                                               max_completion_tokens=8000)
         msg = resp.choices[0].message
         if not msg.tool_calls:
-            return {"mode": "azure", "answer": (msg.content or "").strip(), "tool_calls": calls, "table": last_view,
-                    "steps": steps, "actions": actions, "ui": ui}
+            out = {"mode": "azure", "answer": (msg.content or "").strip(), "tool_calls": calls, "table": last_view,
+                   "steps": steps, "actions": actions, "ui": ui}
+            if excel_job:
+                out["excel_job"] = excel_job
+            return out
         messages.append({"role": "assistant", "content": msg.content or "",
                          "tool_calls": [tc.model_dump() for tc in msg.tool_calls]})
         for tc in msg.tool_calls:
@@ -424,9 +431,55 @@ def _ask_azure(m, question, history, documents=None, emails=None):
                 ui = {"view": out["opened"], "filters": {"item_class": out["filters"].get("item_class"),
                                                          "site": out["filters"].get("site"),
                                                          "q": out["filters"].get("search")}}
+            if isinstance(out, dict) and out.get("job_id") and out.get("async"):
+                excel_job = {"id": out["job_id"], "status": out.get("status") or "queued",
+                             "progress": out.get("progress", 0), "message": out.get("message")}
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": json.dumps(out, default=str)[:60000]})
-    return {"mode": "azure", "answer": "I couldn't complete that within the allowed steps.", "tool_calls": calls,
-            "table": last_view, "steps": steps, "actions": actions, "ui": ui}
+    out = {"mode": "azure", "answer": "I couldn't complete that within the allowed steps.", "tool_calls": calls,
+           "table": last_view, "steps": steps, "actions": actions, "ui": ui}
+    if excel_job:
+        out["excel_job"] = excel_job
+    return out
+
+
+def _attach_excel_job(res):
+    """If a tool started an async rebuild, expose excel_job so the UI can poll."""
+    if res.get("excel_job"):
+        return res
+    from . import excel_jobs
+    job_id = None
+    for call in res.get("tool_calls") or []:
+        if call.get("tool") != "rebuild_from_upload":
+            continue
+        # Prefer the latest status/download tool args if present.
+        pass
+    for call in reversed(res.get("tool_calls") or []):
+        inp = call.get("input") or {}
+        if call.get("tool") in ("excel_job_status", "excel_download") and inp.get("job_id"):
+            job_id = inp["job_id"]
+            break
+    if not job_id:
+        # recover from rebuild_from_upload by scanning recent jobs for this turn is hard;
+        # look for job_id embedded in steps/details or re-run tool outputs via last call.
+        for call in reversed(res.get("tool_calls") or []):
+            if call.get("tool") == "rebuild_from_upload":
+                # Tool already ran; find newest queued/active job for that document if any.
+                doc_id = (call.get("input") or {}).get("document_id")
+                for job in excel_jobs.list_recent(10):
+                    if doc_id and job.get("document_id") == doc_id and job.get("status") not in ("ready", "failed"):
+                        job_id = job["id"]
+                        break
+                    if doc_id and job.get("document_id") == doc_id:
+                        job_id = job["id"]
+                        break
+                break
+    if not job_id:
+        return res
+    job = excel_jobs.get(job_id) or {"id": job_id, "status": "queued", "progress": 0}
+    res["excel_job"] = {"id": job["id"], "status": job.get("status"), "progress": job.get("progress", 0),
+                        "message": job.get("message"), "history_id": job.get("history_id"),
+                        "error": job.get("error")}
+    return res
 
 
 def ask(m, question, user="demo", history=None, documents=None, emails=None):
@@ -447,9 +500,13 @@ def ask(m, question, user="demo", history=None, documents=None, emails=None):
                 res["answer"] = f"_Claude unavailable ({type(e).__name__}); offline answer:_\n\n" + res["answer"]
         else:
             res = _ask_offline(m, question, emails, documents)
+    res = _attach_excel_job(res)
     if documents and res.get("mode") in ("offline", "agent") and "No upload number was copied" not in (res.get("answer") or ""):
-        res["answer"] += ("\n\nAny numbers in the uploaded file were not used. "
-                          "The figures above come from the system.")
+        # Skip disclaimer when answering workbook structure from the upload itself.
+        ans = res.get("answer") or ""
+        if "Workbook flow" not in ans and "formula" not in ans.lower():
+            res["answer"] = ans + ("\n\nAny numbers in the uploaded file were not used. "
+                                   "The figures above come from the system.")
     res.setdefault("steps", [{"label": STEP_LABELS.get(c["tool"], c["tool"]), "detail": _brief(c.get("input"))}
                              for c in res["tool_calls"]])
     res.setdefault("actions", [])
@@ -482,7 +539,7 @@ def _ask_claude(m, question, history, documents=None, emails=None):
     client = anthropic.Anthropic()
     messages = [{"role": h["role"], "content": h["content"]} for h in history[-6:]]
     messages.append({"role": "user", "content": _prompt_question(question, documents, emails)})
-    calls, last_view, actions, ui, steps = [], None, [], None, []
+    calls, last_view, actions, ui, steps, excel_job = [], None, [], None, [], None
     for _ in range(12):
         resp = client.beta.messages.create(
             model=MODEL, max_tokens=16000, system=_system(m), tools=_tools(), messages=messages,
@@ -495,8 +552,11 @@ def _ask_claude(m, question, history, documents=None, emails=None):
         uses = [b for b in resp.content if b.type == "tool_use"]
         if resp.stop_reason != "tool_use" or not uses:
             text = "\n".join(b.text for b in resp.content if b.type == "text").strip()
-            return {"mode": "claude", "answer": text, "tool_calls": calls, "table": last_view, "steps": steps,
-                    "actions": actions, "ui": ui}
+            out = {"mode": "claude", "answer": text, "tool_calls": calls, "table": last_view, "steps": steps,
+                   "actions": actions, "ui": ui}
+            if excel_job:
+                out["excel_job"] = excel_job
+            return out
         results = []
         for u in uses:
             out = run_tool(m, u.name, u.input)
@@ -511,11 +571,17 @@ def _ask_claude(m, question, history, documents=None, emails=None):
                 ui = {"view": out["opened"], "filters": {"item_class": out["filters"].get("item_class"),
                                                          "site": out["filters"].get("site"),
                                                          "q": out["filters"].get("search")}}
+            if isinstance(out, dict) and out.get("job_id") and out.get("async"):
+                excel_job = {"id": out["job_id"], "status": out.get("status") or "queued",
+                             "progress": out.get("progress", 0), "message": out.get("message")}
             results.append({"type": "tool_result", "tool_use_id": u.id,
                             "content": json.dumps(out, default=str), "is_error": "error" in out})
         messages.append({"role": "user", "content": results})
-    return {"mode": "claude", "answer": "I couldn't complete that question within the allowed steps.",
-            "tool_calls": calls, "table": last_view, "steps": steps, "actions": actions, "ui": ui}
+    out = {"mode": "claude", "answer": "I couldn't complete that question within the allowed steps.",
+           "tool_calls": calls, "table": last_view, "steps": steps, "actions": actions, "ui": ui}
+    if excel_job:
+        out["excel_job"] = excel_job
+    return out
 
 
 # ---------- offline keyword router (no API key) ----------
@@ -572,6 +638,18 @@ def _ask_offline(m, question, emails=None, documents=None):
     rebuilt = _try_rebuild(m, documents, question)
     if rebuilt is not None:
         return rebuilt
+    # Offline: still surface workbook structure when the user asks about the upload.
+    if documents and re.search(r"explain|analy[sz]e|interpret|formula|sheet|layout|structure|flow|what.?is.?in",
+                               question or "", re.I):
+        from . import documents as docs
+        block = docs.context_block(documents)
+        if block:
+            return {"mode": "offline",
+                    "answer": ("Here is what I can see in the uploaded workbook (layout, sheets, and formulas only; "
+                               "numbers in the file are not inventory figures):\n\n" + block[:6000] +
+                               "\n\n_Offline mode: connect Azure OpenAI for a fuller interpretation._"),
+                    "tool_calls": [], "table": None, "steps": [{"label": "Read uploaded workbook structure", "detail": ""}],
+                    "actions": [], "ui": None}
     q = question.lower()
     for pat, pb in INTENTS:
         if re.search(pat, q):

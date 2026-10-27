@@ -8,8 +8,9 @@ Pulse App Service remains the conversational front door. Set these app settings 
 |---------|---------|
 | `PULSE_EXCEL_STORAGE_ACCOUNT` or `PULSE_EXCEL_STORAGE_CONNECTION` | Workbook Blob store |
 | `PULSE_EXCEL_BLOB_CONTAINER` | Default `excel-workbooks` |
-| `PULSE_EXCEL_SERVICEBUS` | Service Bus connection string |
+| `PULSE_EXCEL_SERVICEBUS` | Service Bus connection string (notify only unless external worker) |
 | `PULSE_EXCEL_SERVICEBUS_QUEUE` | Default `excel-jobs` |
+| `PULSE_EXCEL_EXTERNAL_WORKER` | Set `1` only when a Container Apps Job consumes the queue; otherwise App Service always runs an in-process worker |
 | `PULSE_EXCEL_SEARCH_ENDPOINT` / `PULSE_EXCEL_SEARCH_KEY` | Workbook intelligence index |
 | `PULSE_KEY_VAULT_URI` | Optional secret hydration |
 | `PULSE_EXCEL_LOGIC_APP_URL` | Optional ready-job webhook |

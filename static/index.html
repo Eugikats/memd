@@ -1660,14 +1660,16 @@ async function pollExcelJob(jobId, pending, hosts) {
     await new Promise(r => setTimeout(r, 1500));
     let job;
     try { job = await api('/api/excel/jobs/' + jobId); } catch (e) { continue; }
-    if (!job || job.error) continue;
+    // Unknown-job JSON has error but no status — keep polling briefly; do not treat failed jobs as retryable.
+    if (!job) continue;
+    if (!job.status && job.error) continue;
+    if (job.status === 'ready' || job.status === 'failed') return job;
     const pct = job.progress != null ? job.progress : 0;
     const label = job.message || job.status || 'Working…';
     pending.forEach(a => {
       a.innerHTML = `<div class="steps live"><div class="step"><span class="thinking"><i></i><i></i><i></i></span> Excel engine: ${esc(label)} (${pct}%)</div></div>`;
     });
     hosts.forEach(thread => { thread.scrollTop = thread.scrollHeight; });
-    if (job.status === 'ready' || job.status === 'failed') return job;
   }
   return { status: 'failed', error: 'Excel job timed out after 15 minutes. Check Reports history or try again.' };
 }
@@ -1696,7 +1698,7 @@ async function ask(text, playbook, origin) {
   syncAssist();
   let r;
   try {
-    const isTemplateAsk = !playbook && /same\s+(format|template|layout)|this\s+(format|template|layout)|rebuild|from\s+(the\s+)?upload|from\s+(this|the)\s+(file|document|excel|spreadsheet|workbook)|fill\s+(this|the)\s+template/i.test(text)
+    const isTemplateAsk = !playbook && /same\s+(format|template|layout)|this\s+(format|template|layout)|\brebuild\b|recreate\s+.+\btemplate\b|fill\s+(this|the)\s+template|report\s+in\s+the\s+same\s+(format|template|layout)/i.test(text)
       && readyUploads().length;
     const ctrl = new AbortController();
     // Template rebuilds return a job immediately; ordinary ask keeps the 120s guard.
