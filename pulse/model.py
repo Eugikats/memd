@@ -324,13 +324,46 @@ def build():
     cum = item.groupby("item_class").usage_value.cumsum() / item.groupby("item_class").usage_value.transform("sum").replace(0, np.nan)
     item["abc"] = np.select([item.usage_value <= 0, cum <= 0.80, cum <= 0.95], ["C", "A", "B"], "C")
 
-    model = dict(weekly=weekly, weekly_pg=weekly_pg, item_week=item_week, items=items, locations=locs, stock_loc=stock_loc, item=item, projection=projection,
+    item_month, history = _item_month(rep)
+    notes["history"] = history
+    model = dict(weekly=weekly, weekly_pg=weekly_pg, item_week=item_week, item_month=item_month,
+                 items=items, locations=locs, stock_loc=stock_loc, item=item, projection=projection,
                  purchase_lines=pl, site=site, location_risk=location_risk, bom=bom, readiness=readiness,
                  wip=wip, fg_from_wip=fg_from_wip, exceptions=exceptions, notes=notes)
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
     MODEL_PATH.write_bytes(pickle.dumps(model))
     _snapshot(model)
     return model
+
+
+def load_history():
+    """12-month item ledger entries (Excel ledger dumps). Empty frame when the extract predates the history pull."""
+    if not (RAW / "ile_history.json.gz").exists():
+        return pd.DataFrame(columns=["Entry_No", "Entry_Type", "Item_No", "Location_Code", "Posting_Date", "Quantity",
+                                     "Document_No", "Document_Type", "Item_Description", "Item_Category_Code",
+                                     "Remaining_Quantity", "Open", "Cost_Amount_Actual", "Sales_Amount_Actual"])
+    return _load("ile_history")
+
+
+def _item_month(rep):
+    """Item × calendar month quantities over the 12-month history (separate from the 90-day cover window)."""
+    h = load_history()
+    cols = ["item_no", "month", "consumed", "sold", "received", "output", "abs_qty", "net_qty"]
+    if h.empty:
+        return pd.DataFrame(columns=cols), {"loaded": False, "first": None, "last": None, "rows": 0}
+    h = h.rename(columns={"Item_No": "item_no", "Entry_Type": "entry_type", "Quantity": "qty",
+                          "Posting_Date": "posting_date"})
+    h["month"] = h.posting_date.str[:7]
+    h["consumed"] = np.where(h.entry_type.isin(C.CONSUMPTION_TYPES), -h.qty, 0.0)
+    h["sold"] = np.where(h.entry_type.isin(C.DEMAND_TYPES), -h.qty, 0.0)
+    h["received"] = np.where(h.entry_type == "Purchase", h.qty, 0.0)
+    h["output"] = np.where(h.entry_type.isin({"Output", "Assembly Output"}), h.qty, 0.0)
+    h["abs_qty"] = h.qty.abs()
+    h["net_qty"] = h.qty
+    im = h.groupby(["item_no", "month"])[cols[2:]].sum().reset_index()
+    first, last = h.posting_date.min(), h.posting_date.max()
+    return im, {"loaded": True, "first": first, "last": last, "rows": int(len(h)),
+                "reporting_date": rep.isoformat()}
 
 
 def _snapshot(m):
@@ -362,10 +395,15 @@ def load():
         RAW.mkdir(parents=True, exist_ok=True)
         for f in bundled.iterdir():
             shutil.copy2(f, RAW / f.name)
+    elif bundled != RAW and (bundled / "ile_history.json.gz").exists() and not (RAW / "ile_history.json.gz").exists():
+        # Older persistent extracts have no 12-month history yet; seed it until the next BC refresh.
+        import shutil
+        shutil.copy2(bundled / "ile_history.json.gz", RAW / "ile_history.json.gz")
+        MODEL_PATH.unlink(missing_ok=True)
     if MODEL_PATH.exists():
         try:
             m = pickle.loads(MODEL_PATH.read_bytes())
-            if "item_week" in m:   # cache from an older version is rebuilt
+            if "item_week" in m and "item_month" in m:   # cache from an older version is rebuilt
                 return m
         except Exception:
             pass

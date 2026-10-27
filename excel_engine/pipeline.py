@@ -35,9 +35,19 @@ def run_job(job_id: str, model=None) -> dict:
         except Exception as e:
             return bump("failed", 100, "Could not load workbook", error=str(e)[:300])
 
+    if model is None:
+        try:
+            from pulse import model as M
+            model = M.load()
+        except Exception as e:
+            return bump("failed", 100, "Model unavailable", error=f"Could not load supply chain model: {e}"[:300])
+
+    name = doc.get("name") or "workbook.xlsx"
+    if name.lower().endswith((".xlsx", ".xlsm")):
+        return _run_xlsx(job_id, job, doc, model, bump)
+
     bump("extracting", 10, "Extracting worksheets, formulas, and layout (fast scan)")
-    # Always fast — full openpyxl extract hangs large RM planning files at 10%.
-    extracted = extract.extract_workbook(doc["bytes"], doc.get("name") or "workbook.xlsx", fast=True)
+    extracted = extract.extract_workbook(doc["bytes"], name, fast=True)
     extract_key = f"{job.get('tenant', 'default')}/extracts/{job_id}.json"
     excel_blob.put_bytes(extract_key, json.dumps(extracted).encode("utf-8"), "application/json")
     bump("extracting", 25, "Extraction complete", extract=extracted.get("summary"),
@@ -46,13 +56,6 @@ def run_job(job_id: str, model=None) -> dict:
     bump("indexing", 35, "Indexing workbook intelligence")
     indexed = search_index.index_extract(job_id, job["document_id"], job.get("tenant") or "default", extracted)
     bump("indexing", 45, f"Indexed {indexed.get('indexed', 0)} chunks ({indexed.get('backend')})")
-
-    if model is None:
-        try:
-            from pulse import model as M
-            model = M.load()
-        except Exception as e:
-            return bump("failed", 100, "Model unavailable", error=f"Could not load supply chain model: {e}"[:300])
 
     bump("rebuilding", 55, "Rebuilding template with system figures (deterministic)")
 
@@ -104,4 +107,56 @@ def run_job(job_id: str, model=None) -> dict:
                        "history_id": filled.get("history_id"), "user": job.get("user"),
                        "tenant": job.get("tenant"), "rows": filled.get("rows"),
                        "unsupported": unsupported[:20]})
+    return ready
+
+
+def _run_xlsx(job_id, job, doc, model, bump):
+    """Map every sheet, let the LLM plan the refresh, patch the original workbook in place."""
+    from pulse import excel_blob
+    from pulse import excel_jobs
+    from excel_engine import engine, summary, understand
+
+    name = doc.get("name") or "workbook.xlsx"
+    try:
+        built = engine.rebuild_xlsx(
+            model, doc["bytes"], name, instruction=job.get("instruction") or "",
+            column_map=job.get("column_map"),
+            progress=lambda pct, msg: bump("rebuilding" if pct >= 50 else ("planning" if pct >= 35 else "extracting"),
+                                           min(pct, 74), msg))
+    except Exception as e:
+        return bump("failed", 100, "Rebuild failed", error=f"{type(e).__name__}: {e}"[:400])
+    wmap, plan = built["wmap"], built["plan"]
+    try:
+        excel_blob.put_bytes(f"{job.get('tenant', 'default')}/extracts/{job_id}.json",
+                             json.dumps(understand.compact(wmap), default=str).encode("utf-8"), "application/json")
+    except Exception:
+        pass
+
+    bump("validating", 76, "Validating sheets, formulas, tables and pivots")
+    report = validate.validate_patch(doc["bytes"], built["bytes"], wmap, plan, built["patched"])
+    if report["status"] == "fail":
+        return bump("failed", 100, "Validation failed", error="; ".join(report["errors"])[:400],
+                    validation=report, plan=plan, sheets=built["sheets"])
+
+    bump("summarising", 85, "Writing the summary")
+    facts = summary.facts(wmap, plan, built["patched"], built["catalog"], report)
+    text = summary.write(facts)
+
+    built = rebuild.persist_history(built, trigger="excel_engine")
+    out_key = f"{job.get('tenant', 'default')}/outputs/{built.get('history_id')}.{built.get('ext') or 'xlsx'}"
+    stored = excel_blob.put_bytes(out_key, built["bytes"])
+    ready = bump(
+        "ready", 100, "Report ready",
+        history_id=built.get("history_id"), output_uri=stored.get("uri"),
+        matched=built["matched"], unmatched=built["unmatched"], sheets=built["sheets"],
+        validation=report, unsupported=built.get("unsupported") or [], recalculated=False,
+        rows=built.get("rows") or 0, name=name, view=None, lightweight=False,
+        summary=text, plan={"source": plan.get("source"), "llm_error": plan.get("llm_error"),
+                            "warnings": (plan.get("warnings") or [])[:40], "sheets": plan["sheets"]},
+        flow=understand.flow_text(wmap, limit=6000), facts=facts,
+    )
+    delivery.notify_ready(ready)
+    excel_jobs._audit({"at": excel_jobs._now(), "type": "excel_job_ready", "job_id": job_id,
+                       "history_id": built.get("history_id"), "user": job.get("user"),
+                       "tenant": job.get("tenant"), "rows": built.get("rows"), "plan_source": plan.get("source")})
     return ready

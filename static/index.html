@@ -1636,6 +1636,8 @@ async function loadInsights() {
 function excelJobAnswer(job) {
   if (!job) return 'Excel job missing.';
   if (job.status === 'failed' || job.error) return job.error || 'Excel job failed.';
+  const link = job.history_id ? `\n\nDownload: [/api/reports/history/${job.history_id}/download](/api/reports/history/${job.history_id}/download)` : '';
+  if (job.summary) return job.summary + link;
   const sheets = job.sheets || [];
   const filled = sheets.filter(s => s.role === 'filled');
   const kept = sheets.filter(s => s.role === 'kept');

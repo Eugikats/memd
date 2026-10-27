@@ -305,6 +305,20 @@ def _job_finished_answer(job):
     kept = [s for s in sheets if s.get("role") == "kept"]
     matched = job.get("matched") or []
     unmatched = job.get("unmatched") or []
+    if job.get("summary"):
+        text = job["summary"]
+        if job.get("history_id"):
+            text += (f"\n\nDownload: [/api/reports/history/{job['history_id']}/download]"
+                     f"(/api/reports/history/{job['history_id']}/download)")
+        return {"mode": "agent", "answer": text,
+                "tool_calls": [{"tool": "excel_job_status", "input": {"job_id": job.get("id")}}],
+                "table": None,
+                "steps": [{"label": "Excel rebuild ready",
+                           "detail": f"history_id={job.get('history_id')}, refreshed="
+                                     f"{', '.join(s.get('name', '') for s in filled[:8])}"}],
+                "actions": [], "ui": {"view": "reports", "filters": {}},
+                "excel_job": {"id": job.get("id"), "status": "ready", "progress": 100,
+                              "history_id": job.get("history_id")}}
     # Descriptive-only matches (e.g. Description) are not a full planning pack
     planningish = re.compile(
         r"item|stock|inventory|cover|qty|quantity|usage|cons|status|transit|incoming|order", re.I)

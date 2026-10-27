@@ -49,10 +49,15 @@ class BCClient:
 
     def _get(self, url, params=None):
         for attempt in range(6):
-            r = self.session.get(url, params=params, timeout=180, headers={
-                "Authorization": f"Bearer {self.token()}",
-                "Prefer": "odata.maxpagesize=20000",
-                "Accept": "application/json"})
+            try:
+                r = self.session.get(url, params=params, timeout=180, headers={
+                    "Authorization": f"Bearer {self.token()}",
+                    "Prefer": "odata.maxpagesize=20000",
+                    "Accept": "application/json"})
+            except (requests.ConnectionError, requests.Timeout):
+                # Long ledger pulls occasionally drop mid-page; retry the same page.
+                time.sleep(min(2 ** attempt * 2, 60))
+                continue
             if r.status_code in (429, 500, 502, 503, 504):
                 wait = int(r.headers.get("Retry-After", 2 ** attempt * 2))
                 time.sleep(min(wait, 60))

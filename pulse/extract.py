@@ -20,9 +20,29 @@ def save(name, rows):
     return len(rows)
 
 
+HISTORY_DAYS = 365
+HISTORY_FIELDS = ("Entry_No,Entry_Type,Item_No,Location_Code,Posting_Date,Quantity,Document_No,Document_Type,"
+                  "Item_Description,Item_Category_Code,Remaining_Quantity,Open,Cost_Amount_Actual,Sales_Amount_Actual")
+MOVEMENT_KEYS = ("Entry_No", "Entry_Type", "Item_No", "Location_Code", "Posting_Date", "Quantity", "Document_No")
+
+
+def pull_history(bc, days=HISTORY_DAYS):
+    """12 months of item ledger entries: monthly history for templates and Excel ledger dumps."""
+    since = (date.today() - timedelta(days=days)).isoformat()
+    return bc.odata("ItemLedgerEntries", {"$filter": f"Posting_Date ge {since}", "$select": HISTORY_FIELDS})
+
+
 def run(days=90):
     bc = BCClient()
     since = (date.today() - timedelta(days=days)).isoformat()
+    history = {}
+
+    def movements():
+        # One 12-month pull; the reporting window (cover math) uses only the last `days` of it.
+        rows = pull_history(bc, max(days, HISTORY_DAYS))
+        history["rows"] = rows
+        return [{k: r.get(k) for k in MOVEMENT_KEYS} for r in rows if str(r.get("Posting_Date") or "") >= since]
+
     print(f"Company: {bc.company_name}  ({bc.env})")
     jobs = [
         ("items", lambda: bc.api("items", {"$select": "number,displayName,type,itemCategoryCode,"
@@ -35,9 +55,8 @@ def run(days=90):
             "$filter": "Open eq true",
             "$select": "Entry_No,Item_No,Location_Code,Posting_Date,Remaining_Quantity,Entry_Type"})),
         # Movements over the reporting window drive consumption and demand rates.
-        ("ile_movements", lambda: bc.odata("ItemLedgerEntries", {
-            "$filter": f"Posting_Date ge {since}",
-            "$select": "Entry_No,Entry_Type,Item_No,Location_Code,Posting_Date,Quantity,Document_No"})),
+        ("ile_movements", movements),
+        ("ile_history", lambda: history.pop("rows", [])),
         ("purchase_lines", lambda: bc.odata("Purchase_Lines_Excel", {
             "$filter": "Document_Type eq 'Order' and Type eq 'Item' and Outstanding_Quantity gt 0",
             "$select": "Document_No,Line_No,Buy_from_Vendor_No,Buy_from_Vendor_Name,No,Description,"
@@ -49,7 +68,8 @@ def run(days=90):
                        "Unit_of_Measure_Code,Scrap_Percent"})),
     ]
     log = {"started": datetime.now().isoformat(timespec="seconds"), "company": bc.company_name,
-           "environment": bc.env, "window_days": days, "since": since, "tables": {}}
+           "environment": bc.env, "window_days": days, "since": since,
+           "history_days": max(days, HISTORY_DAYS), "tables": {}}
     for name, fn in jobs:
         t = time.time()
         print(f"  {name} ...", flush=True)

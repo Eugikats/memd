@@ -25,7 +25,8 @@ _MODEL_GETTER = None  # set by app: lambda: STATE["model"]
 _STALE_QUEUED_SEC = 5
 
 
-STATES = ("queued", "extracting", "indexing", "rebuilding", "validating", "ready", "failed")
+STATES = ("queued", "extracting", "indexing", "planning", "rebuilding", "validating", "summarising", "ready",
+          "failed")
 
 
 def set_model_getter(fn):
