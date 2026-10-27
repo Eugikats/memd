@@ -389,10 +389,6 @@ dl dt { font-weight: 600; margin-top: 12px; } dl dd { margin: 2px 0 0; color: va
   .topbar .when b { font-size: 13px; } .topbar .when a { font-size: 11.5px; }
   main { padding: 12px 14px 88px; }
   html, body, .app, .shell { overflow-x: hidden; max-width: 100%; }
-  .inv-head { flex-wrap: wrap; align-items: stretch; }
-  .inv-head .sec-tabs { max-width: 100%; width: 100%; }
-  .inv-head .inv-actions, .page-tools { width: 100%; margin-left: 0; flex-wrap: wrap; }
-  .page-tools { flex-direction: column; align-items: stretch; }
   .inv-filters select { min-width: 0; flex: 1 1 140px; }
   .inv-tablehead .rbtns, body.page-inv .tablehead.inv-tablehead .rbtns { flex-wrap: wrap; width: 100%; }
   .vhead { gap: 10px; } .vhead h1 { font-size: 23px; } .vhead p { font-size: 14px; }
@@ -703,6 +699,17 @@ body.page-inv .tablehead.inv-tablehead .rbtns { width: auto; }
   .post-axis span:last-child { display: none; }
   .inv-donut { grid-template-columns: 1fr; }
   .inv-actions .btn { flex: 1; justify-content: center; }
+}
+@media (max-width: 900px) {
+  .inv-head { flex-wrap: wrap; align-items: stretch; }
+  .inv-head .sec-tabs, .page-tools .sec-tabs, .vhead .sec-tabs {
+    display: flex; flex: 1 1 100%; width: 100%; max-width: 100%; min-width: 0; overflow-x: auto;
+  }
+  .inv-head .inv-actions { width: 100%; margin-left: 0; flex: 1 1 100%; flex-wrap: wrap; }
+  .page-tools, .vhead .page-tools {
+    flex: 1 1 100%; width: 100%; min-width: 0; margin-left: 0;
+    flex-direction: column; align-items: stretch; justify-content: flex-start;
+  }
 }
 </style>
 </head>
