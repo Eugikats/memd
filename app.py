@@ -374,7 +374,8 @@ def document_upload():
     except ValueError as e:
         return _json({"error": str(e)}, 400)
     except Exception as e:
-        return _json({"error": f"Could not read that file ({type(e).__name__})."}, 400)
+        detail = str(e).strip().splitlines()[0][:120]
+        return _json({"error": f"Could not read that file ({type(e).__name__}{': ' + detail if detail else ''})."}, 400)
     return _json(saved)
 
 

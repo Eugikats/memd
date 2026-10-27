@@ -47,44 +47,104 @@ def _is_formula(value):
     return isinstance(value, str) and value.startswith("=")
 
 
-def _loose_formulas(ws):
-    found = []
-    for r in range(1, min(ws.max_row or 1, 20) + 1):
-        for c in range(1, min(ws.max_column or 1, 8) + 1):
-            value = ws.cell(r, c).value
+def _looks_like_xlsx(data):
+    return isinstance(data, (bytes, bytearray)) and len(data) >= 4 and data[:2] == b"PK"
+
+
+def _xlsx_zip_fallback(data):
+    """Sheet names only — used when openpyxl cannot open a complex workbook on upload."""
+    import zipfile
+    from xml.etree import ElementTree as ET
+    if not _looks_like_xlsx(data):
+        raise ValueError("That Excel file could not be opened.")
+    names = []
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        if "[Content_Types].xml" not in zf.namelist():
+            raise ValueError("That Excel file could not be opened.")
+        if "xl/workbook.xml" in zf.namelist():
+            root = ET.fromstring(zf.read("xl/workbook.xml"))
+            for el in root.iter():
+                if el.tag.endswith("sheet") and el.attrib.get("name"):
+                    names.append(el.attrib["name"])
+    chunks = [f"# Sheet {n}\nKept as laid out." for n in (names or ["Workbook"])]
+    text = _trim("\n\n".join(chunks) + "\n\nCached formula results are not inventory figures.")
+    return text, []
+
+
+def _xlsx_describe_rows(title, matrix):
+    """matrix is a list of row tuples from the first rows of a sheet."""
+    header_idx, labels = None, []
+    for i, row in enumerate(matrix[:15]):
+        found = []
+        for c, value in enumerate(row[:40], start=1):
+            if isinstance(value, str) and value.strip() and not _is_formula(value):
+                found.append((c, value.strip()))
+        if len(found) >= 2:
+            header_idx, labels = i, found
+            break
+    if header_idx is None:
+        loose = [v for row in matrix[:20] for v in row[:8] if _is_formula(v)][:4]
+        lines = [f"# Sheet {title} (kept as formulas)"]
+        for sample in loose:
+            lines.append(f"Calculated cell: {_formula_note(sample)}. Example: {sample}")
+        if len(lines) == 1:
+            lines.append("Kept as laid out.")
+        return "\n".join(lines), []
+    inputs, formulas = [], []
+    for col, header in labels:
+        kinds, sample = [], None
+        for row in matrix[header_idx + 1:header_idx + 9]:
+            value = row[col - 1] if col - 1 < len(row) else None
+            if value in (None, ""):
+                continue
             if _is_formula(value):
-                found.append(value)
-                if len(found) >= 4:
-                    return found
-    return found
+                kinds.append("formula")
+                sample = sample or value
+            else:
+                kinds.append("value")
+        if kinds and kinds.count("formula") >= kinds.count("value") and "formula" in kinds:
+            formulas.append((header, sample))
+        else:
+            inputs.append(header)
+    cross = any("!" in str(sample or "") for _, sample in formulas)
+    role = "keep" if formulas and (not inputs or (cross and len(inputs) <= 1)) else "fill"
+    lines = [f"# Sheet {title} ({'kept as formulas' if role == 'keep' else 'data sheet, header row ' + str(header_idx + 1)})"]
+    if inputs:
+        lines.append("Input columns: " + ", ".join(inputs))
+    for header, sample in formulas:
+        lines.append(f"Calculated column {header}: {_formula_note(sample) or 'calculation'}. Example: {sample}")
+    if len(lines) == 1:
+        lines.append("Kept as laid out.")
+    return "\n".join(lines), inputs if role == "fill" else []
 
 
 def _xlsx_describe(data):
-    book = load_workbook(io.BytesIO(data), data_only=False)
+    """Stream the workbook on upload so large planning files do not need a full in-memory load."""
     chunks, headers = [], []
-    for ws in book.worksheets:
-        header_row, labels = _header_row(ws)
-        role, inputs, formulas = _sheet_role(ws, header_row, labels)
-        if not headers and inputs:
-            headers = [h for _, h in inputs]
-        lines = [f"# Sheet {ws.title} ({'kept as formulas' if role == 'keep' else 'data sheet, header row ' + str(header_row)})"]
-        if inputs:
-            lines.append("Input columns: " + ", ".join(h for _, h in inputs))
-        if formulas:
-            for _col, header, sample in formulas:
-                note = _formula_note(sample) or "calculation"
-                lines.append(f"Calculated column {header}: {note}. Example: {sample}")
-        elif role == "keep":
-            for sample in _loose_formulas(ws):
-                lines.append(f"Calculated cell: {_formula_note(sample)}. Example: {sample}")
-        if len(lines) == 1:
-            lines.append("Kept as laid out.")
-        chunks.append("\n".join(lines))
-    book.close()
+    try:
+        book = load_workbook(io.BytesIO(data), read_only=True, data_only=False, keep_links=False)
+    except Exception:
+        return _xlsx_zip_fallback(data)
+    try:
+        for ws in book.worksheets[:40]:
+            try:
+                matrix = []
+                for i, row in enumerate(ws.iter_rows(values_only=True)):
+                    if i >= 40:
+                        break
+                    matrix.append(tuple("" if c is None else c for c in row[:40]))
+                block, sheet_headers = _xlsx_describe_rows(ws.title, matrix)
+                chunks.append(block)
+                if not headers and sheet_headers:
+                    headers = sheet_headers
+            except Exception:
+                chunks.append(f"# Sheet {getattr(ws, 'title', 'Sheet')}\nKept as laid out.")
+    finally:
+        book.close()
     text = _trim("\n\n".join(chunks))
-    if text:
-        text += "\n\nCached formula results are not inventory figures."
-    return text, headers
+    if not text:
+        return _xlsx_zip_fallback(data)
+    return text + "\n\nCached formula results are not inventory figures.", headers
 
 
 def _header_row(ws):
@@ -188,9 +248,20 @@ def extract(name, data):
 
 
 def save(name, data):
-    text, headers = extract(name, data)
+    ext = _ext(name)
+    try:
+        text, headers = extract(name, data)
+    except Exception as e:
+        if ext in ("xlsx", "xlsm") and _looks_like_xlsx(data):
+            text, headers = _xlsx_zip_fallback(data)
+            text = (text or "Excel workbook attached.") + f"\n(Layout summary was limited: {type(e).__name__}.)"
+        else:
+            raise
     if not text:
-        raise ValueError("No text could be read from that file.")
+        if ext in ("xlsx", "xlsm") and _looks_like_xlsx(data):
+            text, headers = _xlsx_zip_fallback(data)
+        else:
+            raise ValueError("No text could be read from that file.")
     now = datetime.now()
     stale = [k for k, v in _STORE.items() if v["at"] < now - timedelta(hours=12)]
     for k in stale:
@@ -198,7 +269,6 @@ def save(name, data):
     while len(_STORE) >= _LIMIT:
         _STORE.pop(next(iter(_STORE)))
     doc_id = uuid.uuid4().hex[:10]
-    ext = _ext(name)
     _STORE[doc_id] = {"id": doc_id, "name": name[:180], "text": text, "headers": headers[:30],
                       "bytes": data, "ext": ext, "at": now}
     return {"id": doc_id, "name": name[:180], "headers": headers[:30], "chars": len(text)}
@@ -291,7 +361,10 @@ def _write_cell(ws, row, col, value):
 
 
 def _fill_xlsx(model, doc, view):
-    book = load_workbook(io.BytesIO(doc["bytes"]), data_only=False)
+    try:
+        book = load_workbook(io.BytesIO(doc["bytes"]), data_only=False, keep_links=False)
+    except Exception as e:
+        return {"error": f"That Excel template could not be opened for refill ({type(e).__name__})."}
     catalog = _catalog(model)
     loaded = {}
     if view and view not in catalog:

@@ -978,7 +978,11 @@ async function takeUpload(file, host) {
   try {
     const res = await fetch('/api/documents', { method: 'POST', body });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.error) throw new Error(data.error || 'Could not read that file.');
+    if (!res.ok || data.error) {
+      const fallback = res.status === 413 ? 'That file is too large for the server.'
+        : res.status ? `Could not read that file (HTTP ${res.status}).` : 'Could not read that file.';
+      throw new Error(data.error || fallback);
+    }
     S.uploads = [...(S.uploads || []).filter(d => d.id !== localId && d.id !== data.id), data].slice(-4);
     paintUploads();
     row.innerHTML = `<div class="answer">Attached ${esc(data.name)}.</div>`;
