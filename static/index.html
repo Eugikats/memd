@@ -488,7 +488,9 @@ body.page-inv #topAvatar { display: none; }
 .sec-tabs button { border: 0; background: transparent; color: #64748b; font: inherit; font-size: 12px; font-weight: 500; line-height: 1.2; padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
 .sec-tabs button.on { background: rgba(23, 105, 255, .12); color: #1769FF; box-shadow: 0 0 0 1px rgba(23, 105, 255, .35), 0 0 12px rgba(23, 105, 255, .25); }
 .sec-tabs button:hover:not(.on) { background: #f8fafc; color: #334155; }
-.sec-tabs.rm-tabs { max-width: calc(100% - 280px); }
+.rm-head { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 14px; }
+.rm-head .inv-actions { margin-left: 0; align-self: flex-end; }
+.sec-tabs.rm-tabs { display: flex; flex-wrap: wrap; width: 100%; max-width: 100%; overflow: visible; gap: 4px; }
 .sec-tabs.rm-tabs button { color: var(--tone, #64748b); }
 .sec-tabs.rm-tabs button::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--tone, #94a3b8); display: inline-block; margin-right: 6px; vertical-align: 1px; }
 .sec-tabs.rm-tabs button.on { background: color-mix(in srgb, var(--tone, #1769FF) 16%, white); color: var(--tone, #1769FF); box-shadow: 0 0 0 1px color-mix(in srgb, var(--tone, #1769FF) 45%, white); }
@@ -2914,20 +2916,27 @@ function renderRmPlanning(c, d) {
     return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${esc(String(fmt(k.value, k.kind)))}</p>${cipSpark(k.spark, face.fg, k.label)}</div></article>`;
   }).join('');
-  const tone = { Planning: '#2563eb', Stock: '#059669', Consumption: '#d97706', 'Forecast and recipe': '#7c3aed', Reference: '#0f766e' };
-  const tabs = (d.rm_sheets || []).map(s => `<button type="button" role="tab" data-sheet="${esc(s.id)}" class="${s.id === d.sheet ? 'on' : ''}" aria-selected="${s.id === d.sheet}" title="${esc(s.group)}" style="--tone:${tone[s.group] || '#64748b'}">${esc(s.title)}</button>`).join('');
+  const tone = {
+    MRP: '#1d4ed8', 'Resin Material': '#2563eb', Masterbatch: '#3b82f6', 'Local & Others': '#0ea5e9',
+    RISKS: '#0369a1', 'Milk and crates': '#1e40af', Others: '#0284c7', 'All Purchase Plans': '#60a5fa',
+    'Local Purchase': '#38bdf8', Stock: '#059669', 'Consmptn Dump': '#d97706', 'Pivot Tables': '#ea580c',
+    Sheet6: '#b45309', 'RM MATRIX': '#7c3aed', 'Projected Sales ': '#9333ea', 'Sales FY26': '#6d28d9',
+    'Sales rev. forecast mar.': '#a855f7', Alternatives: '#0f766e', KEY: '#0d9488', Intransit: '#14b8a6',
+    'my sheet': '#115e59', Sheet1: '#134e4a',
+  };
+  const tabs = (d.rm_sheets || []).map(s => `<button type="button" role="tab" data-sheet="${esc(s.id)}" class="${s.id === d.sheet ? 'on' : ''}" aria-selected="${s.id === d.sheet}" title="${esc(s.group)}" style="--tone:${tone[s.id] || '#64748b'}">${esc(s.title)}</button>`).join('');
   const charts = d.charts || [];
-  const card = (ch, id, wide) => ch ? `<section class="card inv-card${wide ? ' span-2' : ''}"><div class="inv-ch-head"><div><h3>${esc(ch.title)}</h3>${ch.subtitle ? `<p>${esc(ch.subtitle)}</p>` : ''}</div></div><div class="chartbox" style="height:${ch.height || 280}px"><canvas id="${id}"></canvas></div></section>` : '';
+  const card = (ch, id, wide) => ch ? `<section class="card inv-card${wide ? ' span-2' : ''}"><div class="inv-ch-head"><div><h3>${esc(ch.title)}</h3></div></div><div class="chartbox" style="height:${ch.height || 280}px"><canvas id="${id}"></canvas></div></section>` : '';
   const byTitle = re => charts.find(ch => re.test(ch.title));
   const cons = byTitle(/monthly consumption/i);
   const cover = byTitle(/cover position/i);
   const orders = byTitle(/suggested orders/i);
   const locs = byTitle(/SUM RM locations/i);
   c.innerHTML = `<div class="inv-page">
-    <div class="inv-head"><div class="sec-tabs rm-tabs" role="tablist" aria-label="Raw material sheets">${tabs}</div>
-      <div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
+    <div class="rm-head"><div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
       <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
-      <button class="btn primary" id="exportRm">${svg('download', 14)} Export</button></div></div>
+      <button class="btn primary" id="exportRm">${svg('download', 14)} Export</button></div>
+      <div class="sec-tabs rm-tabs" role="tablist" aria-label="Raw material sheets">${tabs}</div></div>
     ${invFilters()}
     <div class="inv-kpis">${kpis}</div>
     <div class="inv-topcharts">${card(cons, 'chRmCons', true)}${card(cover, 'chRmCover')}</div>
@@ -2945,17 +2954,7 @@ function renderRmPlanning(c, d) {
     catch (e) { el.parentElement.innerHTML = `<div class="muted">Chart unavailable (${esc(e.message)})</div>`; }
   };
   put('chRmCons', cons); put('chRmCover', cover); put('chRmOrders', orders); put('chRmLocs', locs);
-  (d.tables || []).forEach((t, i) => {
-    const host = document.getElementById('tb' + i);
-    if (t.subtitle) {
-      const note = document.createElement('p');
-      note.className = 'muted';
-      note.style.cssText = 'margin:0 0 8px;font-size:12.5px';
-      note.textContent = t.subtitle;
-      host.before(note);
-    }
-    renderTable(host, t, { variant: 'inventory', size: 10, search: 'Search item, description, location…' });
-  });
+  (d.tables || []).forEach((t, i) => renderTable(document.getElementById('tb' + i), t, { variant: 'inventory', size: 10, search: 'Search item, description, location…' }));
   if (d.tables && d.tables[0]) document.getElementById('exportRm').onclick = () => exportCsv(d.tables[0]);
 }
 

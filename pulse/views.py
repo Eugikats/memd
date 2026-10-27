@@ -28,8 +28,7 @@ VIEWS = [
      "What can be produced from available/incoming RM and WIP, and which components constrain production?"),
     ("11", "exceptions", "Supply Chain Exceptions",
      "What needs management attention across stockouts, low cover, overdue receipts, locations and production?"),
-    ("12", "rm_planning", "Raw Material Planning",
-     "What should we order, from the same sheets and formulas as the raw-material planning workbook?"),
+    ("12", "rm_planning", "Raw Material Planning", ""),
 ]
 VIEW_IDS = {v[1] for v in VIEWS}
 
