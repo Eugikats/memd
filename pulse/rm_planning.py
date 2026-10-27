@@ -385,9 +385,15 @@ def compute(model):
     by_item, by_desc = _index(mrp)
     names = model["items"].set_index("item_no").description.to_dict()
     classes = model["items"].set_index("item_no").item_class.to_dict()
+    sl = model["stock_loc"]
+    at_site, at_loc = {}, {}
+    if len(sl):
+        for item_no, site, loc in zip(sl.item_no, sl.site.fillna(""), sl.location.fillna("")):
+            at_site.setdefault(item_no, set()).add(str(site))
+            at_loc.setdefault(item_no, set()).add(str(loc).strip())
     built = {"pack": pack, "mrp": mrp, "by_item": by_item, "by_desc": by_desc, "months": months,
              "by_item_m": by_item_m, "by_desc_m": by_desc_m, "stock": stock, "names": names,
-             "classes": classes}
+             "classes": classes, "at_site": at_site, "at_loc": at_loc}
     _CACHE.clear()
     _CACHE[key] = built
     return built
@@ -675,39 +681,35 @@ def _headline(built):
         V.chart("bar", "Stock on the SUM RM locations", list(loc_qty),
                 [("On hand", "RM", list(loc_qty.values()))], "qty"),
     ]
-    insights = [
-        V.insight("info", f"{len(rows)} items on the MRP list. Inventory is the workbook's SUM RM "
-                          f"({stock:,.0f}), not stock at every location."),
-        V.insight("critical", f"{critical} active items have 29 days of cover or less.") if critical else
-        V.insight("good", "No active MRP item is at 29 days of cover or less."),
-        V.insight("info", "Forecasts, the resin recipe, alternatives and the shipment tracker are the planner's "
-                          "own inputs from the workbook. Stock, consumption and open orders are Business Central."),
-    ]
-    return kpis, charts, insights
+    return kpis, charts
 
 
 def render(model, filters=None):
     filters = filters or {}
     built = compute(model)
     sheet = filters.get("sheet") or "MRP"
-    known = {sid for _g, sid, _k in SHEETS}
+    known = {sid for _g, _title, sid in SHEETS}
     if sheet not in known:
         sheet = "MRP"
-    kpis, charts, insights = _headline(built)
+    kpis, charts = _headline(built)
     table = sheet_table(built, sheet)
-    table["rows_all"] = None
-    table_rows = []
-    # Filter the materialized rows. Rebuild from records would be heavier; filter the clean rows.
     classes = built["classes"]
     rows = table["rows"]
     cls = filters.get("item_class")
+    site = filters.get("site")
+    loc = (filters.get("location") or "").strip()
     q = (filters.get("q") or "").strip().lower()
-    if cls or q:
+    if cls or site or loc or q:
         kept = []
         for r in rows:
             item = r.get("item_no")
-            if cls and item and classes.get(item) not in (None, cls):
-                continue
+            if item:
+                if cls and classes.get(item) not in (None, cls):
+                    continue
+                if site and site not in built["at_site"].get(item, ()):
+                    continue
+                if loc and loc not in built["at_loc"].get(item, ()):
+                    continue
             if q and not any(q in str(v).lower() for v in r.values() if v not in (None, "")):
                 continue
             kept.append(r)
@@ -717,8 +719,8 @@ def render(model, filters=None):
     table["total_rows"] = len(rows)
     return {
         "id": "rm_planning", "no": "12", "title": "Raw Material Planning",
-        "question": "What should we order, from the same sheets and formulas as the raw-material planning workbook?",
-        "kpis": kpis, "insights": insights, "charts": charts,
+        "question": "",
+        "kpis": kpis, "insights": [], "charts": charts,
         "tables": [table], "sheet": sheet,
         "rm_sheets": [{"group": g, "id": sid, "title": title} for g, title, sid in SHEETS],
     }

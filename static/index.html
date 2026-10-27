@@ -488,8 +488,11 @@ body.page-inv #topAvatar { display: none; }
 .sec-tabs button { border: 0; background: transparent; color: #64748b; font: inherit; font-size: 12px; font-weight: 500; line-height: 1.2; padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
 .sec-tabs button.on { background: rgba(23, 105, 255, .12); color: #1769FF; box-shadow: 0 0 0 1px rgba(23, 105, 255, .35), 0 0 12px rgba(23, 105, 255, .25); }
 .sec-tabs button:hover:not(.on) { background: #f8fafc; color: #334155; }
-.rm-sheets { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
-.rm-sheets .sec-tabs { width: 100%; max-width: 100%; }
+.sec-tabs.rm-tabs { max-width: calc(100% - 280px); }
+.sec-tabs.rm-tabs button { color: var(--tone, #64748b); }
+.sec-tabs.rm-tabs button::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--tone, #94a3b8); display: inline-block; margin-right: 6px; vertical-align: 1px; }
+.sec-tabs.rm-tabs button.on { background: color-mix(in srgb, var(--tone, #1769FF) 16%, white); color: var(--tone, #1769FF); box-shadow: 0 0 0 1px color-mix(in srgb, var(--tone, #1769FF) 45%, white); }
+.sec-tabs.rm-tabs button:hover:not(.on) { background: color-mix(in srgb, var(--tone, #64748b) 8%, white); }
 .inv-head .sec-tabs { flex: 0 1 auto; width: max-content; max-width: calc(100% - 280px); }
 .inv-head .inv-actions { margin-left: auto; flex: none; }
 .set-overlay { position: fixed; inset: 0; z-index: 60; background: rgba(15, 23, 42, .3); display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -2909,16 +2912,10 @@ function renderRmPlanning(c, d) {
   const kpis = (d.kpis || []).map(k => {
     const face = faces[k.label] || { icon: 'chart', fg: '#475569' };
     return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
-      <div class="inv-kpi-row"><p class="inv-kpi-v">${esc(String(fmt(k.value, k.kind)))}</p>${cipSpark(k.spark, face.fg, k.label)}</div>
-      ${k.note ? `<p class="muted" style="margin:6px 0 0;font-size:12px">${esc(k.note)}</p>` : ''}</article>`;
+      <div class="inv-kpi-row"><p class="inv-kpi-v">${esc(String(fmt(k.value, k.kind)))}</p>${cipSpark(k.spark, face.fg, k.label)}</div></article>`;
   }).join('');
-  const groups = [];
-  (d.rm_sheets || []).forEach(s => {
-    let g = groups.find(x => x.name === s.group);
-    if (!g) { g = { name: s.group, sheets: [] }; groups.push(g); }
-    g.sheets.push(s);
-  });
-  const tabs = groups.map(g => `<div class="sec-tabs" role="tablist" aria-label="${esc(g.name)}">${g.sheets.map(s => `<button type="button" role="tab" data-sheet="${esc(s.id)}" class="${s.id === d.sheet ? 'on' : ''}" aria-selected="${s.id === d.sheet}" title="${esc(g.name)}">${esc(s.title)}</button>`).join('')}</div>`).join('');
+  const tone = { Planning: '#2563eb', Stock: '#059669', Consumption: '#d97706', 'Forecast and recipe': '#7c3aed', Reference: '#0f766e' };
+  const tabs = (d.rm_sheets || []).map(s => `<button type="button" role="tab" data-sheet="${esc(s.id)}" class="${s.id === d.sheet ? 'on' : ''}" aria-selected="${s.id === d.sheet}" title="${esc(s.group)}" style="--tone:${tone[s.group] || '#64748b'}">${esc(s.title)}</button>`).join('');
   const charts = d.charts || [];
   const card = (ch, id, wide) => ch ? `<section class="card inv-card${wide ? ' span-2' : ''}"><div class="inv-ch-head"><div><h3>${esc(ch.title)}</h3>${ch.subtitle ? `<p>${esc(ch.subtitle)}</p>` : ''}</div></div><div class="chartbox" style="height:${ch.height || 280}px"><canvas id="${id}"></canvas></div></section>` : '';
   const byTitle = re => charts.find(ch => re.test(ch.title));
@@ -2927,17 +2924,16 @@ function renderRmPlanning(c, d) {
   const orders = byTitle(/suggested orders/i);
   const locs = byTitle(/SUM RM locations/i);
   c.innerHTML = `<div class="inv-page">
-    <div class="inv-head"><div class="sec-tabs" role="tablist"><button type="button" class="on" aria-selected="true">Raw Material Planning</button></div>
+    <div class="inv-head"><div class="sec-tabs rm-tabs" role="tablist" aria-label="Raw material sheets">${tabs}</div>
       <div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
       <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
       <button class="btn primary" id="exportRm">${svg('download', 14)} Export</button></div></div>
-    <p class="muted" style="margin:4px 0 0">${esc(d.question || '')}</p>
-    ${insightsHTML(d.insights)}
+    ${invFilters()}
     <div class="inv-kpis">${kpis}</div>
     <div class="inv-topcharts">${card(cons, 'chRmCons', true)}${card(cover, 'chRmCover')}</div>
     <div class="inv-charts2">${card(orders, 'chRmOrders', true)}${card(locs, 'chRmLocs')}</div>
-    <div class="rm-sheets">${tabs}</div>
     ${(d.tables || []).map((t, i) => `<div class="card tablecard inv-table" id="tb${i}"></div>`).join('')}</div>`;
+  bindFilters();
   document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Summarise raw material planning: what should we order and which items are critical?'), 50); };
   document.getElementById('pdfThis').onclick = () => window.print();
   c.querySelectorAll('[data-sheet]').forEach(b => b.onclick = () => { rmSheet = b.dataset.sheet; go('rm_planning', true); });
