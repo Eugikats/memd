@@ -571,6 +571,12 @@ body.page-inv #topAvatar { display: none; }
 .inv-filterpop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 8; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 8px 24px rgba(15, 23, 42, .08); padding: 12px; min-width: 220px; }
 .inv-filterpop label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600; color: #64748b; }
 .inv-filterpop select { height: 36px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0 8px; font: inherit; color: #14213D; background: #fff; }
+.inv-filters .inv-seg { flex: none; }
+.rm-sheetpop { display: flex; flex-direction: column; gap: 2px; max-height: 320px; overflow: auto; min-width: 240px; padding: 8px; }
+.rm-sheetpop button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; text-align: left; padding: 7px 8px; border-radius: 8px; font: inherit; color: #14213D; cursor: pointer; }
+.rm-sheetpop button.on, .rm-sheetpop button:hover { background: color-mix(in srgb, var(--tone, #64748b) 14%, #fff); }
+.rm-sheetpop button i { width: 8px; height: 8px; border-radius: 50%; background: var(--tone, #64748b); flex: none; }
+.chartbox canvas, .heat-t td, .post-row, .post-bub { cursor: pointer; }
 .inv-trend-tools { display: flex; align-items: center; gap: 8px; flex: none; }
 .inv-trend-tools select { height: 32px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0 8px; font: inherit; font-size: 12px; font-weight: 600; color: #334155; background: #fff; }
 .inv-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
@@ -1944,50 +1950,95 @@ function postingRows(items) {
 }
 function postColor(row, i) { return row.label === 'Others' ? '#94a3b8' : POST_PALETTE[i % POST_PALETTE.length]; }
 function drawPosting(host, items, mode, subject) {
-  const pack = postingRows(items);
+  const asQty = pageMeasure === 'qty' && (items || []).some(x => x && x.qty != null);
+  const src = asQty ? items.map(x => Object.assign({}, x, { value: x.qty })) : items;
+  const kind = asQty ? 'qty' : 'money';
+  const unitLabel = asQty ? '' : ' UGX';
+  const pack = postingRows(src);
   const rows = pack.rows;
   const total = rows.reduce((s, x) => s + (Number(x.value) || 0), 0) || 1;
-  const ofWhat = subject || 'posting-group value';
+  const ofWhat = subject || (asQty ? 'quantity' : 'posting-group value');
   if (mode === 'bubble') {
     host.innerHTML = `<div class="post-bubbles">${rows.map((r, i) => {
       const size = Math.round(54 + Math.sqrt((Number(r.value) || 0) / total) * 150);
       const stroke = postColor(r, i);
-      const label = size >= 78 ? `<b>${esc(r.label)}</b><span>${fmt(r.value, 'money')}</span>` : `<b>${esc(fmt(r.value, 'money'))}</b>`;
-      return `<div class="post-bub" style="width:${size}px;height:${size}px;background:radial-gradient(circle at 32% 28%, ${mixWhite(stroke, .62)}, ${stroke} 58%, ${shadeHex(stroke, .8)});color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.45)" title="${esc(r.label)}: ${fmt(r.value, 'money')} UGX (${(100 * r.value / total).toFixed(1)}% of ${esc(ofWhat)})">${label}</div>`;
+      const label = size >= 78 ? `<b>${esc(r.label)}</b><span>${fmt(r.value, kind)}</span>` : `<b>${esc(fmt(r.value, kind))}</b>`;
+      return `<div class="post-bub" data-i="${i}" style="width:${size}px;height:${size}px;background:radial-gradient(circle at 32% 28%, ${mixWhite(stroke, .62)}, ${stroke} 58%, ${shadeHex(stroke, .8)});color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.45)" title="${esc(r.label)}: ${fmt(r.value, kind)}${unitLabel} (${(100 * r.value / total).toFixed(1)}% of ${esc(ofWhat)})">${label}</div>`;
     }).join('')}</div>`;
+    host.querySelectorAll('[data-i]').forEach(el => { el.onclick = () => { const r = rows[+el.dataset.i]; if (r) openPointCard({ title: subject || 'Distribution', label: r.label, value: r.value, unit: asQty ? '' : 'UGX' }); }; });
     return null;
   }
   if (mode === 'treemap') {
     host.innerHTML = '<canvas id="chPost"></canvas>';
     return drawChart(host.querySelector('canvas'), {
-      type: 'treemap', unit: 'UGX', palette: INV_PALETTE, quiet: true, glassy: true,
+      type: 'treemap', title: subject || 'Distribution', unit: asQty ? '' : 'UGX', palette: INV_PALETTE, quiet: true, glassy: true,
       extra: { items: rows.map(r => ({ label: r.label, value: r.value, group: r.group || r.label })) },
     });
   }
   const max = Math.max(...rows.map(r => Number(r.value) || 0), 1);
   const axisTop = (() => { const p = Math.pow(10, Math.floor(Math.log10(max))); const n = max / p; const s = n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10; return s * p; })();
-  const ticks = [0, .25, .5, .75, 1].map(t => fmt(axisTop * t, 'money'));
+  const ticks = [0, .25, .5, .75, 1].map(t => fmt(axisTop * t, kind));
   host.innerHTML = `<div class="post-bars">${rows.map((r, i) => {
     const share = (100 * (Number(r.value) || 0) / total).toFixed(1);
     const stroke = postColor(r, i);
-    return `<div class="post-row" title="${esc(r.label)}: ${fmt(r.value, 'money')} UGX (${share}% of ${esc(ofWhat)})"><span class="post-name">${esc(r.label)}</span><span class="post-track"><span style="width:${Math.max(2, 100 * r.value / axisTop)}%;background:${glassCss(stroke)}"></span></span><span class="post-val">${fmt(r.value, 'money')} <em>(${share}%)</em></span></div>`;
+    return `<div class="post-row" data-i="${i}" title="${esc(r.label)}: ${fmt(r.value, kind)}${unitLabel} (${share}% of ${esc(ofWhat)})"><span class="post-name">${esc(r.label)}</span><span class="post-track"><span style="width:${Math.max(2, 100 * r.value / axisTop)}%;background:${glassCss(stroke)}"></span></span><span class="post-val">${fmt(r.value, kind)} <em>(${share}%)</em></span></div>`;
   }).join('')}<div class="post-axis"><span></span><span class="post-ticks">${ticks.map(t => `<span>${t}</span>`).join('')}</span><span></span></div></div>`;
+  host.querySelectorAll('[data-i]').forEach(el => { el.onclick = () => { const r = rows[+el.dataset.i]; if (r) openPointCard({ title: subject || 'Distribution', label: r.label, value: r.value, unit: asQty ? '' : 'UGX' }); }; });
   return null;
 }
 let invDonutMode = 'value';
 let invTrendMetric = 'total';
 let invTrendMonths = 12;
 let rmSheet = 'MRP';
+let pageMeasure = 'value';
+const RM_TONE = {
+  MRP: '#1d4ed8', 'Resin Material': '#2563eb', Masterbatch: '#3b82f6', 'Local & Others': '#0ea5e9',
+  RISKS: '#0369a1', 'Milk and crates': '#1e40af', Others: '#0284c7', 'All Purchase Plans': '#60a5fa',
+  'Local Purchase': '#38bdf8', Stock: '#059669', 'Consmptn Dump': '#d97706', 'Pivot Tables': '#ea580c',
+  Sheet6: '#b45309', 'RM MATRIX': '#7c3aed', 'Projected Sales ': '#9333ea', 'Sales FY26': '#6d28d9',
+  'Sales rev. forecast mar.': '#a855f7', Alternatives: '#0f766e', KEY: '#0d9488', Intransit: '#14b8a6',
+  'my sheet': '#115e59', Sheet1: '#134e4a',
+};
 function invFilters() {
   const f = S.filters, m = S.meta;
   const locs = m.locations || [];
+  const sheets = S.view === 'rm_planning' ? (S.rmSheets || []) : [];
+  const current = sheets.find(s => s.id === rmSheet);
+  const sheet = sheets.length ? `<div class="inv-filterwrap"><button type="button" class="btn inv-filterbtn" id="f_sheet"><i style="width:8px;height:8px;border-radius:50%;background:${RM_TONE[rmSheet] || '#64748b'};display:inline-block"></i> ${esc(current ? current.title : rmSheet)}</button>
+      <div class="inv-filterpop rm-sheetpop" id="f_sheetpop" hidden>${sheets.map(s => `<button type="button" data-sheet="${esc(s.id)}" class="${s.id === rmSheet ? 'on' : ''}" style="--tone:${RM_TONE[s.id] || '#64748b'}"><i></i>${esc(s.title)}</button>`).join('')}</div></div>` : '';
+  const measure = pageMeasure === 'qty' ? 'qty' : 'value';
   return `<div class="filters inv-filters">
     <select id="f_class"><option value="">All classes</option>${['RM', 'WIP', 'FG'].map(c => `<option ${f.item_class === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
     <select id="f_site"><option value="">All sites</option>${m.sites.map(s => `<option ${f.site === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
+    ${sheet}
     <label class="inv-search">${svg('search', 15)}<input id="f_q" placeholder="Search item, description, vendor, posting group…" value="${esc(f.q)}"></label>
+    <div class="seg inv-seg" id="f_measure"><button type="button" data-measure="value" class="${measure === 'value' ? 'on' : ''}">Value</button><button type="button" data-measure="qty" class="${measure === 'qty' ? 'on' : ''}">Quantity</button></div>
     <div class="inv-filterwrap"><button type="button" class="btn inv-filterbtn" id="f_filters">${svg('lines', 14)} Filters</button>
       <div class="inv-filterpop" id="f_pop" hidden><label>Location<select id="f_loc"><option value="">All locations</option>${locs.map(s => `<option ${f.location === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></label></div></div>
     <button class="btn ghost" id="f_clear">Clear</button></div>`;
+}
+function shownView(d) {
+  if (!d) return d;
+  S.pageTables = d.tables || [];
+  if (d.rm_sheets) S.rmSheets = d.rm_sheets;
+  if (pageMeasure !== 'qty') return d;
+  return Object.assign({}, d, {
+    kpis: (d.kpis || []).map(k => k.qty == null ? k : Object.assign({}, k, { value: k.qty, kind: 'qty' })),
+  });
+}
+function applyChartMeasure(ch) {
+  if (!ch || pageMeasure !== 'qty') return ch;
+  const ex = ch.extra || {};
+  if (Array.isArray(ex.quantity_series) && ch.series && ex.quantity_series.length === ch.series.length) {
+    return Object.assign({}, ch, { unit: '', series: ch.series.map((s, i) => Object.assign({}, s, { data: ex.quantity_series[i] })) });
+  }
+  if (Array.isArray(ex.quantity) && ch.series && ch.series.length === 1) {
+    return Object.assign({}, ch, { unit: '', series: [Object.assign({}, ch.series[0], { data: ex.quantity })] });
+  }
+  if (ch.type === 'treemap' && ex.items && ex.items.some(x => x && x.qty != null)) {
+    return Object.assign({}, ch, { unit: '', extra: Object.assign({}, ex, { items: ex.items.map(x => Object.assign({}, x, { value: x.qty != null ? x.qty : x.value })) }) });
+  }
+  return ch;
 }
 function renderInventory(c, d) {
   const faces = {
@@ -2000,7 +2051,8 @@ function renderInventory(c, d) {
   const kpis = (d.kpis || []).map(k => {
     const title = { 'Total RM / WIP / FG value': 'Total Inventory Value', 'Excess / not moving': 'Excess / Not Moving' }[k.label] || k.label;
     const face = faces[title] || { icon: 'chart', bg: '#eef2f7', fg: '#475569' };
-    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(title)}</p>${invRing(k.pct, face.fg)}</div>
+    const shown = k.kind === 'qty' && /value/i.test(title) ? title.replace(/Value/g, 'Quantity') : title;
+    return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(shown)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${k.kind === 'money' ? moneyRich(k.value) : esc(String(fmt(k.value, k.kind)))}</p>${cipSpark(k.spark, face.fg, title)}</div></article>`;
   }).join('');
   const donut = (d.charts || []).find(ch => ch.type === 'doughnut');
@@ -2078,8 +2130,8 @@ function renderInventory(c, d) {
         return `<li><i style="background:${col}"></i><span class="nm"><b>${esc(lb)}</b><span class="sh">${share}%</span></span><em>${shown}</em></li>`;
       }).join('');
     };
-    document.querySelectorAll('#donutMode button').forEach(b => b.onclick = () => showDonut(b.dataset.mode));
-    showDonut(invDonutMode);
+    document.querySelectorAll('#donutMode button').forEach(b => b.onclick = () => { pageMeasure = b.dataset.mode === 'qty' ? 'qty' : 'value'; go(S.view, true); });
+    showDonut(pageMeasure === 'qty' ? 'qty' : 'value');
   }
   mountInventoryTrend();
   if (posting) {
@@ -2904,6 +2956,8 @@ async function mountInventoryTrend() {
 }
 
 function renderRmPlanning(c, d) {
+  S.rmSheets = d.rm_sheets || S.rmSheets || [];
+  if (d.sheet) rmSheet = d.sheet;
   const faces = {
     'RM stock (SUM RM)': { icon: 'box', fg: '#2563EB' },
     'Cover ≤ 29 days': { icon: 'alert', fg: '#d03b3b' },
@@ -2916,15 +2970,6 @@ function renderRmPlanning(c, d) {
     return `<article class="inv-kpi"><div class="inv-kpi-top"><span class="inv-kpi-ic" style="color:${face.fg}">${kpiMark(face.icon)}</span><p class="inv-kpi-l">${esc(k.label)}</p>${invRing(k.pct, face.fg)}</div>
       <div class="inv-kpi-row"><p class="inv-kpi-v">${esc(String(fmt(k.value, k.kind)))}</p>${cipSpark(k.spark, face.fg, k.label)}</div></article>`;
   }).join('');
-  const tone = {
-    MRP: '#1d4ed8', 'Resin Material': '#2563eb', Masterbatch: '#3b82f6', 'Local & Others': '#0ea5e9',
-    RISKS: '#0369a1', 'Milk and crates': '#1e40af', Others: '#0284c7', 'All Purchase Plans': '#60a5fa',
-    'Local Purchase': '#38bdf8', Stock: '#059669', 'Consmptn Dump': '#d97706', 'Pivot Tables': '#ea580c',
-    Sheet6: '#b45309', 'RM MATRIX': '#7c3aed', 'Projected Sales ': '#9333ea', 'Sales FY26': '#6d28d9',
-    'Sales rev. forecast mar.': '#a855f7', Alternatives: '#0f766e', KEY: '#0d9488', Intransit: '#14b8a6',
-    'my sheet': '#115e59', Sheet1: '#134e4a',
-  };
-  const tabs = (d.rm_sheets || []).map(s => `<button type="button" role="tab" data-sheet="${esc(s.id)}" class="${s.id === d.sheet ? 'on' : ''}" aria-selected="${s.id === d.sheet}" title="${esc(s.group)}" style="--tone:${tone[s.id] || '#64748b'}">${esc(s.title)}</button>`).join('');
   const charts = d.charts || [];
   const card = (ch, id, wide) => ch ? `<section class="card inv-card${wide ? ' span-2' : ''}"><div class="inv-ch-head"><div><h3>${esc(ch.title)}</h3></div></div><div class="chartbox" style="height:${ch.height || 280}px"><canvas id="${id}"></canvas></div></section>` : '';
   const byTitle = re => charts.find(ch => re.test(ch.title));
@@ -2933,10 +2978,9 @@ function renderRmPlanning(c, d) {
   const orders = byTitle(/suggested orders/i);
   const locs = byTitle(/SUM RM locations/i);
   c.innerHTML = `<div class="inv-page">
-    <div class="rm-head"><div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
+    <div class="inv-head"><div></div><div class="inv-actions"><button class="btn" id="askThis">${svg('sparkle', 14)} Ask about this view</button>
       <button class="btn" id="pdfThis">${svg('printer', 14)} Print</button>
-      <button class="btn primary" id="exportRm">${svg('download', 14)} Export</button></div>
-      <div class="sec-tabs rm-tabs" role="tablist" aria-label="Raw material sheets">${tabs}</div></div>
+      <button class="btn primary" id="exportRm">${svg('download', 14)} Export</button></div></div>
     ${invFilters()}
     <div class="inv-kpis">${kpis}</div>
     <div class="inv-topcharts">${card(cons, 'chRmCons', true)}${card(cover, 'chRmCover')}</div>
@@ -2945,7 +2989,6 @@ function renderRmPlanning(c, d) {
   bindFilters();
   document.getElementById('askThis').onclick = () => { go('command'); setTimeout(() => ask('Summarise raw material planning: what should we order and which items are critical?'), 50); };
   document.getElementById('pdfThis').onclick = () => window.print();
-  c.querySelectorAll('[data-sheet]').forEach(b => b.onclick = () => { rmSheet = b.dataset.sheet; go('rm_planning', true); });
   S.charts.forEach(ch => ch.destroy()); S.charts = [];
   const glass = { palette: INV_PALETTE, quiet: true, glassy: true };
   const put = (id, ch) => {
@@ -2964,7 +3007,7 @@ async function loadView() {
   if (view === 'rm_planning') qs.set('sheet', rmSheet);
   const c = document.getElementById('content');
   if (!c.querySelector('.vhead') && !c.querySelector('.inv-page')) c.innerHTML = `<div class="loading"><span class="thinking"><i></i><i></i><i></i></span> Loading view…</div>`;
-  const d = await api(`/api/view/${view}?${qs}`);
+  const d = shownView(await api(`/api/view/${view}?${qs}`));
   if (S.view !== view) return;
   if (view === 'inventory_position') { renderInventory(c, d); return; }
   if (view === 'inventory_by_location') { renderLocation(c, d); return; }
@@ -3033,14 +3076,15 @@ function renderOverview(c, d) {
   put('chOvEx', bars);
   if (donut) {
     const labels = (donut.labels || []).map(niceLabel);
-    const data = (donut.series[0] && donut.series[0].data) || [];
+    const qtyMode = pageMeasure === 'qty' && donut.extra && donut.extra.quantity;
+    const data = qtyMode ? donut.extra.quantity : ((donut.series[0] && donut.series[0].data) || []);
     const chart = drawChart(document.getElementById('chOvDonut'), Object.assign({}, donut, { labels }, glass, { hideLegend: true, cutout: '68%', palette: INV_PALETTE }));
     if (chart) S.charts.push(chart);
     const total = data.reduce((a, b) => a + (Number(b) || 0), 0);
     const leg = document.getElementById('ovLegend');
     if (leg) leg.innerHTML = labels.map((lb, i) => {
       const v = Number(data[i]) || 0, share = total ? Math.round(100 * v / total) : 0;
-      return `<li><i style="background:${INV_PALETTE[lb] || '#94a3b8'}"></i><span class="nm"><b>${esc(lb)}</b><span class="sh">${share}%</span></span><em>${fmt(v, 'money')}</em></li>`;
+      return `<li><i style="background:${INV_PALETTE[lb] || '#94a3b8'}"></i><span class="nm"><b>${esc(lb)}</b><span class="sh">${share}%</span></span><em>${fmt(v, qtyMode ? 'qty' : 'money')}</em></li>`;
     }).join('');
   }
   d.tables.forEach((t, i) => renderTable(document.getElementById('tb' + i), t, { variant: 'inventory', size: 10, search: 'Search item, type…' }));
@@ -3065,11 +3109,21 @@ function bindFilters() {
   f_class.onchange = upd; f_site.onchange = upd;
   const loc = document.getElementById('f_loc'); if (loc) loc.onchange = upd;
   let t; f_q.oninput = () => { clearTimeout(t); t = setTimeout(upd, 400); };
-  f_clear.onclick = () => { S.filters = { item_class: '', site: '', location: '', q: '' }; loadView(); };
+  f_clear.onclick = () => { S.filters = { item_class: '', site: '', location: '', q: '' }; pageMeasure = 'value'; loadView(); };
   const fb = document.getElementById('f_filters'), pop = document.getElementById('f_pop');
-  if (fb && pop) { fb.onclick = e => { e.stopPropagation(); pop.hidden = !pop.hidden; }; pop.onclick = e => e.stopPropagation(); }
+  if (fb && pop) { fb.onclick = e => { e.stopPropagation(); const sheet = document.getElementById('f_sheetpop'); if (sheet) sheet.hidden = true; pop.hidden = !pop.hidden; }; pop.onclick = e => e.stopPropagation(); }
+  document.querySelectorAll('#f_measure button').forEach(b => b.onclick = () => { pageMeasure = b.dataset.measure === 'qty' ? 'qty' : 'value'; go(S.view, true); });
+  const sb = document.getElementById('f_sheet'), sp = document.getElementById('f_sheetpop');
+  if (sb && sp) {
+    sb.onclick = e => { e.stopPropagation(); if (pop) pop.hidden = true; sp.hidden = !sp.hidden; };
+    sp.onclick = e => e.stopPropagation();
+    sp.querySelectorAll('[data-sheet]').forEach(b => b.onclick = () => { rmSheet = b.dataset.sheet; sp.hidden = true; go('rm_planning', true); });
+  }
   if (!bindFilters.outside) {
-    bindFilters.outside = () => { const p = document.getElementById('f_pop'); if (p) p.hidden = true; };
+    bindFilters.outside = () => {
+      const p = document.getElementById('f_pop'); if (p) p.hidden = true;
+      const s = document.getElementById('f_sheetpop'); if (s) s.hidden = true;
+    };
     document.addEventListener('click', bindFilters.outside);
   }
 }
@@ -3222,7 +3276,18 @@ const glassPaint = { id: 'glassPaint', beforeDatasetsDraw(chart) {
     });
   });
 } };
+function hookChart(chart, ch) {
+  if (!chart || !chart.options) return chart;
+  chart.options.onClick = (evt, els) => {
+    if (!els || !els.length) return;
+    const hit = els[0];
+    const raw = chart.data.datasets[hit.datasetIndex] && chart.data.datasets[hit.datasetIndex].data[hit.index];
+    openPointCard({ ch, index: hit.index, datasetIndex: hit.datasetIndex, raw: raw && typeof raw === 'object' ? raw : null });
+  };
+  return chart;
+}
 function drawChart(el, ch) {
+  ch = applyChartMeasure(ch || {});
   const grid = ch.quiet ? '#f1f5f9' : css('--grid'), ink = css('--text-secondary'), surf = css('--surface-1');
   const money = ch.unit && String(ch.unit).startsWith('UGX');
   const vfmt = v => v == null ? '–' : money ? Math.round(v).toLocaleString() + ' UGX' : Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 }) + (ch.unit && ch.unit !== 'UGX' ? ' ' + ch.unit : '');
@@ -3234,41 +3299,41 @@ function drawChart(el, ch) {
 
   if (ch.type === 'gauge') {
     const v = ch.extra.value, col = tok(ch.extra.key);
-    return new Chart(el, { type: 'doughnut', data: { labels: ['', ''], datasets: [{ data: [v, 100 - v], backgroundColor: [col, css('--surface-3')], borderWidth: 0, borderRadius: [6, 0] }] },
+    return hookChart(new Chart(el, { type: 'doughnut', data: { labels: ['', ''], datasets: [{ data: [v, 100 - v], backgroundColor: [col, css('--surface-3')], borderWidth: 0, borderRadius: [6, 0] }] },
       options: { responsive: true, maintainAspectRatio: false, rotation: -90, circumference: 180, cutout: '74%', layout: { padding: { bottom: 14 } },
-        plugins: { legend: { display: false }, tooltip: { enabled: false }, centerText: { text: `${Math.round(v)}%` } } }, plugins: [centerText] });
+        plugins: { legend: { display: false }, tooltip: { enabled: false }, centerText: { text: `${Math.round(v)}%` } } }, plugins: [centerText] }), ch);
   }
 
   if (ch.type === 'treemap') {
     const items = ch.extra.items, groups = [...new Set(items.map(x => x.group))];
     const gcol = g => classPaint(ch, g, CLASS[g] ? css(CLASS[g]) : catCol(groups.indexOf(g)));
     const glass = !!ch.glassy;
-    return new Chart(el, { type: 'treemap', data: { datasets: [{ tree: items, key: 'value', borderWidth: glass ? 1.5 : 2, spacing: 0, borderRadius: 4,
+    return hookChart(new Chart(el, { type: 'treemap', data: { datasets: [{ tree: items, key: 'value', borderWidth: glass ? 1.5 : 2, spacing: 0, borderRadius: 4,
       borderColor: c => !glass || c.type !== 'data' ? (glass ? 'transparent' : surf) : gcol(c.raw._data.group),
       backgroundColor: c => c.type !== 'data' ? 'transparent' : (glass ? gcol(c.raw._data.group) : hexA(gcol(c.raw._data.group), .82)),
       labels: { display: true, align: 'left', position: 'top', color: '#fff', font: [{ size: 12, weight: '600' }, { size: 11 }], overflow: 'hidden',
         formatter: c => c.type !== 'data' ? '' : [c.raw._data.label, money ? fmt(c.raw.v, 'money') : Number(c.raw.v).toLocaleString()] } }] },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false },
-        tooltip: { ...tooltip, callbacks: { title: i => i[0].raw._data.label, label: c => `${c.raw._data.group}: ${vfmt(c.raw.v)}` } } } } });
+        tooltip: { ...tooltip, callbacks: { title: i => i[0].raw._data.label, label: c => `${c.raw._data.group}: ${vfmt(c.raw.v)}` } } } } }), ch);
   }
 
   if (ch.type === 'sankey') {
     const flows = ch.extra.flows, nodes = [...new Set(flows.flatMap(f => [f.from, f.to]))];
     const ncol = n => { const k = n.trim(); return CLASS[k] ? css(CLASS[k]) : catCol(nodes.indexOf(n)); };
-    return new Chart(el, { type: 'sankey', data: { datasets: [{ data: flows, colorFrom: c => ncol(c.dataset.data[c.dataIndex].from), colorTo: c => ncol(c.dataset.data[c.dataIndex].to),
+    return hookChart(new Chart(el, { type: 'sankey', data: { datasets: [{ data: flows, colorFrom: c => ncol(c.dataset.data[c.dataIndex].from), colorTo: c => ncol(c.dataset.data[c.dataIndex].to),
       colorMode: 'gradient', alpha: .55, borderWidth: 0, nodeWidth: 12, size: 'max', color: css('--text-primary'), font: { size: 11 } }] },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false },
-        tooltip: { ...tooltip, callbacks: { label: c => { const f = c.dataset.data[c.dataIndex]; return `${f.from.trim()} → ${f.to}: ${vfmt(f.flow)}`; } } } } } });
+        tooltip: { ...tooltip, callbacks: { label: c => { const f = c.dataset.data[c.dataIndex]; return `${f.from.trim()} → ${f.to}: ${vfmt(f.flow)}`; } } } } } }), ch);
   }
 
   if (ch.type === 'scatter') {
     const e = ch.extra || {};
     const datasets = ch.series.map((s, i) => { const col = seriesColor(s, i, [], ch); return { label: s.name, data: s.data, backgroundColor: ch.glassy ? hexA(col, .78) : hexA(col, .55), borderColor: ch.glassy ? mixWhite(col, .45) : col, borderWidth: ch.glassy ? 1.5 : 1, hoverBorderWidth: 2 }; });
-    return new Chart(el, { type: 'bubble', data: { datasets }, plugins: [refLines],
+    return hookChart(new Chart(el, { type: 'bubble', data: { datasets }, plugins: [refLines],
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend, refLines: { y: e.yRef || [] },
         tooltip: { ...tooltip, callbacks: { title: i => i[0].raw.label, label: c => [`Usage: ${Math.round(c.raw.x).toLocaleString()} UGX/day`, `Cover: ${c.raw.y} days`, `Status: ${c.dataset.label}`] } } },
         scales: { x: { type: e.xLog ? 'logarithmic' : 'linear', title: { display: true, text: e.xLabel, color: ink }, grid: { color: grid }, ticks: { color: ink, callback: v => { const l = Math.log10(v); return Number.isInteger(l) ? fmt(v, 'money') : ''; } } },
-          y: { type: e.yLog ? 'logarithmic' : 'linear', title: { display: true, text: e.yLabel, color: ink }, grid: { color: grid }, ticks: { color: ink, callback: v => [0.1, 1, 7, 14, 30, 90, 365].includes(v) ? v : '' } } } } });
+          y: { type: e.yLog ? 'logarithmic' : 'linear', title: { display: true, text: e.yLabel, color: ink }, grid: { color: grid }, ticks: { color: ink, callback: v => [0.1, 1, 7, 14, 30, 90, 365].includes(v) ? v : '' } } } } }), ch);
   }
 
   const horizontal = ch.type === 'hbar', area = ch.type === 'area';
@@ -3284,7 +3349,7 @@ function drawChart(el, ch) {
       borderRadius: 0, borderSkipped: true, maxBarThickness: horizontal ? 16 : 28, categoryPercentage: .72, barPercentage: .82 }, mark);
   });
   const total = type === 'doughnut' ? (ch.series[0]?.data || []).reduce((a, b) => a + (b || 0), 0) : 0;
-  return new Chart(el, {
+  return hookChart(new Chart(el, {
     type, data: { labels: ch.labels, datasets }, plugins: type === 'doughnut' ? [centerText, glassPaint] : [refLines, glassPaint],
     options: {
       indexAxis: horizontal ? 'y' : 'x', responsive: true, maintainAspectRatio: false,
@@ -3302,16 +3367,23 @@ function drawChart(el, ch) {
         y: Object.assign({ stacked: ch.stacked, beginAtZero: !ch.tight, border: { display: false }, grid: { color: horizontal ? 'transparent' : grid }, ticks: { color: ink, autoSkip: !horizontal, font: { size: horizontal ? 11 : 12 }, callback: horizontal ? function (v) { const l = String(this.getLabelForValue(v)); return l.length > 30 ? l.slice(0, 29) + '…' : l; } : tick } }, ch.tight ? { min: ch.tightMin, max: ch.tightMax } : {}),
       }, ch.dual ? { y1: { position: 'right', beginAtZero: true, border: { display: false }, grid: { display: false }, ticks: { color: ink, callback: v => Number(v).toLocaleString() } } } : {}),
     },
-  });
+  }), ch);
 }
 
 function drawHeatmap(el, ch) {
-  const e = ch.extra, vals = e.values.flat().filter(v => v != null), mx = Math.max(1, ...vals);
-  const base = tok(e.key), money = ch.unit === 'UGX';
+  const e = ch.extra;
+  const useQty = pageMeasure === 'qty' && e.values_qty;
+  const values = useQty ? e.values_qty : e.values;
+  const vals = values.flat().filter(v => v != null), mx = Math.max(1, ...vals);
+  const base = tok(e.key), money = !useQty && ch.unit === 'UGX';
   const colColor = name => (ch.classCols && INV_CLASS[name]) || base;
   el.innerHTML = `<table class="heat-t"><thead><tr><th></th>${e.cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>
-    ${ch.labels.map((r, i) => `<tr><th>${esc(r)}</th>${e.values[i].map((v, j) => { const a = v ? .1 + .85 * (v / mx) : 0; const paint = colColor(e.cols[j]);
-      return `<td style="background:${v ? hexA(paint, a) : 'transparent'};color:${a > .55 ? '#fff' : 'var(--text-primary)'}" title="${esc(r)} · ${esc(e.cols[j])}: ${money ? Math.round(v || 0).toLocaleString() + ' UGX' : (v || 0)}">${v ? (money ? fmt(v, 'money') : Number(v).toLocaleString()) : '·'}</td>`; }).join('')}</tr>`).join('')}</tbody></table>`;
+    ${ch.labels.map((r, i) => `<tr><th>${esc(r)}</th>${values[i].map((v, j) => { const a = v ? .1 + .85 * (v / mx) : 0; const paint = colColor(e.cols[j]);
+      return `<td data-r="${i}" data-c="${j}" style="background:${v ? hexA(paint, a) : 'transparent'};color:${a > .55 ? '#fff' : 'var(--text-primary)'}" title="${esc(r)} · ${esc(e.cols[j])}: ${money ? Math.round(v || 0).toLocaleString() + ' UGX' : (v || 0)}">${v ? (money ? fmt(v, 'money') : Number(v).toLocaleString()) : '·'}</td>`; }).join('')}</tr>`).join('')}</tbody></table>`;
+  el.querySelectorAll('td[data-r]').forEach(td => td.onclick = () => {
+    const i = +td.dataset.r, j = +td.dataset.c;
+    openPointCard({ ch, title: ch.title, label: `${ch.labels[i]} · ${e.cols[j]}`, value: values[i][j], unit: money ? 'UGX' : (ch.unit || '') });
+  });
   return null;
 }
 
@@ -3411,6 +3483,64 @@ function exportCsv(t) {
 
 /* ---------- item detail panel ---------- */
 let drawerCharts = [];
+function pointItem(label, extra, index) {
+  const nos = extra && extra.item_nos;
+  if (nos && nos[index]) return String(nos[index]);
+  const m = String(label || '').match(/\b([A-Z]{1,5}-\d{3,7}[A-Z]?)\b/);
+  return m ? m[1] : '';
+}
+function openPointCard(detail) {
+  detail = detail || {};
+  const ch = detail.ch || {};
+  const raw = detail.raw;
+  let label = detail.label;
+  let value = detail.value;
+  if (label == null && raw) {
+    if (raw._data && raw._data.label) label = raw._data.label;
+    else if (raw.label) label = raw.label;
+    else if (raw.from && raw.to) label = `${String(raw.from).trim()} → ${String(raw.to).trim()}`;
+  }
+  if (label == null) {
+    const labels = ch.labels || [];
+    label = labels[detail.index] != null ? labels[detail.index] : (((ch.series || [])[detail.datasetIndex] || {}).name || ch.title || 'Selection');
+  }
+  if (value == null && raw) value = raw.flow != null ? raw.flow : (raw.v != null ? raw.v : (raw.value != null ? raw.value : raw.y));
+  if (value == null && ch.series && ch.series.length) {
+    const s = ch.series[detail.datasetIndex] || ch.series[0];
+    value = (s.data || [])[detail.index];
+  }
+  const item = detail.item || pointItem(label, ch.extra, detail.index) || pointItem(raw && (raw.label || (raw._data && raw._data.label)), null, 0);
+  if (item) { openItem(item); return; }
+  const unit = detail.unit != null ? detail.unit : (ch.unit || '');
+  const money = String(unit).startsWith('UGX');
+  const shown = v => v == null || v === '' ? '–' : (money ? fmt(v, 'money') + ' UGX' : fmt(v, 'qty') + (unit && unit !== 'UGX' ? ' ' + unit : ''));
+  const series = (ch.series || []).map(s => ({ name: s.name, value: (s.data || [])[detail.index] })).filter(s => s.value != null);
+  const base = (ch.series && ch.series[0] && ch.series[0].data) || [];
+  const total = base.reduce((a, b) => a + (Number(b) || 0), 0);
+  const share = total ? Math.round(100 * (Number(value) || 0) / total) : null;
+  const siblings = (ch.labels || []).map((lb, i) => ({ lb, v: base[i] })).filter(x => x.v != null).sort((a, b) => (Number(b.v) || 0) - (Number(a.v) || 0)).slice(0, 8);
+  const rows = [];
+  const needle = String(label || '').toLowerCase();
+  (S.pageTables || []).forEach(t => (t.rows || []).forEach(r => {
+    if (rows.length >= 8 || !needle) return;
+    const hit = Object.values(r).some(v => { const s = String(v ?? '').toLowerCase(); return s && (s === needle || (needle.length > 2 && s.includes(needle))); });
+    if (hit) rows.push({ cols: t.columns || [], row: r });
+  }));
+  const dr = document.getElementById('drawer');
+  dr.classList.add('open');
+  const rowHtml = rows.map(({ cols, row }) => {
+    const bits = cols.length ? cols.slice(0, 4) : Object.keys(row).slice(0, 4).map(field => ({ field, label: field, kind: 'text' }));
+    return `<div class="d-tiles" style="margin-top:8px">${bits.map(c => `<div><span>${esc(c.label)}</span><b>${esc(String(tableFmt(row[c.field], c.kind)))}</b></div>`).join('')}</div>`;
+  }).join('');
+  dr.innerHTML = `<div class="d-head"><div><div class="d-tags"><span class="cls">${esc(detail.title || ch.title || 'Chart')}</span></div><h2>${esc(String(label))}</h2></div>
+    <div class="rbtns"><button class="btn" id="dclose">${svg('x', 14)}</button></div></div>
+    <div class="d-hero"><div class="d-cover"><div class="muted">This point</div><div class="d-big">${esc(shown(value))}</div>
+      ${share != null ? `<div class="muted">${share}% of this series</div>` : ''}</div>
+      ${series.length ? `<div class="d-tiles">${series.map(s => `<div><span>${esc(s.name || 'Value')}</span><b>${esc(shown(s.value))}</b></div>`).join('')}</div>` : ''}</div>
+    ${siblings.length ? `<div style="padding:0 16px 12px"><div class="muted" style="margin-bottom:8px">In this chart</div><div class="d-tiles">${siblings.map(s => `<div><span>${esc(String(s.lb))}</span><b>${esc(shown(s.v))}</b></div>`).join('')}</div></div>` : ''}
+    ${rowHtml ? `<div style="padding:0 16px 16px"><div class="muted" style="margin-bottom:8px">Matching rows</div>${rowHtml}</div>` : ''}`;
+  document.getElementById('dclose').onclick = () => dr.classList.remove('open');
+}
 async function openItem(no) {
   const dr = document.getElementById('drawer');
   dr.innerHTML = `<div class="loading"><span class="thinking"><i></i><i></i><i></i></span> Loading ${esc(no)}…</div>`; dr.classList.add('open');

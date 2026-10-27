@@ -110,7 +110,7 @@ def table(title, df, cols, limit=None, drill="item_no", bars=True):
             "rows": [{f: _clean(r.get(f)) for f, _, _ in cols} for r in d.to_dict("records")]}
 
 
-def kpi(label, value, kind="qty", note=None, status=None, spark=None, pct=None, view=None):
+def kpi(label, value, kind="qty", note=None, status=None, spark=None, pct=None, view=None, qty=None):
     out = {"label": label, "value": _clean(value), "kind": kind, "note": note, "status": status}
     if spark is not None:
         out["spark"] = [_clean(x) for x in spark]
@@ -118,6 +118,8 @@ def kpi(label, value, kind="qty", note=None, status=None, spark=None, pct=None, 
         out["pct"] = round(float(max(0, min(100, pct))), 1)
     if view:
         out["view"] = view
+    if qty is not None:
+        out["qty"] = _clean(qty)
     return out
 
 
@@ -215,16 +217,27 @@ def _scatter(it, color_by, keys, title, subtitle, size_col="stock_value", ycol="
                       "xLog": True, "yLog": True, "yRef": [7, 14]}}
 
 
-def _heatmap(title, rows, cols, values, unit="items", key="seq", subtitle=None, span=1):
+def _heatmap(title, rows, cols, values, unit="items", key="seq", subtitle=None, span=1, values_qty=None):
+    extra = {"cols": cols, "values": [[_clean(v) for v in r] for r in values], "key": key}
+    if values_qty is not None:
+        extra["values_qty"] = [[_clean(v) for v in r] for r in values_qty]
     return {"type": "heatmap", "title": title, "subtitle": subtitle, "labels": rows, "unit": unit, "stacked": False,
-            "span": span, "series": [], "extra": {"cols": cols, "values": [[_clean(v) for v in r] for r in values],
-                                                  "key": key}}
+            "span": span, "series": [], "extra": extra}
 
 
 def _treemap(title, items, unit="UGX", subtitle=None, span=1):
+    built = []
+    for row in items:
+        a, v, g = row[0], row[1], row[2]
+        q = row[3] if len(row) > 3 else None
+        if not v or v <= 0:
+            continue
+        item = {"label": str(a), "value": _clean(v), "group": g}
+        if q is not None:
+            item["qty"] = _clean(q)
+        built.append(item)
     return {"type": "treemap", "title": title, "subtitle": subtitle, "labels": [], "unit": unit, "stacked": False,
-            "span": span, "series": [], "extra": {"items": [{"label": str(a), "value": _clean(v), "group": g}
-                                                            for a, v, g in items if v and v > 0]}}
+            "span": span, "series": [], "extra": {"items": built}}
 
 
 def _sankey(title, flows, unit="UGX", subtitle=None, span=1):
@@ -247,8 +260,9 @@ def inventory_position(m, f):
     tot = by.value.sum()
     it = apply_filters(m["item"], f)
     it = it[it.stock_qty > 0].sort_values("stock_value", ascending=False)
-    pg = sl.groupby(["posting_group", "item_class"]).stock_value.sum().reset_index().sort_values("stock_value",
-                                                                                               ascending=False)
+    pg = (sl.groupby(["posting_group", "item_class"])
+          .agg(stock_value=("stock_value", "sum"), stock_qty=("stock_qty", "sum"))
+          .reset_index().sort_values("stock_value", ascending=False))
     top = it.head(15)
     health = it.groupby("cover_status").stock_value.sum().reindex(COVER_ORDER).fillna(0)
     hc = it.pivot_table(index="item_class", columns="cover_status", values="stock_value", aggfunc="sum",
@@ -257,6 +271,9 @@ def inventory_position(m, f):
     abc = allit.groupby("abc").agg(items=("item_no", "size"), uv=("usage_value", "sum"), sv=("stock_value", "sum"))
     abc = abc.reindex(["A", "B", "C"]).fillna(0)
     excess = health.get("Excess", 0) + health.get("No movement", 0)
+    excess_qty = it[it.cover_status.isin(["Excess", "No movement"])].stock_qty.sum()
+    hq = it.pivot_table(index="item_class", columns="cover_status", values="stock_qty", aggfunc="sum",
+                        fill_value=0).reindex(index=CLS, columns=COVER_ORDER, fill_value=0)
     top10 = it.head(10).stock_value.sum()
     ins = [insight("info", f"Raw material holds {pct(by.loc['RM', 'value'], tot):.0f}% of stock value "
                            f"({money(by.loc['RM', 'value'])}); finished goods {pct(by.loc['FG', 'value'], tot):.0f}%."),
@@ -269,24 +286,29 @@ def inventory_position(m, f):
                            f"{money(abc.loc['A', 'sv'])} of stock.")]
     return {
         "kpis": [kpi("Total RM / WIP / FG value", tot, "money", f"{int(by['items'].sum()):,} items in stock",
-                     spark=_full_weeks(*_weekly(m, f=f, field="received_value"))[1])]
+                     spark=_full_weeks(*_weekly(m, f=f, field="received_value"))[1], qty=float(by.qty.sum()))]
                 + [kpi(C.CLASS_LABELS[c], by.loc[c, "value"], "money", f"{int(by.loc[c, 'items']):,} items · "
-                       f"{pct(by.loc[c, 'value'], tot):.0f}% of value", pct=pct(by.loc[c, "value"], tot)) for c in CLS]
+                       f"{pct(by.loc[c, 'value'], tot):.0f}% of value", pct=pct(by.loc[c, "value"], tot),
+                       qty=float(by.loc[c, "qty"])) for c in CLS]
                 + [kpi("Excess / not moving", excess, "money", "cover > 180 days or no movement", status="warning",
-                       pct=pct(excess, tot))],
+                       pct=pct(excess, tot), qty=float(excess_qty))],
         "insights": [i for i in ins if i],
         "charts": [chart("doughnut", "Stock value by class", [C.CLASS_LABELS[c] for c in CLS],
                          [("Value", "class", by.value.tolist())], "UGX", subtitle="Share of on-hand value",
                          extra={"quantity": [_clean(x) for x in by.qty.tolist()]}),
-                   _treemap("Stock value by posting group", [(r.posting_group, r.stock_value, r.item_class)
+                   _treemap("Stock value by posting group", [(r.posting_group, r.stock_value, r.item_class, r.stock_qty)
                                                               for r in pg.itertuples()],
                             subtitle="Box size = value; colour = class", span=2),
                    chart("bar", "Stock health by value", [C.CLASS_LABELS[c] for c in CLS],
                          [(s, COVER_KEY[s], hc[s].tolist()) for s in COVER_ORDER if hc[s].sum() > 0], "UGX",
-                         stacked=True, subtitle="How much of each class is healthy, short or excess"),
+                         stacked=True, subtitle="How much of each class is healthy, short or excess",
+                         extra={"quantity_series": [[_clean(x) for x in hq[s].tolist()]
+                                                    for s in COVER_ORDER if hc[s].sum() > 0]}),
                    chart("hbar", "Top 15 items by stock value", [f"{r.item_no} · {str(r.description)[:28]}" for r in top.itertuples()],
                          [("Value", "class:" + ",".join(top.item_class.tolist()), top.stock_value.tolist())], "UGX",
-                         span=2, height=380),
+                         span=2, height=380,
+                         extra={"quantity": [_clean(x) for x in top.stock_qty.tolist()],
+                                "item_nos": top.item_no.tolist()}),
                    chart("bar", "ABC analysis", ["A", "B", "C"],
                          [("% of items", "seq", [pct(x, abc["items"].sum()) for x in abc["items"]]),
                           ("% of usage value", "FG", [pct(x, abc.uv.sum()) for x in abc.uv]),
@@ -308,10 +330,15 @@ def inventory_by_location(m, f):
     sl = sl[sl.item_class != "OTHER"]
     loc = sl.pivot_table(index=["site", "location", "location_name"], columns="item_class", values="stock_value",
                          aggfunc="sum", fill_value=0).reindex(columns=CLS, fill_value=0)
+    locq = sl.pivot_table(index=["site", "location", "location_name"], columns="item_class", values="stock_qty",
+                          aggfunc="sum", fill_value=0).reindex(columns=CLS, fill_value=0)
     loc["total"] = loc.sum(axis=1)
+    locq["total"] = locq.sum(axis=1)
     loc["items"] = sl.groupby(["site", "location", "location_name"]).item_no.nunique()
     loc = loc.sort_values("total", ascending=False).reset_index()
+    locq = locq.reindex(loc.set_index(["site", "location", "location_name"]).index).reset_index()
     site = loc.groupby("site")[CLS + ["total"]].sum().sort_values("total", ascending=False)
+    siteq = locq.groupby("site")[CLS + ["total"]].sum().reindex(site.index).fillna(0)
     site_items = sl.groupby("site").item_no.nunique().reindex(site.index).fillna(0)
     tot = site.total.sum()
     top = loc.head(15)
@@ -330,16 +357,21 @@ def inventory_by_location(m, f):
                      f"{money(site.total.iloc[0])} · {pct(site.total.iloc[0], tot):.0f}%" if len(site) else None,
                      pct=pct(site.total.iloc[0], tot) if len(site) else None),
                  kpi("Top 3 locations share", pct(top3, tot), "days", "of total value (%)", pct=pct(top3, tot)),
-                 kpi("Stock in transit locations", sl[sl.in_transit].stock_value.sum(), "money", status="warning")],
+                 kpi("Stock in transit locations", sl[sl.in_transit].stock_value.sum(), "money", status="warning",
+                     qty=float(sl[sl.in_transit].stock_qty.sum()))],
         "insights": [i for i in ins if i],
         "charts": [chart("bar", "Stock value by site", site.index.tolist(),
-                         [(C.CLASS_LABELS[c], c, site[c].tolist()) for c in CLS], "UGX", stacked=True, span=2),
+                         [(C.CLASS_LABELS[c], c, site[c].tolist()) for c in CLS], "UGX", stacked=True, span=2,
+                         extra={"quantity_series": [siteq[c].tolist() for c in CLS]}),
                    _heatmap("Value heatmap: site × class", site.index.tolist(), [C.CLASS_LABELS[c] for c in CLS],
-                            site[CLS].values.tolist(), "UGX", subtitle="Darker = more value"),
-                   _treemap("Locations sized by value", [(f"{r.location}", r.total, r.site) for r in loc.itertuples()],
+                            site[CLS].values.tolist(), "UGX", subtitle="Darker = more value",
+                            values_qty=siteq[CLS].values.tolist()),
+                   _treemap("Locations sized by value",
+                            [(f"{r.location}", r.total, r.site, float(locq.loc[i, "total"])) for i, r in enumerate(loc.itertuples())],
                             subtitle="Grouped by site", span=2),
                    chart("hbar", "Top 15 locations by stock value", top.location.tolist(),
-                         [(C.CLASS_LABELS[c], c, top[c].tolist()) for c in CLS], "UGX", stacked=True, height=380),
+                         [(C.CLASS_LABELS[c], c, top[c].tolist()) for c in CLS], "UGX", stacked=True, height=380,
+                         extra={"quantity_series": [locq.head(15)[c].tolist() for c in CLS]}),
                    chart("hbar", "Distinct items held per site", site_items.index.tolist(),
                          [("Items", "seq", site_items.tolist())], "items")],
         "tables": [table("Stock value by location", loc, [
@@ -381,13 +413,14 @@ def rm_consumption_cover(m, f):
                            f"{'comfortable overall; risk is concentrated in specific items' if w > 30 else 'tight overall'}.")]
     return {
         "kpis": [kpi("RM consumption / production day", cons_val / n["production_days"], "money",
-                     f"{n['production_days']} production days in window", spark=wv),
+                     f"{n['production_days']} production days in window", spark=wv,
+                     qty=float(it.usage_qty.sum() / (n["production_days"] or 1))),
                  kpi("Value-weighted RM cover", w, "days", "calendar days"),
                  kpi("Under 7 production days", len(crit), "qty", f"of {len(it)} consumed RM items", status="critical",
                      pct=pct(len(crit), len(it))),
                  kpi("Under 14 production days", int((it.cover_prod_days < 14).sum()), "qty", status="serious",
                      pct=pct((it.cover_prod_days < 14).sum(), len(it))),
-                 kpi("RM stock value", allrm.stock_value.sum(), "money")],
+                 kpi("RM stock value", allrm.stock_value.sum(), "money", qty=float(allrm.stock_qty.sum()))],
         "insights": [i for i in ins if i],
         "charts": [chart("area", "Weekly RM consumption by posting group (UGX)", [str(x) for x in piv.index],
                          [(c, "cat", piv[c].tolist()) for c in piv.columns], "UGX", stacked=True, span=2,
@@ -399,10 +432,13 @@ def rm_consumption_cover(m, f):
                             "RM risk map: usage vs cover",
                             "Bottom-right = high usage, low cover (act first). Bubble = stock value."),
                    chart("doughnut", "Consumption value by posting group", topg.index[:8].tolist(),
-                         [("Value", "cat", topg.iloc[:8].tolist())], "UGX"),
+                         [("Value", "cat", topg.iloc[:8].tolist())], "UGX",
+                         extra={"quantity": [_clean(x) for x in it.groupby("posting_group").usage_qty.sum().reindex(topg.index[:8]).fillna(0).tolist()]}),
                    chart("hbar", "Top 15 raw materials by daily usage value",
                          [f"{r.item_no} · {str(r.description)[:26]}" for r in mv.itertuples()],
-                         [("UGX / day", "RM", mv.daily_usage_value.tolist())], "UGX", span=2, height=400)],
+                         [("UGX / day", "RM", mv.daily_usage_value.tolist())], "UGX", span=2, height=400,
+                         extra={"quantity": [_clean(x) for x in mv.daily_usage.tolist()],
+                                "item_nos": mv.item_no.tolist()})],
         "tables": [table("Raw material consumption & cover", it, ITEM_COLS[:2] + [
             ("abc", "ABC", "text"), ("posting_group", "Group", "text"), ("stock_qty", "Stock", "qty"), ("uom", "UoM", "text"),
             ("usage_qty", "Consumed in window", "qty"), ("daily_usage_prod", "Per production day", "qty"),
@@ -423,7 +459,9 @@ def wip_cover(m, f):
     wl, made = _full_weeks(*_weekly(m, "WIP", field="output_value"))
     _, used = _full_weeks(*_weekly(m, "WIP", field="consumed_value"))
     cat = m["items"].set_index("item_no").category
-    wc = w.assign(cat=w.item_no.map(cat).fillna("Other")).groupby("cat").stock_value.sum().sort_values(ascending=False)
+    tagged = w.assign(cat=w.item_no.map(cat).fillna("Other"))
+    wc = tagged.groupby("cat").stock_value.sum().sort_values(ascending=False)
+    wcq = tagged.groupby("cat").stock_qty.sum().reindex(wc.index).fillna(0)
     short = fw[fw.days_of_output < 7]
     ins = [insight("info", f"WIP worth {money(w.stock_value.sum())} across {len(w)} items; "
                            f"median cover {w.cover_days.median():,.0f} days."),
@@ -435,7 +473,8 @@ def wip_cover(m, f):
                            f"consumption {money(np.mean(used) if used else 0)} per week "
                            f"({'building' if (np.mean(made) if made else 0) > (np.mean(used) if used else 0) else 'drawing down'} WIP).")]
     return {
-        "kpis": [kpi("WIP value", w.stock_value.sum(), "money", f"{len(w):,} WIP items", spark=made),
+        "kpis": [kpi("WIP value", w.stock_value.sum(), "money", f"{len(w):,} WIP items", spark=made,
+                     qty=float(w.stock_qty.sum())),
                  kpi("WIP linked to a BOM parent", int(w.main_parent.notna().sum()), "qty",
                      pct=pct(w.main_parent.notna().sum(), len(w))),
                  kpi("Products < 7 days from WIP", len(short), "qty", f"of {len(fw)} products", status="serious",
@@ -447,8 +486,9 @@ def wip_cover(m, f):
                    chart("bar", "WIP items by days of cover", labels, [("Items", "seq", counts)], "items", colors=keys),
                    chart("hbar", "Products with least output supported by WIP (days)",
                          [f"{r.item_no} · {str(r.parent_description)[:24]}" for r in top.itertuples()],
-                         [("Days of output", "WIP", top.days_of_output.tolist())], "days", span=2, height=400),
-                   _treemap("WIP value by category", [(k, v, "WIP") for k, v in wc.items()])],
+                         [("Days of output", "WIP", top.days_of_output.tolist())], "days", span=2, height=400,
+                         extra={"item_nos": top.item_no.tolist()}),
+                   _treemap("WIP value by category", [(k, v, "WIP", float(wcq.loc[k])) for k, v in wc.items()])],
         "tables": [table("WIP cover", w, ITEM_COLS[:2] + [
             ("stock_qty", "WIP stock", "qty"), ("uom", "UoM", "text"), ("stock_value", "Value (UGX)", "money"),
             ("daily_usage", "Used / day", "qty"), ("cover_days", "Cover days", "days"),
@@ -482,13 +522,15 @@ def fg_cover(m, f):
                            f"straight away) and are not counted as stockouts."),
            insight("warning", f"{money(excess_v)} of FG has more than 180 days of cover.") if excess_v else None]
     return {
-        "kpis": [kpi("FG value", it.stock_value.sum(), "money"),
-                 kpi("FG demand / day (cost)", it.daily_usage_value.sum(), "money", spark=sales and [s / 7 for s in sales]),
+        "kpis": [kpi("FG value", it.stock_value.sum(), "money", qty=float(it.stock_qty.sum())),
+                 kpi("FG demand / day (cost)", it.daily_usage_value.sum(), "money", spark=sales and [s / 7 for s in sales],
+                     qty=float(it.daily_usage.sum())),
                  kpi("Value-weighted FG cover", wcover, "days"),
                  kpi("FG stockouts", int(st["Stockout"]), "qty", "excl. made to order", status="critical",
                      pct=pct(st["Stockout"], len(it))),
                  kpi("Made to order", int(st["Made to order"]), "qty"),
-                 kpi("Excess FG (> 180 days)", excess_v, "money", status="warning")],
+                 kpi("Excess FG (> 180 days)", excess_v, "money", status="warning",
+                     qty=float(it[it.cover_status == "Excess"].stock_qty.sum()))],
         "insights": [i for i in ins if i],
         "charts": [chart("line", "Weekly FG sales vs production (UGX at cost)", wl,
                          [("Sales", "FG", sales), ("Production output", "seq", made)], "UGX", span=2),
@@ -502,7 +544,9 @@ def fg_cover(m, f):
                             "FG risk map: demand vs cover", "Bottom-right = high demand, low cover. Bubble = stock value."),
                    chart("hbar", "Top 15 FG by daily demand value",
                          [f"{r.item_no} · {str(r.description)[:26]}" for r in top.itertuples()],
-                         [("UGX / day", "FG", top.daily_usage_value.tolist())], "UGX", span=2, height=400)],
+                         [("UGX / day", "FG", top.daily_usage_value.tolist())], "UGX", span=2, height=400,
+                         extra={"quantity": [_clean(x) for x in top.daily_usage.tolist()],
+                                "item_nos": top.item_no.tolist()})],
         "tables": [table("Finished goods cover", it, ITEM_COLS[:2] + [
             ("abc", "ABC", "text"), ("stock_qty", "Stock", "qty"), ("uom", "UoM", "text"), ("sold", "Sold in window", "qty"),
             ("daily_usage", "Demand / day", "qty"), ("daily_usage_value", "Demand value / day", "money"),
@@ -518,15 +562,20 @@ def in_transit_overdue(m, f):
     pl2["bucket"] = pd.cut(pl2.days_overdue, [-10_000, 0, 7, 30, 90, 10_000],
                            labels=["Not yet due", "1–7 days late", "8–30 days", "31–90 days", "> 90 (stale)"])
     age = pl2.groupby("bucket", observed=False).outstanding_value.sum()
+    age_q = pl2.groupby("bucket", observed=False).outstanding_qty.sum()
     age_n = pl2.groupby("bucket", observed=False).size()
     od = pl[pl.overdue & ~pl.stale]
     ven = od.groupby("vendor_name").outstanding_value.sum().sort_values(ascending=False).head(12)
+    ven_q = od.groupby("vendor_name").outstanding_qty.sum().reindex(ven.index).fillna(0)
     tr = m["stock_loc"]
     tr = apply_filters(tr[tr.in_transit], f)
     pl2["month"] = pd.to_datetime(pl2.expected_date).dt.to_period("M").astype(str)
     tl = pl2.pivot_table(index="month", columns="receipt_status", values="outstanding_value", aggfunc="sum",
                          fill_value=0).sort_index()
+    tlq = pl2.pivot_table(index="month", columns="receipt_status", values="outstanding_qty", aggfunc="sum",
+                          fill_value=0).reindex(index=tl.index, columns=tl.columns).fillna(0)
     byc = pl.groupby(pl.item_class.fillna("OTHER")).outstanding_value.sum()
+    bycq = pl.groupby(pl.item_class.fillna("OTHER")).outstanding_qty.sum().reindex(byc.index).fillna(0)
     vtop = pl.groupby("vendor_name").outstanding_value.sum().sort_values(ascending=False).head(8).index
     flows = pl[pl.vendor_name.isin(vtop)].groupby(["vendor_name", "item_class"]).outstanding_value.sum()
     ins = [insight("critical", f"All {int(pl.overdue.sum())} of {len(pl)} open lines are past their expected date; "
@@ -540,26 +589,32 @@ def in_transit_overdue(m, f):
            insight("info", "Close or re-date stale lines in Business Central so projections and buyer workload are accurate.")]
     return {
         "kpis": [kpi("Open PO lines", len(pl), "qty", f"{pl.po_no.nunique():,} orders · {pl.vendor_no.nunique()} vendors"),
-                 kpi("Outstanding value", pl.outstanding_value.sum(), "money"),
+                 kpi("Outstanding value", pl.outstanding_value.sum(), "money", qty=float(pl.outstanding_qty.sum())),
                  kpi("Overdue ≤ 90 days", od.outstanding_value.sum(), "money", f"{len(od)} lines", status="serious",
-                     pct=pct(od.outstanding_value.sum(), pl.outstanding_value.sum())),
+                     pct=pct(od.outstanding_value.sum(), pl.outstanding_value.sum()),
+                     qty=float(od.outstanding_qty.sum())),
                  kpi("Stale > 90 days", pl[pl.stale].outstanding_value.sum(), "money", f"{int(pl.stale.sum())} lines",
-                     status="warning", pct=pct(pl[pl.stale].outstanding_value.sum(), pl.outstanding_value.sum())),
+                     status="warning", pct=pct(pl[pl.stale].outstanding_value.sum(), pl.outstanding_value.sum()),
+                     qty=float(pl[pl.stale].outstanding_qty.sum())),
                  kpi("Average days late", pl[pl.overdue].days_overdue.mean() if pl.overdue.any() else 0, "days"),
-                 kpi("Stock in transit locations", tr.stock_value.sum(), "money")],
+                 kpi("Stock in transit locations", tr.stock_value.sum(), "money", qty=float(tr.stock_qty.sum()))],
         "insights": [i for i in ins if i],
         "charts": [chart("bar", "Outstanding value by lateness", [str(x) for x in age.index],
                          [("Value", "seq", age.tolist())], "UGX",
                          colors=["good", "warning", "serious", "crit", "muted"],
-                         subtitle=" · ".join(f"{k}: {v} lines" for k, v in age_n.items())),
+                         subtitle=" · ".join(f"{k}: {v} lines" for k, v in age_n.items()),
+                         extra={"quantity": [_clean(x) for x in age_q.tolist()]}),
                    chart("bar", "Expected receipts by month (UGX)", tl.index.tolist(),
                          [(c, {"Expected": "good", "Overdue": "serious"}.get(c, "muted"), tl[c].tolist())
                           for c in tl.columns], "UGX", stacked=True, span=2,
-                         subtitle="When open lines were due — grey = stale"),
+                         subtitle="When open lines were due — grey = stale",
+                         extra={"quantity_series": [tlq[c].tolist() for c in tl.columns]}),
                    chart("hbar", "Overdue value by vendor (≤ 90 days)", [v.strip()[:30] for v in ven.index],
-                         [("Overdue value", "serious", ven.tolist())], "UGX", span=2, height=380),
+                         [("Overdue value", "serious", ven.tolist())], "UGX", span=2, height=380,
+                         extra={"quantity": [_clean(x) for x in ven_q.tolist()]}),
                    chart("doughnut", "Open value by item class", [C.CLASS_LABELS.get(c, c) for c in byc.index],
-                         [("Value", "class", byc.tolist())], "UGX"),
+                         [("Value", "class", byc.tolist())], "UGX",
+                         extra={"quantity": [_clean(x) for x in bycq.tolist()]}),
                    _sankey("Open order value: vendor → class", [(a.strip()[:24], C.CLASS_LABELS.get(b, b), v)
                                                                  for (a, b), v in flows.items()],
                            subtitle="Top 8 vendors", span=3)],
@@ -582,6 +637,8 @@ def projection_stockout(m, f):
     pr["value"] = pr.projected_qty.clip(lower=0) * pr.unit_cost.fillna(0)
     curve = pr.pivot_table(index="week_date", columns="item_class", values="value", aggfunc="sum").reindex(
         columns=CLS, fill_value=0).fillna(0)
+    curve_q = pr.pivot_table(index="week_date", columns="item_class", values="projected_qty", aggfunc="sum").reindex(
+        index=curve.index, columns=CLS, fill_value=0).fillna(0)
     zero = pr[pr.projected_qty <= 0].pivot_table(index="week_date", columns="item_class", values="item_no",
                                                  aggfunc="nunique").reindex(index=curve.index, columns=CLS).fillna(0)
     ex = it[it.stockout_exposed].sort_values("stockout_day")
@@ -607,11 +664,13 @@ def projection_stockout(m, f):
                      status="serious"),
                  kpi("Projected value in 12 weeks", curve.iloc[-1].sum() if len(curve) else 0, "money",
                      spark=curve.sum(axis=1).tolist(),
-                     pct=pct(curve.iloc[-1].sum(), curve.iloc[0].sum()) if len(curve) else None)],
+                     pct=pct(curve.iloc[-1].sum(), curve.iloc[0].sum()) if len(curve) else None,
+                     qty=float(curve_q.iloc[-1].sum()) if len(curve_q) else 0)],
         "insights": [i for i in ins if i],
         "charts": [chart("area", "Projected stock value by week (UGX)", [d.isoformat() for d in curve.index],
                          [(C.CLASS_LABELS[c], c, curve[c].tolist()) for c in CLS], "UGX", stacked=True, span=2,
-                         subtitle="Usage continues at the recent rate; open POs land on their expected dates"),
+                         subtitle="Usage continues at the recent rate; open POs land on their expected dates",
+                         extra={"quantity_series": [curve_q[c].tolist() for c in CLS]}),
                    chart("bar", "Items at zero by week", [d.isoformat() for d in zero.index],
                          [(C.CLASS_LABELS[c], c, zero[c].tolist()) for c in CLS], "items", stacked=True),
                    chart("bar", "When items run out (weeks from today)", [f"Wk {i}" if i < 12 else "Wk 12+" for i in tl.index],
@@ -620,7 +679,7 @@ def projection_stockout(m, f):
                    chart("hbar", "Biggest upcoming stockouts: days left",
                          [f"{r.item_no} · {str(r.description)[:24]}" for r in topx.itertuples()],
                          [("Days to stockout", "class:" + ",".join(topx.item_class.tolist()), topx.stockout_day.tolist())],
-                         "days", height=400)],
+                         "days", height=400, extra={"item_nos": topx.item_no.tolist()})],
         "tables": [table("Stockout exposure", ex, ITEM_COLS + [
             ("abc", "ABC", "text"), ("stock_qty", "Stock", "qty"), ("daily_usage", "Usage / day", "qty"),
             ("daily_usage_value", "Usage value / day", "money"), ("cover_days", "Cover days", "days"),
@@ -651,7 +710,8 @@ def inventory_risk(m, f):
         "kpis": [kpi("High risk items", len(hi), "qty", status="critical", pct=pct(len(hi), len(allit[allit.daily_usage > 0]))),
                  kpi("Medium risk items", int((it.risk_level == "Medium").sum()), "qty", status="serious"),
                  kpi("Low risk items", int((it.risk_level == "Low").sum()), "qty", status="warning"),
-                 kpi("Usage value at risk / day", hi.daily_usage_value.sum(), "money", "high-risk items")],
+                 kpi("Usage value at risk / day", hi.daily_usage_value.sum(), "money", "high-risk items",
+                     qty=float(hi.daily_usage.sum()))],
         "insights": [i for i in ins if i],
         "charts": [_heatmap("Risk matrix: cover × supply", cov_rows, sup_cols, mat.values.tolist(), "items", "crit",
                             subtitle="Number of items in each combination", span=2),
@@ -665,7 +725,9 @@ def inventory_risk(m, f):
                    chart("hbar", "Top 15 high-risk items by usage value",
                          [f"{r.item_no} · {str(r.description)[:24]}" for r in top.itertuples()],
                          [("UGX / day", "class:" + ",".join(top.item_class.tolist()), top.daily_usage_value.tolist())],
-                         "UGX", span=3, height=400)],
+                         "UGX", span=3, height=400,
+                         extra={"quantity": [_clean(x) for x in top.daily_usage.tolist()],
+                                "item_nos": top.item_no.tolist()})],
         "tables": [table("Items requiring attention", it, ITEM_COLS + [
             ("abc", "ABC", "text"), ("risk_level", "Risk", "status"), ("cover_status", "Cover", "status"), ("cover_days", "Cover days", "days"),
             ("stock_qty", "Stock", "qty"), ("daily_usage", "Usage / day", "qty"), ("incoming_qty", "Incoming", "qty"),
@@ -711,7 +773,7 @@ def location_risk(m, f):
                  kpi("Fully solvable by transfer", int((lr.rebalance == "Fully covered by transfer").sum()), "qty",
                      status="good", pct=pct((lr.rebalance == "Fully covered by transfer").sum(), len(lr))),
                  kpi("Partly solvable", int((lr.rebalance == "Partly covered by transfer").sum()), "qty"),
-                 kpi("Transferable value", tr.value.sum(), "money")],
+                 kpi("Transferable value", tr.value.sum(), "money", qty=float(tr.suggested_transfer.sum()))],
         "insights": [i for i in ins if i],
         "charts": [_sankey("Suggested transfer flows (value)", [(f"{a} ", b, v) for (a, b), v in lanes.items()],
                            subtitle="From surplus site (left) to short site (right) · 14 largest lanes", span=2),
@@ -723,7 +785,9 @@ def location_risk(m, f):
                    chart("hbar", "Top 15 suggested transfers by value",
                          [f"{r.item_no} {r.donor_site}→{r.site}" for r in topt.itertuples()],
                          [("Value", "class:" + ",".join(topt.item_class.tolist()), topt.value.tolist())], "UGX",
-                         span=2, height=400)],
+                         span=2, height=400,
+                         extra={"quantity": [_clean(x) for x in topt.suggested_transfer.tolist()],
+                                "item_nos": topt.item_no.tolist()})],
         "tables": [table("Location supply risk & rebalancing", lr, ITEM_COLS + [
             ("site", "Site at risk", "text"), ("stock_qty", "Site stock", "qty"),
             ("daily_usage", "Site usage / day", "qty"), ("cover_days", "Site cover days", "days"),
@@ -835,6 +899,7 @@ def overview(m, f):
     lr = apply_filters(m["location_risk"], f)
     soon = it.stockout_exposed & (it.cover_status != "Stockout") & (it.stockout_day <= 7)
     by = sl.groupby("item_class").stock_value.sum().reindex(CLS).fillna(0)
+    by_qty = sl.groupby("item_class").stock_qty.sum().reindex(CLS).fillna(0)
     t = ex.groupby(["exception_type", "severity"]).size().unstack(fill_value=0).reindex(
         columns=["High", "Medium", "Low"], fill_value=0)
     t = t.loc[t.sum(axis=1).sort_values(ascending=False).index]
@@ -855,7 +920,7 @@ def overview(m, f):
            insight("good", f"{int((lr.suggested_transfer > 0).sum())} site shortages can be eased by inter-site transfers.")]
     return {
         "kpis": [kpi("Stock value (RM/WIP/FG)", by.sum(), "money", "01 Inventory Position", view="inventory_position",
-                     spark=cons),
+                     spark=cons, qty=float(by_qty.sum())),
                  kpi("Out of stock (in use)", int((it.cover_status == "Stockout").sum()), "qty",
                      "07 Projected Inventory", status="critical", view="projection_stockout"),
                  kpi("Run out within 7 days", int(soon.sum()), "qty", "07 Projected Inventory", status="critical",
@@ -881,7 +946,8 @@ def overview(m, f):
                          [("Consumption", "seq", cons), ("Production output", "good", outp), ("Sales", "FG", sales),
                           ("Purchase receipts", "serious", rec)], "UGX", span=2),
                    chart("doughnut", "Stock value by class", [C.CLASS_LABELS[c] for c in CLS],
-                         [("Value", "class", by.tolist())], "UGX"),
+                         [("Value", "class", by.tolist())], "UGX",
+                         extra={"quantity": [_clean(x) for x in by_qty.tolist()]}),
                    chart("hbar", "Exceptions by type and severity", t.index.tolist(),
                          [("High", "crit", t.High.tolist()), ("Medium", "serious", t.Medium.tolist()),
                           ("Low", "warning", t.Low.tolist())], "exceptions", stacked=True, span=3)],

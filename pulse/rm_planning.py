@@ -677,7 +677,8 @@ def _headline(built):
                 [("Items", "seq", [critical, okay, slob])], "items", colors=["crit", "good", "warning"]),
         V.chart("hbar", "Largest suggested orders",
                 [f"{r['item_no']} · {str(r['description'] or '')[:28]}" for r in top] or ["—"],
-                [("Order qty", "serious", [r["order_qty"] for r in top] or [0])], "qty", span=2, height=360),
+                [("Order qty", "serious", [r["order_qty"] for r in top] or [0])], "qty", span=2, height=360,
+                extra={"item_nos": [r["item_no"] for r in top]}),
         V.chart("bar", "Stock on the SUM RM locations", list(loc_qty),
                 [("On hand", "RM", list(loc_qty.values()))], "qty"),
     ]
