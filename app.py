@@ -18,6 +18,7 @@ from pulse.bc_client import DATA_DIR, ROOT, load_env
 load_env()
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from pulse import ministry as M
 app = Flask(__name__, static_folder="static")
 # Load the model in the background so gunicorn can bind and serve the page while the
 # supply-chain cache is opening. A full rebuild from raw files can take minutes after a restart.
@@ -101,6 +102,7 @@ def meta():
                     "sites": sorted(sl.site.dropna().unique().tolist()),
                     "locations": sorted(sl.location.dropna().unique().tolist()),
                     "refreshing": STATE["refreshing"], "last_error": STATE["last_error"],
+                    "refresh_available": not m["notes"].get("synthetic", False),
                     "playbooks": A.PLAYBOOKS, "alert_metrics": A.ALERT_METRICS,
                     "pending_actions": sum(a["status"] == "proposed" for a in A.list_actions()),
                     "user_name": display_name(), "user_email": current_user() if current_user() != "demo" else "",
@@ -185,10 +187,69 @@ def item(item_no):
 @app.post("/api/ask")
 def ask():
     body = request.get_json(force=True)
-    res = command.ask(STATE["model"], body.get("question", "")[:2000], user=current_user(),
-                      history=body.get("history"), documents=body.get("documents") or [],
-                      emails=body.get("emails") or [], context=(body.get("context") or "")[:6000])
+    res = M.answer(body.get("question", "")[:1000])
+    res["question"] = body.get("question", "")[:1000]
     return app.response_class(json.dumps(res, default=str), mimetype="application/json")
+
+
+@app.get("/api/memd/overview")
+def memd_overview():
+    return _json(M.overview())
+
+
+@app.post("/api/memd/indicator")
+def memd_indicator_update():
+    try:
+        return _json(M.update_indicator(request.get_json(force=True)))
+    except (KeyError, ValueError, TypeError) as exc:
+        return _json({"error": str(exc)}, 400)
+
+
+@app.get("/api/memd/twin/<asset_id>")
+def memd_twin(asset_id):
+    assets = M.overview()["assets"]
+    asset = next((a for a in assets if a["id"] == asset_id), None)
+    if not asset:
+        return _json({"error": "Asset not found"}, 404)
+    return _json({"asset": asset, "telemetry": M.telemetry(asset_id), "data_label": "MEMD workspace"})
+
+
+@app.post("/api/memd/twin/<asset_id>/analysis")
+def memd_twin_analysis(asset_id):
+    try:
+        return _json(M.analyze_asset(asset_id))
+    except KeyError as exc:
+        return _json({"error": str(exc)}, 404)
+
+
+@app.post("/api/memd/twin/<asset_id>/telemetry")
+def memd_twin_update(asset_id):
+    try:
+        return _json(M.set_reading(asset_id, request.get_json(force=True)))
+    except (KeyError, ValueError, TypeError) as exc:
+        return _json({"error": str(exc)}, 400)
+
+
+@app.post("/api/memd/reports/template")
+def memd_report_template():
+    try:
+        result = M.inspect_and_generate(request.files.get("file"))
+    except ValueError as exc:
+        return _json({"error": str(exc)}, 400)
+    return _json(result)
+
+
+@app.get("/api/memd/reports/templates")
+def memd_report_templates():
+    return _json(M.report_history())
+
+
+@app.get("/api/memd/reports/<rid>/download")
+def memd_report_download(rid):
+    path = M.download_template(rid)
+    if not path:
+        return _json({"error": "Generated report not found"}, 404)
+    return send_file(path, as_attachment=True, download_name=f"MEMD_report_{rid}.xlsx")
 
 
 @app.post("/api/playbook/<name>")
@@ -269,6 +330,10 @@ def unwatch(item_no):
 
 
 def _refresh(days, trigger="manual", user=None):
+    if STATE["model"]["notes"].get("synthetic", False):
+        STATE["refreshing"] = False
+        STATE["last_error"] = "Business Central refresh is disabled while using the synthetic offline demo."
+        return
     t = datetime.now()
     rec = {"started": R.now().isoformat(timespec="seconds"), "trigger": trigger, "user": user}
     try:
@@ -300,6 +365,8 @@ def _refresh(days, trigger="manual", user=None):
 
 @app.post("/api/refresh")
 def refresh():
+    if STATE["model"]["notes"].get("synthetic", False):
+        return jsonify({"status": "offline_demo", "message": "This workspace is using synthetic offline data; no Business Central refresh was attempted."}), 409
     if STATE["refreshing"]:
         return jsonify({"status": "already running"})
     STATE["refreshing"] = True
@@ -533,6 +600,8 @@ def schedule_delete(sid):
 
 @app.post("/api/schedules/refresh")
 def schedule_refresh():
+    if STATE["model"]["notes"].get("synthetic", False):
+        return jsonify({"error": "Scheduled Business Central refresh is unavailable in synthetic offline mode."}), 409
     b = request.get_json(force=True)
     s = R.schedules()
     s["refresh"].update({"enabled": bool(b.get("enabled")), "time": b.get("time", "06:00"),

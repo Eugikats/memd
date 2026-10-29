@@ -28,7 +28,9 @@ def _due_refresh(cfg, now):
 def tick(state, refresh_fn):
     now = R.now()
     s = R.schedules()
-    if _due_refresh(s["refresh"], now) and not state.get("refreshing"):
+    model = state.get("model") or {}
+    is_synthetic = model.get("notes", {}).get("synthetic", False)
+    if not is_synthetic and _due_refresh(s["refresh"], now) and not state.get("refreshing"):
         s["refresh"]["last_run"] = now.isoformat(timespec="minutes")
         R.save_schedules(s)
         state["refreshing"] = True

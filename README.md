@@ -1,91 +1,60 @@
-# Pulse – Supply Chain Reporting POC (Mulwana Group / Nice House of Plastics)
+# MEMD Decision Intelligence POC
 
-Working proof of concept for the **Supply Chain Reporting Dashboards** and **Supply Chain Command Centre**
-described in the Otic technical proposal (12 Oct 2026), connected read-only to Business Central `NHOP-TEST`.
+A Ministry of Energy and Mineral Development decision-intelligence proof of concept, built on the Mulwana POC's web application shell. The Ministry version keeps the source app's compact navigation and card-based visual style while replacing its visible workflows with sector indicators, a pipeline-asset twin, evidence questions, a data catalogue, and report-template processing.
 
-## Run
+## Run locally
+
+From PowerShell in this folder:
+
+```powershell
+\.venv\Scripts\python.exe app.py
 ```
+
+Open [http://127.0.0.1:8054](http://127.0.0.1:8054). If the port is occupied, set another port first:
+
+```powershell
+$env:PORT = "8055"
+\.venv\Scripts\python.exe app.py
+```
+
+If `.venv` has not been created yet:
+
+```powershell
 python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
-copy .env.example .env          # fill in BC credentials (+ optional ANTHROPIC_API_KEY)
-.venv\Scripts\python -m pulse.extract --days 90   # pull from Business Central (~2 min)
-.venv\Scripts\python -m pulse.model               # build the model + reconciliation
-.venv\Scripts\python app.py                       # http://localhost:8050
+\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
-The **Refresh from Business Central** button in the app re-runs extract + model on demand (logged to `data/refresh_log.jsonl`).
 
-## Architecture (matches proposal ch. 7.1)
-| Step | Code | Notes |
-|---|---|---|
-| Authenticate | `pulse/bc_client.py` | Entra ID client-credentials; token cached/refreshed |
-| Extract | `pulse/extract.py` | Paged (20k/page), retry on 429/5xx, read-only GETs only |
-| Stage | `data/raw/*.json.gz` + `run_log.json` | Records kept as received for traceability |
-| Model + Calculate | `pulse/model.py`, `pulse/config.py` | One governed model; all measures |
-| Present | `pulse/views.py`, `static/index.html` | 11 dashboards, filters, drill-down, CSV export |
-| Command centre | `pulse/command.py` | Claude (`claude-opus-5-5`) with read-only tools over the same views; audit log `data/audit.jsonl` |
+## What works in this POC
 
-### Business Central sources
-| Data | Endpoint |
+- **Command Centre:** sector indicator trends for minerals, petroleum, energy, and strategic projects, drawn from the local database.
+- **Pipeline digital twin:** interactive 3D station and pipeline scene, asset selector, telemetry history, and editable readings. Changes are written to SQLite and immediately affect the asset view.
+- **Ask the assistant:** Azure OpenAI analyses the records supplied from the SQLite workspace, cites periods and measures, and states evidence limits. If Azure is unavailable, a deterministic evidence response remains available.
+- **Pipeline monitoring:** request an Azure analysis of an asset's recent telemetry. It identifies measured changes and alert readings, while leaving safety conclusions and operating decisions to the operator.
+- **Reports:** upload an Excel `.xlsx` template (up to 20 MB). The processor inspects sheets, formula cells, labels, and cell formatting; Azure can map clear report labels to known indicators, while exact labels and `{{INDICATOR_NAME}}` tokens are handled locally. Existing formulas and styles are retained, and a sector-data sheet is appended for download.
+- **Data catalogue:** inspect and edit persisted indicator values, and open pipeline assets in the twin.
+- **MEMD mark:** a local SVG lettermark replaces the source product logo.
+
+## Data and limitations
+
+The first start seeds `data/memd.sqlite3` with synthetic POC records. They are not an official Ministry, UNOC, EACOP, TotalEnergies, SCADA, or operator feed. The indicators and asset telemetry exercise the workflows; they must not be used as sector facts, safety information, or operating instructions.
+
+The twin is a conceptual visualisation, not a surveyed route, validated engineering model, safety system, or live digital replica. This workspace is connected to the Azure OpenAI deployment `gpt-5.4-mini` in resource group `rg-memd-dev`. Local authentication uses the signed-in Azure CLI identity (`az login`) with the `Cognitive Services OpenAI User` role; a hosted deployment should use a managed identity with that role. Copy `.env.example` to `.env` and set the Azure endpoint and deployment name for another environment. Azure is used for evidence synthesis, report-label mapping, and asset telemetry analysis; calculations and rule checks remain deterministic.
+
+Excel processing uses `openpyxl`. It preserves workbook formulas and cell styles, but does not calculate formulas or guarantee retention of macros, pivot caches, embedded objects, external connections, or every advanced Excel feature. Azure mappings are checked against known indicator names, periods, worksheet labels, and a confidence threshold before a value is populated. Review the generated workbook in Excel before relying on it.
+
+All decisions remain with authorised Ministry officials and pipeline operators. This POC does not write to external operational systems.
+
+## Local architecture
+
+| Area | Implementation |
 |---|---|
-| Items, vendors | API v2.0 `items`, `vendors` |
-| Item Ledger Entries (open → stock; 90-day movements → usage) | OData `ItemLedgerEntries` (has Location Code, Remaining Qty) |
-| Purchase Lines (outstanding orders) | OData `Purchase_Lines_Excel` |
-| Production BOM header/lines | OData `Production_BOM_Excel`, `Production_BOM_ExcelProdBOMLine` |
-| Locations | OData `Location_Card_Excel` |
+| Web app and APIs | Flask (`app.py`) |
+| Sector indicators and asset telemetry | SQLite (`data/memd.sqlite3`) via `pulse/ministry.py` |
+| Original source analytics shell | `pulse/` and `static/index.html` |
+| 3D pipeline scene | Locally bundled Three.js WebGL scene (`static/vendor/`); works without a CDN connection |
+| Excel inspection and output | `openpyxl` in `pulse/ministry.py` |
+| Generated reports and audit | `data/uploaded_templates/` and SQLite audit table |
 
-The standard v2.0 `itemLedgerEntries` API has no location code, so the published OData pages are used for the
-POC. For production, the proposal's small read-only API extension should replace them.
+The bundled Three.js runtime is distributed under its MIT license in [static/vendor/THREE-LICENSE.txt](static/vendor/THREE-LICENSE.txt).
 
-## Configuration to review with the Supply Chain team
-`pulse/config.py`: item class by inventory posting group, entry types counted as consumption/demand,
-cover thresholds (7 / 14 / 30 / 180 days), site grouping of locations. `pulse/model.py`: stale PO threshold (90 days)
-and overdue-arrival assumption (7 days). All measure definitions are shown in the app under *Definitions & data notes*.
-
-## Findings from the first load (16 Oct 2026)
-- Stock reconciles to BC item inventory for 2,735 of 2,744 items (99.7%); differences are mainly NI- items with negative inventory.
-- All 359 outstanding PO lines are past their expected receipt date; 255 are >90 days overdue (stale).
-- 3,755 of 7,584 certified BOM item lines have Quantity per = 0 and are excluded from WIP/readiness calculations.
-- The company ID supplied (`e813eea0-…`) does not exist in NHOP-TEST; the POC uses **Nice House of Plastics** (`fe9d99b4-…`).
-
-## Agent (Command Center)
-The Command Center is agentic: it plans multi-step work, gathers evidence from the governed views, then creates
-**proposed actions** in Pulse (`pulse/agent.py`). It never writes to Business Central.
-
-| Action | What it produces | After approval |
-|---|---|---|
-| Chase overdue POs | One drafted expedite message per vendor (most overdue value first) | Copy / download and send from your mail |
-| Plan stock transfers | Inter-site transfer plan from location shortages vs. surplus | Export CSV to raise transfer orders in BC |
-| Alerts | Rule on a model metric (stockouts ≤7d, overdue lines, high exceptions, constrained products, item cover) | Active; re-checked after every refresh |
-| Watchlist | Items pinned to the Overview | — |
-| Management briefing | Markdown briefing with ranked tables and recommendations | Download |
-
-With `ANTHROPIC_API_KEY` set, Claude decides which tools to call for any request. Without it, requests are
-matched to the five built-in playbooks (buttons under the ask box). Proposals live in `data/actions.json`; every
-run is logged in `data/audit.jsonl`. Review everything on the **Agent actions** page.
-
-## Azure deployment (16 Oct 2026)
-| Resource | Name | Notes |
-|---|---|---|
-| Subscription | Microsoft Azure Sponsorship (`5f5765ae-…`), tenant Otic Group | |
-| Resource group | `rg-pulse-mulwana-poc` | Everything for this POC lives here |
-| Web app | `pulse-mulwana-mooy0` → https://pulse-mulwana-mooy0.azurewebsites.net | Linux, Python 3.14, plan `asp-pulse-mulwana-wus2` (B2, West US 2) |
-| Sign-in | App Service Authentication, Entra app `Pulse Mulwana Supply Chain POC` (`2c8983af-…`) | Otic Group tenant accounts only; unauthenticated requests are refused |
-| Azure OpenAI | `oai-pulse-mulwana-mooy0` (East US), deployment `gpt-5.4` (DataZoneStandard, 100K TPM) | Web app uses its managed identity (role *Cognitive Services OpenAI User*); no key stored |
-| Data | `/home/data` (persistent) | Seeded from the bundled snapshot on first start; **Refresh from Business Central** reloads live |
-
-App settings hold the BC connection (`BC_*`), `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `PULSE_DATA_DIR`.
-Redeploy: zip `app.py requirements.txt README.md pulse/ static/ data/raw/` and run
-`az webapp deploy -g rg-pulse-mulwana-poc -n pulse-mulwana-mooy0 --src-path pulse_deploy.zip --type zip`.
-To let Mulwana staff sign in, invite them as guests in the Otic Group tenant (or move the app registration to Mulwana's tenant).
-
-## Reporting & governance (added 16 Oct 2026)
-| Page | What it does | Code |
-|---|---|---|
-| Report library | 16 standard reports (stock status, valuation, cover, open/overdue POs, vendor performance, stockout exposure, risk register, rebalancing, production readiness, exceptions, KPI summary, weekly movement trends, data quality & reconciliation). Preview, filter, export **Excel / CSV / Print-PDF**, save to history, schedule | `pulse/reports.py` |
-| Report builder | Custom reports on 7 governed datasets: pick columns or group & summarise (sum/avg/min/max/count), conditions, sort, limit; export or save under *My reports* (then schedulable) | `run_custom()` |
-| Schedules & history | Daily / weekdays / weekly / monthly runs (East Africa Time); every run saves an Excel file to history. Email delivery is a next step (needs an approved mail sender) | `pulse/scheduler.py` |
-| Trends | Weekly flow (consumption, output, sales, receipts) and a KPI snapshot per data load that builds up through the proof period | `kpi_history.jsonl` |
-| Data refresh | Scheduled BC refresh (default 06:00 EAT, Mon–Sat), run log with record counts and reconciliation %, refresh now | `/api/refresh`, `/api/schedules/refresh` |
-| Audit log | Questions, agent runs, approvals, report exports/generation and refreshes, with user and time | `/api/audit` |
-
-The agent has a `generate_report` tool: "give me an Excel of vendor delivery performance" produces the file and an action card.
+See [POC_SCOPE.md](POC_SCOPE.md) for the meeting narrative, supported interactions, and follow-on steps toward an operator-connected pilot.

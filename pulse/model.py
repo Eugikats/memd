@@ -296,6 +296,8 @@ def build():
         "reconciliation": recon,
         "reporting_date": rep.isoformat(), "window_days": window, "production_days": int(prod_days),
         "company": log["company"], "environment": log["environment"], "extracted_at": log["finished"],
+        "data_mode": log.get("data_mode", "BUSINESS_CENTRAL"),
+        "synthetic": bool(log.get("synthetic", False)),
         "open_ledger_entries": int(len(op)), "movement_entries": int(len(mv)),
         "stock_qty_total": float(op.Remaining_Quantity.sum()),
         "purchase_lines_outstanding": int(len(pl)), "purchase_lines_overdue": int(pl.overdue.sum()),
@@ -395,10 +397,21 @@ def load():
         RAW.mkdir(parents=True, exist_ok=True)
         for f in bundled.iterdir():
             shutil.copy2(f, RAW / f.name)
+        MODEL_PATH.unlink(missing_ok=True)
     elif bundled != RAW and (bundled / "ile_history.json.gz").exists() and not (RAW / "ile_history.json.gz").exists():
         # Older persistent extracts have no 12-month history yet; seed it until the next BC refresh.
         import shutil
         shutil.copy2(bundled / "ile_history.json.gz", RAW / "ile_history.json.gz")
+        MODEL_PATH.unlink(missing_ok=True)
+    if not (RAW / "run_log.json").exists():
+        partial = list(RAW.glob("*.json.gz")) if RAW.exists() else []
+        if partial:
+            raise RuntimeError(
+                "The local Business Central snapshot is incomplete (run_log.json is missing). "
+                "Finish `python -m pulse.extract --days 90` or remove only the incomplete data/raw snapshot."
+            )
+        from .demo_data import create_snapshot
+        create_snapshot(RAW)
         MODEL_PATH.unlink(missing_ok=True)
     if MODEL_PATH.exists():
         try:
@@ -411,7 +424,7 @@ def load():
 
 
 if __name__ == "__main__":
-    m = build()
+    m = load()
     print(json.dumps(m["notes"], indent=2))
     it = m["item"]
     print(it.groupby("item_class").agg(items=("item_no", "size"), stock_value=("stock_value", "sum")))
