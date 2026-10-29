@@ -3,10 +3,10 @@
 All seed records are explicitly synthetic and live in SQLite so changing a reading
 changes the API and visualisations. The store is a local POC, not a Ministry feed.
 """
-import io
 import json
 import os
 import sqlite3
+import threading
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -41,6 +41,7 @@ def initialize():
         CREATE TABLE IF NOT EXISTS assets(id TEXT PRIMARY KEY, name TEXT, type TEXT, district TEXT, latitude REAL, longitude REAL, capacity REAL, unit TEXT, status TEXT, risk TEXT);
         CREATE TABLE IF NOT EXISTS telemetry(id INTEGER PRIMARY KEY, asset_id TEXT, recorded_at TEXT, throughput REAL, pressure REAL, temperature REAL, vibration REAL, power_kw REAL, status TEXT, FOREIGN KEY(asset_id) REFERENCES assets(id));
         CREATE TABLE IF NOT EXISTS report_templates(id TEXT PRIMARY KEY, filename TEXT, uploaded_at TEXT, sheets_json TEXT, formula_count INTEGER, output_path TEXT);
+        CREATE TABLE IF NOT EXISTS report_jobs(id TEXT PRIMARY KEY, filename TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result_json TEXT, error TEXT, upload_path TEXT);
         CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, at TEXT, action TEXT, detail TEXT);
         """)
         if db.execute("SELECT count(*) FROM indicators").fetchone()[0] == 0:
@@ -112,7 +113,7 @@ def update_indicator(payload):
 
 def answer(question):
     """Deterministic, evidence-bound POC analyst; no external model required."""
-    data=overview(); q=question.lower(); sector=next((s for s in ('minerals','petroleum','energy','projects') if s in q),None)
+    data=overview(); q=question.lower(); sector=next((s for s in ('minerals','petroleum','energy','projects') if (s in q or (s=='minerals' and 'mineral' in q))),None)
     chosen=[r for r in data['indicators'] if not sector or r['sector']==sector]
     # If configured, Azure may explain only the exact local records supplied here.
     # The deterministic response below remains the offline fallback.
@@ -191,9 +192,16 @@ def inspect_and_generate(file_storage):
     if not file_storage or not file_storage.filename: raise ValueError('Choose an .xlsx report template')
     name=Path(file_storage.filename).name
     if not name.lower().endswith('.xlsx'): raise ValueError('POC template reproduction currently accepts .xlsx files')
-    raw=file_storage.read()
-    if len(raw)>20*1024*1024: raise ValueError('Workbook exceeds the 20 MB POC limit')
-    try: wb=load_workbook(io.BytesIO(raw))
+    UPLOAD_DIR.mkdir(parents=True,exist_ok=True)
+    source=UPLOAD_DIR/f'{uuid.uuid4().hex}_source.xlsx'
+    file_storage.save(source)
+    try: return _inspect_and_generate_path(source,name)
+    finally:
+        try: source.unlink(missing_ok=True)
+        except OSError: pass
+
+def _inspect_and_generate_path(source,name):
+    try: wb=load_workbook(source)
     except Exception as e: raise ValueError(f'Workbook could not be read: {str(e)[:180]}')
     templates=[]; formula_count=0
     for ws in wb.worksheets:
@@ -245,7 +253,50 @@ def inspect_and_generate(file_storage):
         db.execute('INSERT INTO audit(at,action,detail) VALUES(?,?,?)',(datetime.now().isoformat(timespec='seconds'),'report_template_uploaded',f'{name}: {formula_count} formulas scanned'))
         db.commit()
     match_note='AI-assisted label mapping uses Azure OpenAI and only fills high-confidence matches to known indicators.' if ai_by_label else 'Exact indicator labels in a row and {{INDICATOR_NAME}} tokens are populated from the latest database period.'
+    wb.close()
     return {'id':rid,'filename':name,'sheets':templates,'formula_count':formula_count,'matched_cells':matched,'download_url':f'/api/memd/reports/{rid}/download','notes':['Uploaded worksheets, formulas, and cell formatting are retained.',match_note,'The generated workbook includes a MEMD data extract sheet. Formula recalculation, charts, pivot tables, complex layouts, and ambiguous label mapping require review in Excel.']}
+
+def create_report_job(file_storage):
+    if not file_storage or not file_storage.filename: raise ValueError('Choose an .xlsx report template')
+    name=Path(file_storage.filename).name
+    if not name.lower().endswith('.xlsx'): raise ValueError('Report reproduction currently accepts .xlsx files')
+    UPLOAD_DIR.mkdir(parents=True,exist_ok=True)
+    job_id=uuid.uuid4().hex[:16]
+    source=UPLOAD_DIR/f'{job_id}_source.xlsx'
+    file_storage.save(source)
+    now=datetime.now().isoformat(timespec='seconds')
+    with connect() as db:
+        db.execute('INSERT INTO report_jobs(id,filename,status,created_at,updated_at,upload_path) VALUES(?,?,?,?,?,?)',
+                   (job_id,name,'queued',now,now,str(source)))
+    threading.Thread(target=_run_report_job,args=(job_id,),daemon=True,name=f'memd-report-{job_id}').start()
+    return {'job_id':job_id,'filename':name,'status':'queued','status_url':f'/api/memd/reports/jobs/{job_id}'}
+
+def _run_report_job(job_id):
+    with connect() as db:
+        row=db.execute('SELECT filename,upload_path FROM report_jobs WHERE id=?',(job_id,)).fetchone()
+        if not row: return
+        name,path=row['filename'],Path(row['upload_path'])
+        db.execute("UPDATE report_jobs SET status='processing',updated_at=? WHERE id=?",(datetime.now().isoformat(timespec='seconds'),job_id))
+    try:
+        result=_inspect_and_generate_path(path,name)
+        with connect() as db:
+            db.execute("UPDATE report_jobs SET status='ready',updated_at=?,result_json=?,upload_path=NULL WHERE id=?",
+                       (datetime.now().isoformat(timespec='seconds'),json.dumps(result),job_id))
+    except Exception as exc:
+        with connect() as db:
+            db.execute("UPDATE report_jobs SET status='failed',updated_at=?,error=?,upload_path=NULL WHERE id=?",
+                       (datetime.now().isoformat(timespec='seconds'),str(exc)[:500],job_id))
+    finally:
+        try: path.unlink(missing_ok=True)
+        except OSError: pass
+
+def report_job(job_id):
+    with connect() as db:
+        row=db.execute('SELECT id,filename,status,created_at,updated_at,result_json,error FROM report_jobs WHERE id=?',(job_id,)).fetchone()
+    if not row: return None
+    job=dict(row)
+    job['result']=json.loads(job.pop('result_json')) if job.get('result_json') else None
+    return job
 
 def download_template(rid):
     with connect() as db:

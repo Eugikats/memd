@@ -239,6 +239,23 @@ def memd_report_template():
     return _json(result)
 
 
+@app.post("/api/memd/reports/jobs")
+def memd_report_job_create():
+    try:
+        result = M.create_report_job(request.files.get("file"))
+    except ValueError as exc:
+        return _json({"error": str(exc)}, 400)
+    return _json(result, 202)
+
+
+@app.get("/api/memd/reports/jobs/<job_id>")
+def memd_report_job_status(job_id):
+    result = M.report_job(job_id)
+    if result is None:
+        return _json({"error": "Report job not found"}, 404)
+    return _json(result)
+
+
 @app.get("/api/memd/reports/templates")
 def memd_report_templates():
     return _json(M.report_history())

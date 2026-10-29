@@ -1,7 +1,10 @@
 import io
+import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font
 
@@ -55,6 +58,12 @@ class MinistryPocTests(unittest.TestCase):
         self.assertEqual(twin['telemetry'][-1]['vibration'], 4.1)
         self.assertEqual(twin['telemetry'][-1]['status'], 'Alert')
 
+    def test_singular_mineral_question_is_scoped_to_minerals_evidence(self):
+        with patch.dict(os.environ, {'AZURE_OPENAI_ENDPOINT': ''}):
+            result = ministry.answer('Summarise mineral production value')
+        self.assertTrue(result['evidence'])
+        self.assertEqual({row['sector'] for row in result['evidence']}, {'minerals'})
+
     def test_xlsx_template_generation_preserves_formula_and_appends_ministry_data(self):
         wb = Workbook()
         ws = wb.active
@@ -76,6 +85,35 @@ class MinistryPocTests(unittest.TestCase):
         self.assertEqual(generated['Quarterly report']['B1'].value, '=2+2')
         self.assertEqual(generated['Quarterly report']['B2'].value, 342)
         self.assertTrue(generated['Quarterly report']['A1'].font.bold)
+        self.assertIn('MEMD data extract', generated.sheetnames)
+        generated.close()
+        wb.close()
+        output.close()
+
+    def test_report_job_upload_returns_status_and_generated_download(self):
+        wb = Workbook()
+        ws = wb.active
+        ws['A1'] = 'Mineral production value'
+        stream = io.BytesIO()
+        wb.save(stream)
+        response = self.client.post('/api/memd/reports/jobs', data={'file': (io.BytesIO(stream.getvalue()), 'job-template.xlsx')}, content_type='multipart/form-data')
+        self.assertEqual(response.status_code, 202)
+        job = response.get_json()
+        self.assertEqual(job['status'], 'queued')
+        deadline = time.time() + 10
+        state = None
+        while time.time() < deadline:
+            state_response = self.client.get(job['status_url'])
+            self.assertEqual(state_response.status_code, 200)
+            state = state_response.get_json()
+            if state['status'] in ('ready', 'failed'):
+                break
+            time.sleep(0.05)
+        self.assertIsNotNone(state)
+        self.assertEqual(state['status'], 'ready', state)
+        output = self.client.get(state['result']['download_url'])
+        self.assertEqual(output.status_code, 200)
+        generated = load_workbook(io.BytesIO(output.data), data_only=False)
         self.assertIn('MEMD data extract', generated.sheetnames)
         generated.close()
         wb.close()
