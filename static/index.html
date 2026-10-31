@@ -91,7 +91,6 @@ button { font: inherit; }
 .topbar .when b { display: block; font-size: 14px; }
 .topbar .when a { font-size: 12px; color: var(--text-secondary); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; cursor: pointer; }
 .topbar .when a:hover { color: var(--accent); }
-.topbar .when .offline-mode { display: inline-block; margin-top: 3px; padding: 3px 8px; border: 1px solid #f0d9a6; border-radius: 999px; background: #fff8e8; color: #875500; font-size: 10.5px; font-weight: 700; letter-spacing: .025em; }
 main { padding: 16px 24px 48px; flex: 1; min-width: 0; }
 
 /* ---------- command center home ---------- */
@@ -155,7 +154,6 @@ body.assist-open .assist-fab { display: none; }
 .cockpit-wave { position: relative; flex: 1 1 auto; min-height: 0; width: calc(100% + 48px); margin: 6px -24px 0; background: #fff; overflow: hidden; }
 .wave-clip { position: absolute; left: 0; right: 0; bottom: 0; height: 46%; overflow: hidden; background: #fff; }
 .wave-clip img { width: 100%; height: auto; display: block; margin-top: -11.6%; background: #fff; }
-.wave-clip svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .wave-metric { position: absolute; top: 0; bottom: 46%; display: flex; flex-direction: column; justify-content: flex-end; text-align: center; transform: translateX(-50%); padding-bottom: 2px; }
 .wave-metric .lab { margin: 0; font-size: 13px; color: #64748b; font-weight: 500; white-space: nowrap; }
 .wave-metric .val { margin: 4px 0 0; font-family: "Times New Roman", "Source Serif 4", Times, serif; font-size: clamp(18px, 2.1vw, 32px); font-weight: 700; letter-spacing: -.04em; color: #0B1640; line-height: 1.05; }
@@ -718,8 +716,18 @@ body.page-inv .tablehead.inv-tablehead .rbtns { width: auto; }
 .memd-action{font-family:inherit;font-size:15px;font-weight:500;line-height:1.45}
 @media(max-width:900px){.memd-kpis{grid-template-columns:repeat(2,1fr)}.memd-kpi:nth-child(2){border-right:0}.memd-kpi:nth-child(-n+2){border-bottom:1px solid var(--border)}.memd-grid,.memd-twin-layout{grid-template-columns:1fr}.memd-scene{height:420px}.memd-page{padding:16px}}
 .memd-field{display:block;width:100%;box-sizing:border-box;margin-top:6px;min-height:42px;padding:9px 12px;border:1px solid #dbe3ef;border-radius:9px;background:#fff;color:#0b1640;font:inherit}.memd-card label{display:block;color:#53647d;font-weight:600}.memd-card input[type=checkbox]{accent-color:#2563eb;margin-right:8px}.rail-user{font:inherit}
-.topbar .when .memd-context{display:grid;grid-template-columns:auto minmax(220px,1fr) auto;align-items:center;gap:14px;width:min(1120px,78vw);text-align:left}.memd-source-pill{display:inline-flex;align-items:center;white-space:nowrap;padding:7px 13px;border:1px solid #d4e3ff;border-radius:999px;background:#f4f8ff;color:#1858bd;font-size:11px;font-weight:700;letter-spacing:.06em}.memd-context-summary{color:#64748b;font-size:12px;line-height:1.35;text-align:center}.memd-context-period{color:#0b1640;font-size:14px;font-weight:700;line-height:1.3;text-align:right;white-space:nowrap}
-@media(max-width:900px){.topbar .when .memd-context{display:grid;grid-template-columns:auto auto;width:auto;gap:8px}.memd-context-summary{display:none}.memd-source-pill{font-size:9px;padding:5px 8px}.memd-context-period{font-size:11px;white-space:normal}}
+/* Keep the desktop POC overview intact; stack its metric labels on phones. */
+@media (max-width:600px) {
+  .hero:not(.chatting) { height:auto; min-height:calc(100dvh - 58px); max-height:none; }
+  .cockpit-wave { flex:1 0 370px; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:100px 100px; gap:16px 8px; padding:30px 8px 140px; }
+  .wave-metric { position:static; transform:none; width:auto !important; justify-content:center; }
+  .wave-metric .lab { white-space:normal; font-size:12px; }
+  .wave-metric .val { font-size:24px; }
+  .wave-delta .chg,.wave-delta .vs { font-size:11px; }
+  .wave-clip { height:130px; }
+  .wave-clip img { width:180%; max-width:none; margin-left:-40%; }
+  .memd-card { overflow-x:auto; }
+}
 </style>
 </head>
 <body>
@@ -728,7 +736,7 @@ body.page-inv .tablehead.inv-tablehead .rbtns { width: auto; }
   <div class="shell">
     <header class="topbar">
       <button class="menu-btn" id="menuBtn" aria-label="Open menu"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
-      <img class="top-logo" src="/static/mip-logo.png" alt="Manufacturing Intelligence Platform">
+      <img class="top-logo" src="/static/memd-mark.svg" alt="MEMD Decision Intelligence">
       <select class="mobile-nav btn" id="mobileNav" hidden></select>
       <div class="page" id="pageTitle">Command Center</div>
       <div class="right"><div class="when" id="when"></div><div class="avatar ghost" id="topAvatar"></div></div>
@@ -953,7 +961,7 @@ function readStore(key, fallback) {
 function profile() {
   return Object.assign({ fullName: '', jobTitle: '', department: '', phone: '', timezone: 'Africa/Kampala', email: '' }, readStore('pulse-profile', {}));
 }
-function displayName() { return profile().fullName || (S.meta && S.meta.user_name) || ''; }
+function displayName() { return memdStore('profile', {}).name || profile().fullName || 'Charles'; }
 function saveProfile(p) { localStorage.setItem('pulse-profile', JSON.stringify(p)); applyIdentity(); }
 function storedImage(key) { try { return localStorage.getItem(key) || ''; } catch { return ''; } }
 function saveImage(key, dataUrl) {
@@ -1025,6 +1033,20 @@ async function takeUpload(file, host) {
     S.uploads = [...(S.uploads || []).filter(d => d.id !== localId && d.id !== data.id), data].slice(-4);
     paintUploads();
     row.innerHTML = `<div class="answer">Attached ${esc(data.name)}.</div>`;
+    if (/\.xlsx$/i.test(file.name)) {
+      const button = document.createElement('button');
+      button.className = 'btn'; button.textContent = 'Generate Ministry report';
+      button.onclick = async () => {
+        button.disabled = true;
+        const result = document.createElement('div'); result.className = 'answer'; row.append(result);
+        try {
+          const report = await generateMinistryReport(file, message => { result.textContent = message; });
+          result.innerHTML = `<p>${report.formula_count} formulas preserved · ${report.matched_cells.length} indicator cells populated.</p><a class="btn" href="${esc(report.download_url)}">Download generated workbook</a>`;
+        } catch (error) { result.textContent = error.message; }
+        finally { button.disabled = false; }
+      };
+      row.append(button);
+    }
   } catch (err) {
     S.uploads = (S.uploads || []).map(d => d.id === localId ? { id: localId, name: file.name, error: err.message } : d);
     paintUploads();
@@ -1448,7 +1470,7 @@ function paintOrg(body) {
 
 async function init() {
   const content = document.getElementById('content');
-  content.innerHTML = `<div class="loading"><span class="thinking"><i></i><i></i><i></i></span> Opening Manufacturing Intelligence Platform…</div>`;
+  content.innerHTML = `<div class="loading"><span class="thinking"><i></i><i></i><i></i></span> Opening MEMD Decision Intelligence…</div>`;
   for (;;) {
     try {
       S.meta = await api('/api/meta');
@@ -1462,21 +1484,28 @@ async function init() {
       return;
     }
     if (S.meta && !S.meta.loading) break;
-    content.innerHTML = `<div class="loading"><span class="thinking"><i></i><i></i><i></i></span> Loading the supply chain model… This can take a minute after a restart.</div>`;
+    content.innerHTML = `<div class="loading"><span class="thinking"><i></i><i></i><i></i></span> Loading the workspace… This can take a minute after a restart.</div>`;
     await new Promise(r => setTimeout(r, 1500));
   }
   const rail = document.getElementById('rail');
   const navLink = s => `<a data-v="${s.views[0]}" data-sec="${s.key}" title="${esc(s.label)}">${svg(s.icon)}<span class="lbl">${esc(s.label)}</span>${s.badge ? '<span class="badge" id="badge" hidden></span>' : ''}</a>`;
-  const navGroups = [['command', 'overview'], ['inventory_position', 'in_transit_overdue', 'inventory_risk'], ['rm_planning'], ['reporting', 'governance']];
-  rail.innerHTML = `<div class="rail-head"><a class="logo" href="#command" data-v="command" title="Manufacturing Intelligence Platform"><img class="logo-img" src="/static/mip-logo.png" alt=""><div class="logo-text">Manufacturing<small>Intelligence Platform</small></div></a>
+  const navGroups = [
+    [{key:'command',views:['command'],label:'Command Center',icon:'monitor'},
+     {key:'assistant',views:['assistant'],label:'Ask the assistant',icon:'sparkle'}],
+    [{key:'reports',views:['reports'],label:'Reports',icon:'doc'},
+     {key:'catalogue',views:['catalogue'],label:'Data catalogue',icon:'book'},
+     {key:'twin',views:['twin'],label:'Pipeline digital twin',icon:'layers'}],
+    [{key:'agents',views:['agents'],label:'Agent rules',icon:'sparkle'}],
+  ];
+  rail.innerHTML = `<div class="rail-head"><a class="logo" href="#command" data-v="command" title="MEMD Decision Intelligence"><img class="logo-img" src="/static/memd-mark.svg" alt=""><div class="logo-text">MEMD<small>Decision Intelligence</small></div></a>
     <button class="toggle" id="railToggle" type="button" title="Collapse sidebar" aria-label="Collapse sidebar">${I.side}</button></div>
     <div class="scroll">
-      ${navGroups.map(keys => `<div class="nav-block">${keys.map(k => navLink(SECTIONS.find(s => s.key === k))).join('')}</div>`).join('<div class="nav-break"></div>')}
+      ${navGroups.map(keys => `<div class="nav-block">${keys.map(k => navLink(k)).join('')}</div>`).join('<div class="nav-break"></div>')}
       <div class="nav-break"></div>
       <a id="railSettings" title="Settings">${svg('gear')}<span class="lbl">Settings</span></a>
       <div class="recent" id="recent"></div>
     </div>
-    <div class="foot"><button type="button" class="rail-user" id="railProfile" title="Profile"><div class="avatar" id="railAvatar">${markInner(storedImage('pulse-user-photo'), initials(profile().fullName || S.meta.user_name))}</div><div class="who lbl" style="font-size:12px;color:var(--text-secondary);white-space:nowrap"><b id="railName" style="color:var(--text-primary);font-weight:600">${esc(profile().fullName || S.meta.user_name || 'Supply Chain')}</b><br><span class="muted">${esc(S.meta.notes.environment)}</span></div></button></div>`;
+    <div class="foot"><button type="button" class="rail-user" id="railProfile" title="Profile"><div class="avatar" id="railAvatar">${markInner(storedImage('pulse-user-photo'), initials(displayName()))}</div><div class="who lbl" style="font-size:12px;color:var(--text-secondary);white-space:nowrap"><b id="railName" style="color:var(--text-primary);font-weight:600">${esc(displayName())}</b><br><span class="muted">MEMD workspace</span></div></button></div>`;
   const slot = document.getElementById('railSlot');
   const syncRail = () => {
     const collapsed = rail.classList.contains('collapsed');
@@ -1494,10 +1523,10 @@ async function init() {
     if (a.classList.contains('logo')) { rail.classList.remove('peek'); syncRail(); return; }
     rail.classList.remove('peek');
     syncRail();
-    if (a.id === 'railSettings') { openSettings('security'); return; }
+    if (a.id === 'railSettings') { go('settings'); return; }
     if (a.dataset.v) go(a.dataset.v);
   };
-  document.getElementById('railProfile').onclick = () => openSettings('profile');
+  document.getElementById('railProfile').onclick = () => go('profile');
   document.getElementById('railToggle').onclick = () => {
     if (isMobile()) { closeMenu(); return; }
     rail.classList.remove('peek');
@@ -1516,8 +1545,8 @@ async function init() {
   bindAssist();
   document.getElementById('menuBtn').onclick = () => { rail.classList.add('open'); document.body.classList.add('menu-open'); };
   document.getElementById('scrim').onclick = closeMenu;
-  document.getElementById('topAvatar').innerHTML = markInner(storedImage('pulse-org-logo'), initials(S.meta.notes.company));
-  document.getElementById('topAvatar').onclick = () => openSettings('organization');
+  document.getElementById('topAvatar').innerHTML = markInner(storedImage('pulse-org-logo'), 'M');
+  document.getElementById('topAvatar').onclick = () => go('profile');
   const mn = document.getElementById('mobileNav');
   mn.innerHTML = SECTIONS.map(s => `<option value="${s.views[0]}">${esc(s.label)}</option>`).join('');
   mn.onchange = () => go(mn.value);
@@ -1536,30 +1565,7 @@ async function updateBadge() {
 }
 
 function renderWhen() {
-  const n = S.meta.notes;
-  const d = new Date(n.reporting_date + 'T12:00:00');
-  const long = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
-  const short = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  const inv = document.body.classList.contains('page-inv');
-  const loaded = new Date(n.extracted_at);
-  const time = Number.isNaN(loaded.getTime()) ? n.extracted_at.replace('T', ' ').slice(0, 16) : loaded.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  const label = `<span class="d-long">${long}</span><span class="d-short">${short}</span>`;
-  const offline = n.synthetic || n.data_mode === 'SYNTHETIC';
-  const refreshLong = S.meta.refreshing ? 'Refreshing from Business Central…' : S.meta.last_error ? 'Last refresh failed – retry' : 'Refresh from Business Central';
-  const invStatus = S.meta.refreshing ? 'Refreshing from Business Central…' : S.meta.last_error ? 'Last refresh failed – retry' : `Last updated: ${esc(time)}`;
-  const refreshStatus = offline ? '<span class="offline-mode" title="Workspace data">WORKSPACE</span>' : `<a id="refresh" title="Click to refresh from Business Central">${invStatus}</a>`;
-  const orgMark = markInner(storedImage('pulse-org-logo'), initials(n.company));
-  document.getElementById('when').innerHTML = inv
-    ? `<div class="inv-when"><span class="inv-cal">${svg('calendar', 16)}</span><div class="inv-when-text"><span class="inv-date">${label}</span>${offline ? refreshStatus : `<a id="refresh" class="inv-updated" title="Click to refresh from Business Central">${invStatus}</a>`}</div><button type="button" class="inv-avatar" id="invAvatar" title="Organization">${orgMark}</button></div>`
-    : `<b>${label}</b>${offline ? refreshStatus : `<a id="refresh" title="Data loaded ${esc(n.extracted_at.replace('T', ' '))}. Click to refresh from Business Central."><span class="r-long">${refreshLong}</span><span class="r-short">${S.meta.refreshing ? 'Refreshing…' : '↻ Refresh'}</span></a>`}`;
-  const invAvatar = document.getElementById('invAvatar');
-  if (invAvatar) invAvatar.onclick = () => openSettings('organization');
-  const refreshButton = document.getElementById('refresh');
-  if (refreshButton) refreshButton.onclick = async () => {
-    if (S.meta.refreshing) return;
-    await api('/api/refresh', { method: 'POST' }); S.meta.refreshing = true; renderWhen();
-    const t = setInterval(async () => { S.meta = await api('/api/meta'); if (!S.meta.refreshing) { clearInterval(t); renderWhen(); go(S.view, true); } }, 4000);
-  };
+  document.getElementById('when').innerHTML = `<div class="inv-when-text"><span class="inv-date">${esc(S.sectorPeriod || 'Sector overview')}</span><span class="muted" style="font-size:12px">Ministry workspace</span></div>`;
 }
 
 const isMobile = () => matchMedia('(max-width: 900px)').matches;
@@ -1578,7 +1584,7 @@ function go(v, force) {
   if (location.hash.slice(1) !== v) location.hash = v;
   const navKey = v.startsWith('report:') ? 'reports' : v;
   const sec = sectionOf(navKey);
-  document.querySelectorAll('.rail a').forEach(a => a.classList.toggle('active', !!((sec && a.dataset.sec === sec.key) || a.dataset.v === v || (v.startsWith('report:') && a.dataset.v === 'reports'))));
+  document.querySelectorAll('.rail a').forEach(a => a.classList.toggle('active', !a.classList.contains('logo') && (a.dataset.v === navKey || (a.id === 'railSettings' && v === 'settings'))));
   document.getElementById('mobileNav').value = sec ? sec.views[0] : navKey;
   const meta = S.meta.views.find(x => x.id === v);
   const grp = (GROUPS.find(([, ids]) => ids.includes(v)) || [''])[0];
@@ -1631,12 +1637,12 @@ function renderCommand() {
     <div class="askbox"><button type="button" class="ask-file" id="heroAttach" title="Attach a document" aria-label="Attach a document"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.6 12.7 20.3a5 5 0 0 1-7.1-7.1l8.5-8.5a3.5 3.5 0 0 1 5 5L10.4 18.4a2 2 0 0 1-2.8-2.8l7.8-7.8"/></svg></button><input id="heroFile" type="file" accept=".xlsx,.xlsm,.csv,.txt,.docx,.pptx" hidden>${I.spark}<input id="q" placeholder="Ask anything..." autocomplete="off"><button class="send" id="send" title="Ask" disabled>${I.up}</button></div>
     <div class="ask-docs" id="heroDocs"></div>
     <div class="cockpit-wave" id="cockpitWave"></div>
-    <button type="button" class="flow-toggle" id="flowToggle">Inventory flow <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+    <button type="button" class="flow-toggle" id="flowToggle">Explore sector data <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
     </section>`;
   armComposer(document.getElementById('q'), document.getElementById('send'), 'hero');
   bindUpload('heroAttach', 'heroFile', 'hero');
   paintUploads();
-  document.getElementById('flowToggle').onclick = () => go('trends');
+  document.getElementById('flowToggle').onclick = () => go('catalogue');
   if (chatting) mirrorThreads(document.body.classList.contains('assist-open') ? 'assist' : 'hero');
   else loadCockpit();
 }
@@ -1644,7 +1650,7 @@ async function loadCockpit() {
   const wave = document.getElementById('cockpitWave');
   if (S.view !== 'command' || !wave) return;
   let feed = { metrics: [], frames: [] };
-  try { feed = await api('/api/cockpit'); } catch (e) { feed = { metrics: [], frames: [] }; }
+  try { feed = await ministryCockpitFeed(); } catch (e) { feed = { metrics: [], frames: [] }; }
   if (S.view !== 'command' || !document.getElementById('cockpitWave')) return;
   const peaks = [
     { x: 14, w: 16 },
@@ -1653,9 +1659,9 @@ async function loadCockpit() {
     { x: 91.1, w: 15 },
   ];
   const metrics = feed.metrics || [];
-  wave.innerHTML = `<div class="wave-clip"><img src="/static/cockpit-wave.png" alt="Inventory flow"></div>` + peaks.map((p, i) => {
+  wave.innerHTML = `<div class="wave-clip"><img src="/static/cockpit-wave.png" alt="Sector overview"></div>` + peaks.map((p, i) => {
     const m = metrics[i] || { label: '', value: 0 };
-    return `<div class="wave-metric" style="left:${p.x}%;width:${p.w}%"><p class="lab">${esc(m.label)}</p><p class="val">${moneyRich(m.value)}</p><div class="wave-delta" data-slot="${i}"></div></div>`;
+    return `<div class="wave-metric" style="left:${p.x}%;width:${p.w}%"><p class="lab">${esc(m.label)}</p><p class="val">${esc(Number(m.value).toLocaleString())} <span class="u">${esc(m.unit || "")}</span></p><div class="wave-delta" data-slot="${i}"></div></div>`;
   }).join('');
   const decks = [[], [], [], []];
   (feed.frames || []).forEach(f => { if (decks[f.slot]) decks[f.slot].push(f); });
@@ -1663,14 +1669,6 @@ async function loadCockpit() {
   paintCockpit(decks, step, false);
   if (S.cockpitTimer) clearInterval(S.cockpitTimer);
   S.cockpitTimer = setInterval(() => { step += 1; paintCockpit(decks, step, true); }, 5000);
-  api('/api/cockpit/narrate').then(extra => {
-    if (S.view !== 'command') return;
-    (extra.frames || []).forEach(f => {
-      const deck = decks[f.slot];
-      if (!deck || deck.some(x => x.value === f.value && x.vs === f.vs)) return;
-      deck.push(f);
-    });
-  }).catch(() => {});
 }
 
 async function loadInsights() {
@@ -1702,27 +1700,6 @@ function excelJobAnswer(job) {
   if (job.history_id) lines.push(`Download: [/api/reports/history/${job.history_id}/download](/api/reports/history/${job.history_id}/download)`);
   return lines.join('\n');
 }
-async function ask(text, playbook) {
-  if (!text) return;
-  const hero = document.getElementById('hero'), thread = document.getElementById('thread'), q = document.getElementById('q');
-  hero.classList.add('chatting');
-  const wrap = document.getElementById('insightsWrap'); if (wrap) wrap.style.display = 'none';
-  q.value = ''; document.getElementById('send').classList.remove('ready');
-  const u = document.createElement('div'); u.className = 'msg user'; u.textContent = text;
-  const a = document.createElement('div'); a.className = 'msg';
-  a.innerHTML = `<div class="steps live"><div class="step"><span class="thinking"><i></i><i></i><i></i></span> ${playbook ? 'Agent is planning and working…' : 'Checking sector evidence and consulting the assistant…'}</div></div>`;
-  thread.append(u, a); S.thread.push(u, a);
-  a.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  const r = playbook
-    ? await api('/api/playbook/' + playbook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-    : await api('/api/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, history: S.history }) });
-  S.history.push({ role: 'user', content: text }, { role: 'assistant', content: r.answer });
-  persistChat();
-  renderAgentResult(a, r);
-  updateBadge();
-  q.focus();
-}
-
 async function pollExcelJob(jobId, pending, hosts) {
   const started = Date.now();
   const maxMs = 15 * 60 * 1000;
@@ -1771,7 +1748,7 @@ async function ask(text, playbook, origin) {
   clearComposers();
   const hosts = [threadHost('hero'), threadHost('assist')].filter(Boolean);
   const liveId = fromPopup || S.view !== 'command' ? 'assistThread' : 'heroThread';
-  const thinking = `<div class="steps live"><div class="step"><span class="thinking"><i></i><i></i><i></i></span> ${playbook ? 'Agent is planning and working…' : 'Planning and querying the supply chain model…'}</div></div>`;
+  const thinking = `<div class="steps live"><div class="step"><span class="thinking"><i></i><i></i><i></i></span> ${playbook ? 'Agent is planning and working…' : 'Checking Ministry records…'}</div></div>`;
   const pending = hosts.map(thread => {
     const u = document.createElement('div'); u.className = 'msg user'; u.textContent = text;
     const a = document.createElement('div'); a.className = 'msg'; a.innerHTML = thinking;
@@ -4212,6 +4189,31 @@ function renderDefinitions() {
 /* MEMD sector experience: the source POC visual shell, with Ministry-owned flows and data. */
 const sectorEsc = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function sectorData(){return api('/api/memd/overview')}
+async function ministryCockpitFeed() {
+  const data = await sectorData();
+  const choices = [
+    ['minerals', 'Mineral production value', 'Mineral production'],
+    ['petroleum', 'Strategic stock cover', 'Petroleum stock cover'],
+    ['energy', 'Electricity access', 'Electricity access'],
+    ['projects', 'Strategic projects on schedule', 'Projects on schedule'],
+  ];
+  const metrics = [], frames = [];
+  choices.forEach(([sector, metric, label], slot) => {
+    const rows = (data.series[sector]?.[metric] || []).slice().sort((a, b) => a.period.localeCompare(b.period));
+    const current = rows.at(-1), previous = rows.at(-2);
+    metrics.push({ label, value: current?.value ?? 0, unit: current?.unit || '' });
+    if (!current) return;
+    const delta = previous ? Number(current.value) - Number(previous.value) : 0;
+    frames.push({ slot, dir: delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat',
+      value: `${delta > 0 ? '+' : ''}${Number(delta.toFixed(1))} ${current.unit === '%' ? 'pp' : current.unit}`,
+      vs: previous ? `vs ${previous.period}` : current.period });
+  });
+  const periods = data.indicators.map(row => row.period).sort();
+  S.sectorPeriod = periods.at(-1);
+  renderWhen();
+  return { metrics, frames };
+}
+
 function sectorSeriesSvg(title, rows, unit){
   const w=640,h=270,left=54,right=18,top=30,bottom=48,plotH=h-top-bottom,plotW=w-left-right;
   const values=rows.map(r=>Number(r.value)||0), max=Math.max(...values,1)*1.18, min=Math.min(...values,0);
@@ -4227,49 +4229,8 @@ function sectorMetrics(data){
  const vals=[pick('minerals','Mineral production value'),pick('petroleum','Strategic stock cover'),pick('energy','Electricity access'),pick('projects','Strategic projects on schedule')];
  return `<div class="memd-kpis">${vals.map((v,i)=>`<div class="memd-kpi"><label>${['Mineral production value','Strategic petroleum stock cover','Electricity access','Strategic projects on schedule'][i]}</label><b>${v?Number(v.value).toLocaleString(): '—'}${i===0?' bn':i===1?' days':i===2?'%':'%'}</b><small>${v?sectorEsc(v.period)+' · '+sectorEsc(v.unit):'No measure available'}</small></div>`).join('')}</div>`
 }
-function renderMemdHome(){
- const name=memdStore('profile',{}).name||'Charles';
- document.getElementById('content').innerHTML=`<section class="hero" id="hero">
-   <h1>${greeting()}, <span>${sectorEsc(name)}</span>.</h1>
-   <div class="hero-rule"></div>
-   <div class="thread" id="thread"></div>
-   <div class="askbox">${I.spark}<input id="memdHomeQ" placeholder="Ask about minerals, petroleum, energy, or projects…" autocomplete="off"><button class="send" id="memdHomeAsk" title="Ask" disabled>${I.up}</button></div>
-   <div class="cockpit-wave" id="cockpitWave"></div>
-   <button type="button" class="flow-toggle" id="flowToggle">Explore sector data <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
-   <div id="memdHomeAnswer" class="memd-result" hidden></div>
- </section>`;
- const q=document.getElementById('memdHomeQ'),send=document.getElementById('memdHomeAsk');
- const submit=()=>{const question=q.value.trim();if(!question)return;document.getElementById('hero').classList.add('chatting');send.disabled=true;askSector(question,'memdHomeAnswer').finally(()=>{send.disabled=false})};
- q.oninput=()=>{send.disabled=!q.value.trim()};q.onkeydown=e=>{if(e.key==='Enter')submit()};send.onclick=submit;
- document.getElementById('flowToggle').onclick=()=>go('catalogue');
- loadMinistryCockpit();
-}
-async function loadMinistryCockpit(){
- const wave=document.getElementById('cockpitWave');if(!wave)return;
- try{
-  const d=await sectorData();if(S.view!=='command'||!wave.isConnected)return;
-  const choices=[['minerals','Mineral production value'],['petroleum','Strategic stock cover'],['energy','Electricity access'],['projects','Strategic projects on schedule']];
-  const points=[{x:14,w:16},{x:40,w:16},{x:60.1,w:16},{x:91.1,w:15}];
-  const metrics=[],decks=[[],[],[],[]],chartSeries=[];
-  choices.forEach(([sector,metric],slot)=>{
-   const rows=(d.series[sector]?.[metric]||[]).slice().sort((a,b)=>a.period.localeCompare(b.period));
-   const current=rows.at(-1),previous=rows.at(-2);if(!current)return;
-   const unit=current.unit==='UGX bn'?'UGX bn':current.unit;
-   metrics.push({label:metric,value:`${Number(current.value).toLocaleString()} <span class="u">${sectorEsc(unit)}</span>`});chartSeries[slot]={rows,unit};
-   const change=previous?Number(current.value)-Number(previous.value):0;
-   const displayChange=Number.isInteger(change)?change:change.toFixed(1);
-   decks[slot].push({slot,dir:change>0?'up':change<0?'down':'flat',value:`${change>0?'+':''}${displayChange}${current.unit==='%'?' pp':` ${current.unit}`}`,vs:previous?`vs ${previous.period}`:current.period});
-  });
-  const colors=['#2563eb','#14b8a6','#8b5cf6','#f59e0b'];
-  const paths=chartSeries.map((series,i)=>{if(!series)return '';const vals=series.rows.map(r=>Number(r.value)),lo=Math.min(...vals),hi=Math.max(...vals),span=hi-lo||1,left=i*250+18,width=214,pts=vals.map((v,j)=>`${(left+(vals.length<2?width/2:j*width/(vals.length-1))).toFixed(1)},${(112-((v-lo)/span)*40).toFixed(1)}`),last=pts.at(-1).split(',');return `<line x1="${left}" y1="124" x2="${left+width}" y2="124" stroke="#e6edf7" stroke-width="1"/><polyline fill="none" stroke="${colors[i]}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" points="${pts.join(' ')}"/><circle cx="${last[0]}" cy="${last[1]}" r="4" fill="${colors[i]}"><title>${sectorEsc(series.rows.at(-1).period)}: ${Number(vals.at(-1)).toLocaleString()} ${sectorEsc(series.unit)}</title></circle>`}).join('');
-  wave.innerHTML=`<div class="wave-clip"><svg viewBox="0 0 1000 150" preserveAspectRatio="none" role="img" aria-label="Sector indicator trends from stored period data">${paths}</svg></div>`+points.map((p,i)=>{const m=metrics[i]||{label:'',value:'—'};return `<div class="wave-metric" style="left:${p.x}%;width:${p.w}%"><p class="lab">${sectorEsc(m.label)}</p><p class="val">${m.value}</p><div class="wave-delta" data-slot="${i}"></div></div>`}).join('');
-  paintCockpit(decks,0,false);
- }catch(e){if(wave.isConnected)wave.innerHTML='<div class="memd-note" style="padding:24px;text-align:center">Sector overview is temporarily unavailable.</div>'}
-}
 async function askSector(q,target){const out=document.getElementById(target);out.hidden=false;out.textContent='Checking the Ministry workspace…';try{const r=await fetch('/api/ask',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q})});const d=await r.json();out.innerHTML=`<b>Evidence-based answer</b><br>${sectorEsc(d.answer)}${d.evidence?.length?`<details><summary>Evidence (${d.evidence.length} records)</summary><pre>${sectorEsc(JSON.stringify(d.evidence.slice(0,20),null,2))}</pre></details>`:''}<p class="memd-note">AI output is advisory; officials and asset operators retain decision authority.</p>`}catch(e){out.textContent='Could not query the local evidence store: '+e.message}}
-function renderMemdAssistant(){document.getElementById('content').innerHTML=`<div class="memd-page"><div class="memd-hero"><span class="memd-badge">Sector intelligence agent</span><h1>Ask the <span>MEMD</span> assistant</h1><p>Ask questions across minerals, petroleum, energy, projects, and pipeline assets.</p></div><div class="memd-card"><h2>Ask a question</h2><div class="memd-chat"><input id="memdAskQ" placeholder="Ask about minerals, petroleum, energy, projects or pipeline assets…"><button id="memdAskGo">Ask</button></div><div class="memd-actions"><button class="memd-action" data-mq="Which pipeline assets need operator review?">Which pipeline assets need review?</button><button class="memd-action" data-mq="Summarise energy sector indicators.">Summarise energy indicators</button><button class="memd-action" data-mq="What data is required for licence-level mineral compliance analytics?">What is missing for licence oversight?</button></div><div id="memdAnswer" class="memd-result" hidden></div></div><div class="memd-grid" style="margin-top:16px"><div class="memd-card"><h3>Sector analyst</h3><p>Compares stored period measures, identifies trends, and states source limitations.</p></div><div class="memd-card"><h3>Pipeline monitoring</h3><p>Surfaces asset telemetry exceptions for human review; does not issue operational control instructions.</p></div><div class="memd-card"><h3>Report extraction</h3><p>Reads workbook formulas, sheet structure, and formatting, then creates a data-backed workbook for review.</p></div><div class="memd-card"><h3>Human decision boundary</h3><p>AI findings and scenarios are advisory. Only authorised officials and infrastructure operators make decisions.</p></div></div></div>`;
- const run=()=>{const q=document.getElementById('memdAskQ').value.trim();if(!q)return;const o=document.getElementById('memdAnswer');o.hidden=false;askSector(q,'memdAnswer')};document.getElementById('memdAskGo').onclick=run;document.getElementById('memdAskQ').onkeydown=e=>{if(e.key==='Enter')run()};document.querySelectorAll('[data-mq]').forEach(b=>b.onclick=()=>{document.getElementById('memdAskQ').value=b.dataset.mq;run()})}
-function renderMemdCatalogue(){sectorData().then(d=>{document.getElementById('content').innerHTML=`<div class="memd-page"><div class="memd-hero"><span class="memd-badge">Sector data</span><h1>Data <span>catalogue</span></h1><p>Explore sector indicators, asset readings, and the pipeline model.</p></div><p class="memd-note">Indicator history and pipeline asset readings are available below. Changes to workspace readings update their charts.</p><div class="memd-grid"><div class="memd-card"><h3>Sector indicators (${d.indicators.length})</h3><table class="memd-table"><thead><tr><th>Sector</th><th>Measure</th><th>Period</th><th>Value</th><th>Unit</th></tr></thead><tbody>${d.indicators.map(r=>`<tr><td>${sectorEsc(r.sector)}</td><td>${sectorEsc(r.metric)}</td><td>${sectorEsc(r.period)}</td><td>${r.value}</td><td>${sectorEsc(r.unit)}</td></tr>`).join('')}</tbody></table></div><div class="memd-card"><h3>Pipeline assets (${d.asset_count})</h3><p>Telemetry history and asset metadata power the 3D twin view.</p><button class="memd-button" id="dataTwin">Open 3D twin</button></div></div></div>`;document.getElementById('dataTwin').onclick=()=>go('twin')})}
+function renderMemdAssistant(){go('command',true);openAssist()}
 let twinFrame=null,twinDispose=null;
 async function renderMemdTwin(){
  const c=document.getElementById('content');const d=await sectorData();if(S.view!=='twin')return;const selected=S.twinAsset||'PS-01';const a=d.assets.find(x=>x.id===selected)||d.assets[0];
@@ -4309,22 +4270,33 @@ function memdStore(key, fallback){try{return JSON.parse(localStorage.getItem('me
 function renderMemdProfile(){
  const p=memdStore('profile',{name:'',title:'',department:'',timezone:'Africa/Kampala'});
  document.getElementById('content').innerHTML=`<div class="memd-page"><div class="memd-hero"><span class="memd-badge">Workspace</span><h1>Your <span>profile</span></h1><p>Set how your name and role appear in this browser.</p></div><section class="memd-card"><h2>Profile details</h2><div class="memd-grid"><label>Display name<input class="memd-field" id="profileName" value="${sectorEsc(p.name)}"></label><label>Role or title<input class="memd-field" id="profileTitle" value="${sectorEsc(p.title)}"></label><label>Department<input class="memd-field" id="profileDepartment" value="${sectorEsc(p.department)}"></label><label>Timezone<select class="memd-field" id="profileTimezone"><option>Africa/Kampala</option><option>Africa/Nairobi</option><option>UTC</option></select></label></div><p><button class="memd-button" id="saveProfile">Save profile</button> <span id="profileSaved" hidden>Saved on this device.</span></p></section></div>`;
- document.getElementById('profileTimezone').value=p.timezone||'Africa/Kampala';document.getElementById('saveProfile').onclick=()=>{const next={name:document.getElementById('profileName').value.trim(),title:document.getElementById('profileTitle').value.trim(),department:document.getElementById('profileDepartment').value.trim(),timezone:document.getElementById('profileTimezone').value};localStorage.setItem('memd-profile',JSON.stringify(next));const foot=document.querySelector('.rail-user .user-copy');if(foot)foot.innerHTML=`<b>${sectorEsc(next.name||'MEMD workspace')}</b><small>${sectorEsc(next.title||'Sector intelligence')}</small>`;document.getElementById('profileSaved').hidden=false}
+ document.getElementById('profileTimezone').value=p.timezone||'Africa/Kampala';document.getElementById('saveProfile').onclick=()=>{const next={name:document.getElementById('profileName').value.trim(),title:document.getElementById('profileTitle').value.trim(),department:document.getElementById('profileDepartment').value.trim(),timezone:document.getElementById('profileTimezone').value};localStorage.setItem('memd-profile',JSON.stringify(next));applyIdentity();document.getElementById('profileSaved').hidden=false}
 }
 function renderMemdSettings(){const p=memdStore('preferences',{refreshSeconds:60,compact:false});document.getElementById('content').innerHTML=`<div class="memd-page"><div class="memd-hero"><span class="memd-badge">Workspace controls</span><h1>Platform <span>settings</span></h1><p>Manage this browser's display and workspace preferences.</p></div><section class="memd-card"><h2>Preferences</h2><label><input id="compactMode" type="checkbox" ${p.compact?'checked':''}> Compact data tables</label><p><label>Default reporting period <select class="memd-field" id="defaultPeriod"><option>2026 Q1</option><option>2025 Q4</option><option>2024/25</option></select></label></p><button class="memd-button" id="saveSettings">Save settings</button> <span id="settingsSaved" hidden>Saved on this device.</span></section><section class="memd-card" style="margin-top:16px"><h2>Data and connections</h2><p>Manage sector datasets and review connected workspace services.</p><button class="memd-button" id="settingsCatalogue">Open data catalogue</button></section></div>`;document.getElementById('defaultPeriod').value=p.defaultPeriod||'2026 Q1';document.getElementById('saveSettings').onclick=()=>{localStorage.setItem('memd-preferences',JSON.stringify({compact:document.getElementById('compactMode').checked,defaultPeriod:document.getElementById('defaultPeriod').value,refreshSeconds:60}));document.getElementById('settingsSaved').hidden=false};document.getElementById('settingsCatalogue').onclick=()=>go('catalogue')}
 function renderMemdAgents(){const rules=memdStore('agent-rules',[{id:'stock-cover',name:'Low petroleum stock cover',metric:'Strategic stock cover',sector:'petroleum',op:'<',threshold:20,active:true},{id:'project-delay',name:'Project schedule below 70%',metric:'Strategic projects on schedule',sector:'projects',op:'<',threshold:70,active:true}]);document.getElementById('content').innerHTML=`<div class="memd-page"><div class="memd-hero"><span class="memd-badge">Advisory rules</span><h1>Agent <span>rules</span></h1><p>Manage local indicator checks. Results are prompts for review, not automated Ministry decisions.</p></div><div class="memd-card"><h2>Configured checks</h2><div id="agentRulesList">${rules.map((r,i)=>`<div class="memd-log"><i class="${r.active?'alert':''}"></i><span><b>${sectorEsc(r.name)}</b> · ${sectorEsc(r.metric)} ${sectorEsc(r.op)} ${Number(r.threshold)} <button class="btn" data-toggle-rule="${i}">${r.active?'Pause':'Enable'}</button> <button class="btn" data-delete-rule="${i}">Remove</button></span></div>`).join('')||'<p>No configured checks.</p>'}</div><div class="memd-grid"><label>Rule name<input id="ruleName" class="memd-field" placeholder="New indicator check"></label><label>Indicator<select id="ruleMetric" class="memd-field"><option value="petroleum|Strategic stock cover">Petroleum stock cover (days)</option><option value="projects|Strategic projects on schedule">Projects on schedule (%)</option><option value="energy|Distribution losses">Distribution losses (%)</option><option value="minerals|Inspections completed">Inspections completed (%)</option></select></label><label>Alert when value is<select id="ruleOp" class="memd-field"><option value="<">Below</option><option value=">">Above</option></select></label><label>Threshold<input id="ruleThreshold" class="memd-field" type="number" value="20"></label></div><p><button class="memd-button" id="addRule">Add rule</button> <button class="memd-button" id="runRules">Run checks against latest stored values</button></p><div id="ruleResults"></div></div></div>`;
  const save=()=>localStorage.setItem('memd-agent-rules',JSON.stringify(rules));document.querySelectorAll('[data-toggle-rule]').forEach(b=>b.onclick=()=>{rules[+b.dataset.toggleRule].active=!rules[+b.dataset.toggleRule].active;save();renderMemdAgents()});document.querySelectorAll('[data-delete-rule]').forEach(b=>b.onclick=()=>{rules.splice(+b.dataset.deleteRule,1);save();renderMemdAgents()});document.getElementById('addRule').onclick=()=>{const [sector,metric]=document.getElementById('ruleMetric').value.split('|');const name=document.getElementById('ruleName').value.trim()||metric;rules.push({id:crypto.randomUUID(),name,sector,metric,op:document.getElementById('ruleOp').value,threshold:Number(document.getElementById('ruleThreshold').value),active:true});save();renderMemdAgents()};document.getElementById('runRules').onclick=async()=>{const d=await sectorData();const matches=rules.filter(r=>r.active).map(r=>{const v=d.series[r.sector]?.[r.metric]?.at(-1);return v&&((r.op==='<'?v.value<r.threshold:v.value>r.threshold))?`${r.name}: ${v.value} ${v.unit} (${v.period}) meets configured threshold; refer for human review.`:null}).filter(Boolean);document.getElementById('ruleResults').innerHTML=`<div class="memd-source"><b>Check complete.</b> ${matches.length?matches.map(sectorEsc).join('<br>'):'No active rules triggered on the latest stored values.'} Results use workspace records and are advisory.</div>`}}
+async function generateMinistryReport(file, progress) {
+  const body = new FormData(); body.append('file', file);
+  progress('Uploading workbook…');
+  const response = await fetch('/api/memd/reports/jobs', { method: 'POST', body });
+  const job = await response.json();
+  if (!response.ok) throw new Error(job.error || 'Workbook upload failed');
+  progress('Inspecting formulas and generating the report…');
+  for (let attempt = 0; attempt < 1800; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    const response = await fetch(job.status_url), state = await response.json();
+    if (!response.ok || state.status === 'failed') throw new Error(state.error || 'Report generation failed');
+    if (state.status === 'ready') return state.result;
+  }
+  throw new Error('The workbook is still processing. Check Reports shortly.');
+}
 function renderMemdReports(){
  document.getElementById('content').innerHTML=`<div class="memd-page"><div class="memd-hero"><span class="memd-badge">Report builder</span><h1>Reports & <span>reproduction</span></h1><p>Generate a workbook from database-backed sector records, or upload an Excel report to preserve its layout and inspect its formulas and formatting.</p></div><div class="memd-grid"><section class="memd-card"><h2>Reproduce an uploaded report</h2><p>Upload a workbook. The report agent inspects sheet structure, formulas, labels, and cell styles, then returns a copy with current MEMD database records.</p><form id="memdReportForm" class="memd-upload"><input id="memdReportFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required><p><button class="memd-button" id="memdReportSubmit">Inspect & generate report</button></p><div class="memd-note">Workbooks are stored with the workspace and processed in the background. Larger files may take longer.</div></form><div id="memdReportResult" aria-live="polite"></div></section><section class="memd-card"><h2>Available period measures</h2><div id="memdReportPreview">Loading database…</div></section></div><div class="memd-section-title">Recent generated workbooks</div><div class="memd-card" id="memdReportHelp"><p>Uploaded templates are recorded in the workspace. Each generated workbook includes sector, indicator, period, value, unit, and data classification.</p></div></div>`;
  sectorData().then(d=>{if(S.view!=='reports')return;document.getElementById('memdReportPreview').innerHTML=`<p>${d.indicators.length} indicator-period values across minerals, petroleum, energy, and projects.</p><button class="memd-button" id="memdDownloadBase">Download current sector data (.csv)</button>`;document.getElementById('memdDownloadBase').onclick=()=>{const rows=[['Sector','Indicator','Period','Value','Unit','Classification'],...d.indicators.map(x=>[x.sector,x.metric,x.period,x.value,x.unit,'MEMD workspace'])];const csv=rows.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='memd_sector_indicators.csv';a.click();URL.revokeObjectURL(a.href)}});api('/api/memd/reports/templates').then(rows=>{if(S.view!=='reports')return;document.getElementById('memdReportHelp').innerHTML=rows.length?`<table class="memd-table"><thead><tr><th>Source workbook</th><th>Uploaded</th><th>Formulas</th><th></th></tr></thead><tbody>${rows.map(x=>`<tr><td>${sectorEsc(x.filename)}</td><td>${sectorEsc(x.uploaded_at)}</td><td>${x.formula_count}</td><td><a class="memd-button" href="/api/memd/reports/${encodeURIComponent(x.id)}/download">Download workbook</a></td></tr>`).join('')}</tbody></table>`:'<p>No workbooks have been generated yet. Uploaded files and outputs are saved locally for retrieval.</p>'}).catch(()=>{});
- document.getElementById('memdReportForm').onsubmit=async e=>{e.preventDefault();const out=document.getElementById('memdReportResult'),submit=document.getElementById('memdReportSubmit'),file=document.getElementById('memdReportFile').files[0];if(!file)return;submit.disabled=true;out.textContent='Uploading workbook…';const fd=new FormData();fd.append('file',file);try{const r=await fetch('/api/memd/reports/jobs',{method:'POST',body:fd});const job=await r.json();if(!r.ok)throw new Error(job.error||'Workbook upload failed');out.textContent='Workbook received. Inspecting formulas and generating a database-backed report…';let d=null;for(let attempt=0;attempt<1800;attempt++){await new Promise(resolve=>setTimeout(resolve,1500));const statusResponse=await fetch(job.status_url);const state=await statusResponse.json();if(!statusResponse.ok)throw new Error(state.error||'Could not read report status');if(state.status==='ready'){d=state.result;break}if(state.status==='failed')throw new Error(state.error||'Report generation failed');if(attempt%8===7)out.textContent=state.status==='queued'?'Report is queued and will start shortly…':'The report agent is inspecting the workbook and building the output…'}if(!d)throw new Error('Report generation is taking longer than expected. Your job is still saved; check Reports again shortly.');out.innerHTML=`<div class="memd-result"><b>Workbook ready: ${sectorEsc(d.filename)}</b><br>${d.sheets.length} sheet(s) inspected · ${d.formula_count} formula(s) preserved · ${d.matched_cells.length} indicator label(s) populated${d.sheets.map(x=>`<p><b>${sectorEsc(x.name)}</b> · ${x.rows} rows · ${x.columns} columns · ${x.formulas.length} formulas scanned</p>`).join('')}<ul>${d.notes.map(x=>`<li>${sectorEsc(x)}</li>`).join('')}</ul><a class="memd-button" href="${sectorEsc(d.download_url)}">Download generated workbook</a></div>`;document.getElementById('memdReportFile').value='';const rows=await api('/api/memd/reports/templates');document.getElementById('memdReportHelp').innerHTML=rows.length?`<table class="memd-table"><thead><tr><th>Source workbook</th><th>Uploaded</th><th>Formulas</th><th></th></tr></thead><tbody>${rows.map(x=>`<tr><td>${sectorEsc(x.filename)}</td><td>${sectorEsc(x.uploaded_at)}</td><td>${x.formula_count}</td><td><a class="memd-button" href="/api/memd/reports/${encodeURIComponent(x.id)}/download">Download workbook</a></td></tr>`).join('')}</tbody></table>`:'<p>No workbooks have been generated yet.</p>'}catch(err){out.innerHTML=`<div class="memd-result">${sectorEsc(err.message)}</div>`}finally{submit.disabled=false}}
+ document.getElementById('memdReportForm').onsubmit=async e=>{e.preventDefault();const out=document.getElementById('memdReportResult'),submit=document.getElementById('memdReportSubmit'),file=document.getElementById('memdReportFile').files[0];if(!file)return;submit.disabled=true;out.textContent='Uploading workbook…';try{const d=await generateMinistryReport(file,message=>{out.textContent=message});out.innerHTML=`<div class="memd-result"><b>Workbook ready: ${sectorEsc(d.filename)}</b><br>${d.sheets.length} sheet(s) inspected · ${d.formula_count} formula(s) preserved · ${d.matched_cells.length} indicator label(s) populated${d.sheets.map(x=>`<p><b>${sectorEsc(x.name)}</b> · ${x.rows} rows · ${x.columns} columns · ${x.formulas.length} formulas scanned</p>`).join('')}<ul>${d.notes.map(x=>`<li>${sectorEsc(x)}</li>`).join('')}</ul><a class="memd-button" href="${sectorEsc(d.download_url)}">Download generated workbook</a></div>`;document.getElementById('memdReportFile').value='';const rows=await api('/api/memd/reports/templates');document.getElementById('memdReportHelp').innerHTML=rows.length?`<table class="memd-table"><thead><tr><th>Source workbook</th><th>Uploaded</th><th>Formulas</th><th></th></tr></thead><tbody>${rows.map(x=>`<tr><td>${sectorEsc(x.filename)}</td><td>${sectorEsc(x.uploaded_at)}</td><td>${x.formula_count}</td><td><a class="memd-button" href="/api/memd/reports/${encodeURIComponent(x.id)}/download">Download workbook</a></td></tr>`).join('')}</tbody></table>`:'<p>No workbooks have been generated yet.</p>'}catch(err){out.innerHTML=`<div class="memd-result">${sectorEsc(err.message)}</div>`}finally{submit.disabled=false}}
 }
 function renderMemdCatalogue(){sectorData().then(d=>{document.getElementById('content').innerHTML=`<div class="memd-page"><div class="memd-hero"><span class="memd-badge">SQLite data store</span><h1>Data <span>catalogue</span></h1><p>Persistent sector indicators and asset readings drive the graphs and twin.</p></div><div class="memd-card"><h3>Indicators · ${d.indicators.length} observations</h3><table class="memd-table"><thead><tr><th>Sector</th><th>Measure</th><th>Period</th><th>Value</th><th>Unit</th><th></th></tr></thead><tbody>${d.indicators.map((r,i)=>`<tr><td>${sectorEsc(r.sector)}</td><td>${sectorEsc(r.metric)}</td><td>${sectorEsc(r.period)}</td><td>${r.value}</td><td>${sectorEsc(r.unit)}</td><td><button class="btn" data-edit-ind="${i}">Edit value</button></td></tr>`).join('')}</tbody></table></div><div class="memd-card" style="margin-top:16px"><h3>Asset inventory · ${d.assets.length} assets</h3><table class="memd-table"><thead><tr><th>Asset</th><th>Type</th><th>District</th><th>Status</th><th>Risk</th><th></th></tr></thead><tbody>${d.assets.map(a=>`<tr><td>${sectorEsc(a.name)}</td><td>${sectorEsc(a.type)}</td><td>${sectorEsc(a.district)}</td><td>${sectorEsc(a.status)}</td><td>${sectorEsc(a.risk)}</td><td><button class="btn" data-asset="${sectorEsc(a.id)}">View twin</button></td></tr>`).join('')}</tbody></table></div></div>`;document.querySelectorAll('[data-asset]').forEach(b=>b.onclick=()=>{S.twinAsset=b.dataset.asset;go('twin')});document.querySelectorAll('[data-edit-ind]').forEach(b=>b.onclick=async()=>{const r=d.indicators[+b.dataset.editInd],value=prompt(`Update ${r.metric} (${r.unit}) for ${r.period}`,r.value);if(value===null)return;const resp=await fetch('/api/memd/indicator',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sector:r.sector,metric:r.metric,period:r.period,value})});const out=await resp.json();if(!resp.ok){alert(out.error);return}renderMemdCatalogue()})})}
-renderCommand=renderMemdHome;
 renderReports=renderMemdReports;
-renderWhen=function(){document.getElementById('when').innerHTML='<div class="memd-context"><span class="memd-source-pill">SECTOR INTELLIGENCE</span><span class="memd-context-summary">Minerals, petroleum, energy, and strategic project indicators · Reporting periods vary by measure</span><span class="memd-context-period">Latest available indicator period</span></div>'};
-const _memdInit=init;
-init=async function(){await _memdInit();document.title='MEMD Decision Intelligence';const logo='/static/memd-mark.svg';document.querySelectorAll('.logo-img,.top-logo').forEach(x=>{x.src=logo;x.alt='MEMD'});document.querySelectorAll('.logo-text').forEach(x=>x.textContent='MEMD');const rail=document.getElementById('rail');rail.innerHTML=`<div class="rail-head"><a class="logo" href="#command" data-v="command" title="MEMD"><img class="logo-img" src="${logo}" alt="MEMD"><div class="logo-text">MEMD</div></a><button class="toggle" id="railToggle" type="button" title="Collapse sidebar" aria-label="Collapse sidebar">${I.side}</button></div><div class="scroll"><div class="nav-block"><a data-v="command" data-sec="memd" title="Command Center"><span>${svg('monitor')}</span><span class="lbl">Command Center</span></a><a data-v="twin" data-sec="memd" title="Pipeline digital twin"><span>${svg('layers')}</span><span class="lbl">Pipeline digital twin</span></a><a data-v="assistant" data-sec="memd" title="Ask the assistant"><span>${svg('sparkle')}</span><span class="lbl">Ask the assistant</span></a><a data-v="reports" data-sec="memd" title="Reports"><span>${svg('doc')}</span><span class="lbl">Reports</span></a><a data-v="catalogue" data-sec="memd" title="Data catalogue"><span>${svg('book')}</span><span class="lbl">Data catalogue</span></a><a data-v="agents" data-sec="memd" title="Agent rules"><span>${svg('sparkle')}</span><span class="lbl">Agent rules</span></a><a data-v="settings" data-sec="memd" title="Settings"><span>${svg('gear')}</span><span class="lbl">Settings</span></a></div></div><div class="foot"><button type="button" class="rail-user" data-v="profile" title="Open profile"><div class="avatar">UG</div><div class="user-copy"><b>MEMD workspace</b><small>Profile</small></div></button></div>`;document.querySelectorAll('.rail [data-v]').forEach(x=>x.onclick=e=>{e.preventDefault();go(x.dataset.v,true)});const topAvatar=document.getElementById('topAvatar');if(topAvatar){topAvatar.style.cursor='pointer';topAvatar.title='Open profile';topAvatar.onclick=()=>go('profile',true)}const t=document.getElementById('railToggle');if(t)t.onclick=()=>{const collapsed=rail.classList.toggle('collapsed');document.body.classList.toggle('rail-collapsed',collapsed);document.getElementById('railSlot').classList.toggle('collapsed',collapsed);localStorage.setItem('pulse-rail-collapsed',collapsed?'1':'0')};if(localStorage.getItem('pulse-rail-collapsed')==='1'){rail.classList.add('collapsed');document.body.classList.add('rail-collapsed');document.getElementById('railSlot').classList.add('collapsed')}go('command',true)};
 init();
 </script>
 </body>

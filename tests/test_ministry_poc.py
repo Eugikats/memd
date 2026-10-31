@@ -30,6 +30,18 @@ class MinistryPocTests(unittest.TestCase):
 
     def setUp(self):
         self.client = app.test_client()
+        # Unit tests must not depend on a developer's Azure credentials/network.
+        env = patch.dict(os.environ, {'AZURE_OPENAI_ENDPOINT': ''})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def test_chat_passes_attached_document_evidence_to_ministry_agent(self):
+        with patch('app.documents.context_block', return_value='Uploaded sector notes') as context:
+            with patch.object(ministry, 'answer', return_value={'answer': 'Reviewed'}) as answer:
+                response = self.client.post('/api/ask', json={'question': 'Summarise', 'documents': ['doc-1']})
+        self.assertEqual(response.status_code, 200)
+        context.assert_called_once_with(['doc-1'])
+        answer.assert_called_once_with('Summarise', 'Uploaded sector notes')
 
     def test_seeded_sector_data_is_persisted_and_classified(self):
         response = self.client.get('/api/memd/overview')

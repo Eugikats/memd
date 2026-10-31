@@ -187,7 +187,7 @@ def item(item_no):
 @app.post("/api/ask")
 def ask():
     body = request.get_json(force=True)
-    res = M.answer(body.get("question", "")[:1000])
+    res = M.answer(body.get("question", "")[:1000], documents.context_block(body.get("documents", [])[:4]))
     res["question"] = body.get("question", "")[:1000]
     return app.response_class(json.dumps(res, default=str), mimetype="application/json")
 
