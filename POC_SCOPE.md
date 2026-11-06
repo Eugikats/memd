@@ -8,10 +8,10 @@
 
 Suggested walk-through:
 
-1. Start on the Command Centre and show four sector trend charts drawn from stored indicator-period records.
-2. Open Data catalogue, change one indicator value, return to Command Centre, and point out that the graph now reflects the changed database record.
+1. Start on the Command Centre and show four sector KPI values and period changes drawn from stored indicator-period records. The wave graphic is decorative and does not plot the observations.
+2. Open Data catalogue, change a latest-period indicator value, return to Command Centre, and point out that the corresponding KPI reflects the changed database record.
 3. Open Pipeline digital twin, select an asset, orbit/zoom the 3D scene, inspect recent telemetry, then change a reading and show that it is persisted and plotted.
-4. Ask the assistant a sector question. Show its evidence records and explicitly identify that the figures are synthetic. If Azure OpenAI is configured, it explains only the records supplied to it; otherwise the local evidence response remains available.
+4. Ask the assistant a sector question and identify that the figures are synthetic. If Azure OpenAI is configured, it explains the records supplied to it; otherwise the local evidence response remains available. The current main chat does not expose its structured evidence payload as clickable citations; closing this gap is in the BRD build plan.
 5. Upload an `.xlsx` template with an exact indicator label in one cell and a blank adjacent value cell, or a `{{MINERAL_PRODUCTION_VALUE}}` placeholder. Review the formula/style scan and download the generated workbook.
 6. Close with the boundary: this is a workflow prototype. A Ministry or operator pilot needs agreed data owners, access, identifiers, reporting definitions, security review, and technical validation.
 
@@ -19,7 +19,7 @@ Suggested walk-through:
 
 | Workflow | POC behavior | Stored state |
 |---|---|---|
-| Sector dashboard | Four time-series charts plus KPI cards | `indicators` table |
+| Sector dashboard | Four database-backed KPIs with period changes and a static decorative wave | `indicators` table |
 | Pipeline twin | WebGL three-dimensional pipeline scene, asset selection, latest measurements, telemetry history | `assets` and `telemetry` tables |
 | Telemetry adjustment | Validate and append a reading; flag high vibration or low pressure for review | `telemetry`; high-severity assets update in `assets` |
 | Sector assistant | Offline evidence answer; optional Azure OpenAI summary constrained to database facts | Database is read-only to the answer path |
@@ -36,7 +36,9 @@ The routes are implemented in `app.py`; SQLite and report processing are in `pul
 - Example high-vibration asset to exercise exception handling.
 - Local storage path: `data/memd.sqlite3`; uploaded template outputs: `data/uploaded_templates/`.
 
-Changing indicator values changes the overview API and its charts after reloading. Changing telemetry appends a timestamped database row and refreshes the selected asset view. Seed data is created only when the corresponding tables are empty; to reset the local seed database, stop the server and remove `data/memd.sqlite3` before the next start.
+Changing indicator values changes the overview API and relevant KPI values after reloading; the homepage wave image stays unchanged. Changing telemetry appends a timestamped database row and refreshes the selected asset chart. Seed data is created on initialisation when the indicator table is empty; to reset the local seed database, stop the server and remove `data/memd.sqlite3` before the next start.
+
+See the [BRD gap assessment and build plan](docs/BRD_BUILD_PLAN.md) for outstanding requirements and implementation acceptance gates.
 
 ## Report reproduction boundary
 

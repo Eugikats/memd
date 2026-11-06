@@ -2,31 +2,35 @@
 
 A Ministry of Energy and Mineral Development decision-intelligence proof of concept, built on the Mulwana POC's web application shell. The Ministry version keeps the source app's compact navigation and card-based visual style while replacing its visible workflows with sector indicators, a pipeline-asset twin, evidence questions, a data catalogue, and report-template processing.
 
+Repository: [Eugikats/memd](https://github.com/Eugikats/memd), branch `main`.
+
+Read the [BRD gap assessment and build plan](docs/BRD_BUILD_PLAN.md) for the current gaps, delivery sequence and acceptance checks. The platform is not yet fully aligned with the BRD; the plan is a backlog, not a completion claim. The current application uses the Mulwana baseline; [CIP](https://github.com/Otic-Group/CIP_Web_App) remains a reference for future reuse.
+
 ## Run locally
 
 From PowerShell in this folder:
 
 ```powershell
-\.venv\Scripts\python.exe app.py
+.\.venv\Scripts\python.exe app.py
 ```
 
 Open [http://127.0.0.1:8054](http://127.0.0.1:8054). If the port is occupied, set another port first:
 
 ```powershell
 $env:PORT = "8055"
-\.venv\Scripts\python.exe app.py
+.\.venv\Scripts\python.exe app.py
 ```
 
 If `.venv` has not been created yet:
 
 ```powershell
 python -m venv .venv
-\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 ## What works in this POC
 
-- **Command Centre:** sector indicator trends for minerals, petroleum, energy, and strategic projects, drawn from the local database.
+- **Command Centre:** KPI values and period changes for minerals, petroleum, energy, and strategic projects, drawn from the local database. The original Mulwana wave is a decorative image, not a data-driven chart. Actual telemetry charts are available in the twin.
 - **Pipeline digital twin:** interactive 3D station and pipeline scene, asset selector, telemetry history, and editable readings. Changes are written to SQLite and immediately affect the asset view.
 - **Ask the assistant:** Azure OpenAI analyses the records supplied from the SQLite workspace, cites periods and measures, and states evidence limits. If Azure is unavailable, a deterministic evidence response remains available.
 - **Pipeline monitoring:** request an Azure analysis of an asset's recent telemetry. It identifies measured changes and alert readings, while leaving safety conclusions and operating decisions to the operator.
