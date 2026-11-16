@@ -7,6 +7,7 @@ from datetime import datetime
 from flask import Flask, Response, jsonify, request, send_file, send_from_directory
 
 from pulse import agent as A
+from pulse import auth
 from pulse import command, documents, extract, model
 from pulse import excel_jobs
 from pulse import mail
@@ -185,6 +186,7 @@ def item(item_no):
 
 
 @app.post("/api/ask")
+@auth.require_role("viewer")
 def ask():
     body = request.get_json(force=True)
     res = M.answer(body.get("question", "")[:1000], documents.context_block(body.get("documents", [])[:4]))
@@ -193,19 +195,33 @@ def ask():
 
 
 @app.get("/api/memd/overview")
+@auth.require_role("viewer")
 def memd_overview():
     return _json(M.overview())
 
 
+@app.get("/api/memd/evidence")
+@auth.require_role("viewer")
+def memd_evidence():
+    return _json(M.get_evidence(
+        sector=request.args.get("sector") or None,
+        metric=request.args.get("metric") or None,
+        period=request.args.get("period") or None,
+    ))
+
+
 @app.post("/api/memd/indicator")
+@auth.require_role("analyst")
 def memd_indicator_update():
+    actor = auth.current_actor()
     try:
-        return _json(M.update_indicator(request.get_json(force=True)))
+        return _json(M.update_indicator(request.get_json(force=True), actor=actor["actor"], role=actor["role"]))
     except (KeyError, ValueError, TypeError) as exc:
         return _json({"error": str(exc)}, 400)
 
 
 @app.get("/api/memd/twin/<asset_id>")
+@auth.require_role("viewer")
 def memd_twin(asset_id):
     assets = M.overview()["assets"]
     asset = next((a for a in assets if a["id"] == asset_id), None)
@@ -215,6 +231,7 @@ def memd_twin(asset_id):
 
 
 @app.post("/api/memd/twin/<asset_id>/analysis")
+@auth.require_role("viewer")
 def memd_twin_analysis(asset_id):
     try:
         return _json(M.analyze_asset(asset_id))
@@ -223,32 +240,39 @@ def memd_twin_analysis(asset_id):
 
 
 @app.post("/api/memd/twin/<asset_id>/telemetry")
+@auth.require_role("analyst")
 def memd_twin_update(asset_id):
+    actor = auth.current_actor()
     try:
-        return _json(M.set_reading(asset_id, request.get_json(force=True)))
+        return _json(M.set_reading(asset_id, request.get_json(force=True), actor=actor["actor"], role=actor["role"]))
     except (KeyError, ValueError, TypeError) as exc:
         return _json({"error": str(exc)}, 400)
 
 
 @app.post("/api/memd/reports/template")
+@auth.require_role("analyst")
 def memd_report_template():
     try:
-        result = M.inspect_and_generate(request.files.get("file"))
+        target_period = request.form.get("period") or None
+        result = M.inspect_and_generate(request.files.get("file"), target_period=target_period)
     except ValueError as exc:
         return _json({"error": str(exc)}, 400)
     return _json(result)
 
 
 @app.post("/api/memd/reports/jobs")
+@auth.require_role("analyst")
 def memd_report_job_create():
     try:
-        result = M.create_report_job(request.files.get("file"))
+        target_period = request.form.get("period") or None
+        result = M.create_report_job(request.files.get("file"), target_period=target_period)
     except ValueError as exc:
         return _json({"error": str(exc)}, 400)
     return _json(result, 202)
 
 
 @app.get("/api/memd/reports/jobs/<job_id>")
+@auth.require_role("viewer")
 def memd_report_job_status(job_id):
     result = M.report_job(job_id)
     if result is None:
@@ -257,16 +281,129 @@ def memd_report_job_status(job_id):
 
 
 @app.get("/api/memd/reports/templates")
+@auth.require_role("viewer")
 def memd_report_templates():
     return _json(M.report_history())
 
 
 @app.get("/api/memd/reports/<rid>/download")
+@auth.require_role("viewer")
 def memd_report_download(rid):
     path = M.download_template(rid)
     if not path:
         return _json({"error": "Generated report not found"}, 404)
     return send_file(path, as_attachment=True, download_name=f"MEMD_report_{rid}.xlsx")
+
+
+@app.get("/api/memd/briefings")
+@auth.require_role("viewer")
+def memd_briefings_list():
+    return _json(M.list_briefings())
+
+
+@app.post("/api/memd/briefings")
+@auth.require_role("analyst")
+def memd_briefing_create():
+    actor = auth.current_actor()
+    try:
+        return _json(M.create_briefing(request.get_json(force=True), actor=actor["actor"], role=actor["role"]), 201)
+    except (ValueError, TypeError) as exc:
+        return _json({"error": str(exc)}, 400)
+
+
+@app.post("/api/memd/briefings/<bid>")
+@auth.require_role("analyst")
+def memd_briefing_update(bid):
+    actor = auth.current_actor()
+    try:
+        return _json(M.update_briefing(bid, request.get_json(force=True), actor=actor["actor"], role=actor["role"]))
+    except KeyError as exc:
+        return _json({"error": str(exc)}, 404)
+    except (ValueError, TypeError) as exc:
+        return _json({"error": str(exc)}, 400)
+
+
+@app.get("/api/memd/briefings/<bid>/docx")
+@auth.require_role("viewer")
+def memd_briefing_docx(bid):
+    try:
+        buf = M.export_briefing_docx(bid)
+    except KeyError as exc:
+        return _json({"error": str(exc)}, 404)
+    return send_file(buf, as_attachment=True, download_name=f"{bid}.docx", mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+
+
+@app.post("/api/memd/rules")
+@auth.require_role("steward")
+def memd_rule_create():
+    actor = auth.current_actor()
+    try:
+        return _json(M.create_rule(request.get_json(force=True), actor=actor["actor"], role=actor["role"]), 201)
+    except (KeyError, ValueError, TypeError) as exc:
+        return _json({"error": str(exc)}, 400)
+
+
+@app.post("/api/memd/rules/evaluate")
+@auth.require_role("steward")
+def memd_rules_evaluate():
+    actor = auth.current_actor()
+    return _json({"created": M.evaluate_rules(actor=actor["actor"], role=actor["role"])})
+
+
+@app.get("/api/memd/exceptions")
+@auth.require_role("viewer")
+def memd_exceptions_list():
+    return _json(M.list_exceptions())
+
+
+@app.get("/api/memd/followups")
+@auth.require_role("viewer")
+def memd_followups_list():
+    return _json(M.list_followups())
+
+
+@app.post("/api/memd/followups")
+@auth.require_role("analyst")
+def memd_followup_create():
+    actor = auth.current_actor()
+    try:
+        return _json(M.create_followup(request.get_json(force=True), actor=actor["actor"], role=actor["role"]), 201)
+    except (ValueError, TypeError) as exc:
+        return _json({"error": str(exc)}, 400)
+
+
+@app.post("/api/memd/followups/<fid>")
+@auth.require_role("analyst")
+def memd_followup_update(fid):
+    actor = auth.current_actor()
+    try:
+        return _json(M.update_followup(fid, request.get_json(force=True), actor=actor["actor"], role=actor["role"]))
+    except KeyError as exc:
+        return _json({"error": str(exc)}, 404)
+    except (ValueError, TypeError) as exc:
+        return _json({"error": str(exc)}, 400)
+
+
+@app.get("/api/memd/dispositions")
+@auth.require_role("viewer")
+def memd_dispositions_list():
+    return _json(M.list_dispositions())
+
+
+@app.post("/api/memd/dispositions")
+@auth.require_role("steward")
+def memd_disposition_create():
+    actor = auth.current_actor()
+    try:
+        return _json(M.record_disposition(request.get_json(force=True), actor=actor["actor"], role=actor["role"]), 201)
+    except (ValueError, TypeError) as exc:
+        return _json({"error": str(exc)}, 400)
+
+
+@app.get("/api/memd/audit")
+@auth.require_role("analyst")
+def memd_audit_list():
+    return _json(M.list_audit_events())
 
 
 @app.post("/api/playbook/<name>")
